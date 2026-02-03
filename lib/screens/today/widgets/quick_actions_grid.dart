@@ -3,8 +3,30 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 
-class QuickActionsGrid extends StatelessWidget {
+class QuickActionsGrid extends StatefulWidget {
   const QuickActionsGrid({super.key});
+
+  @override
+  State<QuickActionsGrid> createState() => _QuickActionsGridState();
+}
+
+class _QuickActionsGridState extends State<QuickActionsGrid> {
+  // Notification state for each chat type
+  int _whatsappNotifications = 3;
+  int _supportNotifications = 1;
+  int _communityNotifications = 12;
+
+  List<_BadgeIcon> get _activeBadges {
+    final badges = <_BadgeIcon>[];
+    if (_whatsappNotifications > 0) badges.add(_BadgeIcon(Icons.shopping_bag, AppColors.earningsGreen));
+    if (_supportNotifications > 0) badges.add(_BadgeIcon(Icons.support_agent, AppColors.routeBlue));
+    if (_communityNotifications > 0) badges.add(_BadgeIcon(Icons.group, AppColors.bonusPurple));
+    return badges;
+  }
+
+  void _markWhatsappRead() => setState(() => _whatsappNotifications = 0);
+  void _markSupportRead() => setState(() => _supportNotifications = 0);
+  void _markCommunityRead() => setState(() => _communityNotifications = 0);
 
   @override
   Widget build(BuildContext context) {
@@ -16,6 +38,7 @@ class QuickActionsGrid extends StatelessWidget {
             label: 'Bot',
             color: AppColors.earningsGreen,
             onTap: () => _showBotOptions(context),
+            badges: _activeBadges,
           ),
         ),
         const SizedBox(width: 12),
@@ -76,6 +99,8 @@ class QuickActionsGrid extends StatelessWidget {
               AppColors.earningsGreen,
               cs,
               context,
+              notificationCount: _whatsappNotifications,
+              onRead: _markWhatsappRead,
             ),
             _botItem(
               Icons.support_agent,
@@ -84,6 +109,8 @@ class QuickActionsGrid extends StatelessWidget {
               AppColors.routeBlue,
               cs,
               context,
+              notificationCount: _supportNotifications,
+              onRead: _markSupportRead,
             ),
             _botItem(
               Icons.group,
@@ -92,6 +119,8 @@ class QuickActionsGrid extends StatelessWidget {
               AppColors.bonusPurple,
               cs,
               context,
+              notificationCount: _communityNotifications,
+              onRead: _markCommunityRead,
             ),
             const SizedBox(height: 8),
           ],
@@ -100,10 +129,11 @@ class QuickActionsGrid extends StatelessWidget {
     );
   }
 
-  Widget _botItem(IconData icon, String title, String subtitle, Color color, ColorScheme cs, BuildContext context) {
+  Widget _botItem(IconData icon, String title, String subtitle, Color color, ColorScheme cs, BuildContext context, {int notificationCount = 0, VoidCallback? onRead}) {
     return InkWell(
       onTap: () {
         Navigator.pop(context);
+        onRead?.call();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Apertura $title...'),
@@ -117,14 +147,42 @@ class QuickActionsGrid extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 22),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 22),
+                ),
+                if (notificationCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: cs.surface, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 18),
+                      child: Text(
+                        notificationCount > 99 ? '99+' : '$notificationCount',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -224,17 +282,25 @@ class QuickActionsGrid extends StatelessWidget {
   }
 }
 
+class _BadgeIcon {
+  final IconData icon;
+  final Color color;
+  const _BadgeIcon(this.icon, this.color);
+}
+
 class _ActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final List<_BadgeIcon> badges;
 
   const _ActionTile({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    this.badges = const [],
   });
 
   @override
@@ -252,7 +318,31 @@ class _ActionTile extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 28, color: color),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(icon, size: 28, color: color),
+                  if (badges.isNotEmpty)
+                    Positioned(
+                      top: -8,
+                      right: -16,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: badges.map((b) => Container(
+                          width: 16,
+                          height: 16,
+                          margin: const EdgeInsets.only(left: 2),
+                          decoration: BoxDecoration(
+                            color: b.color.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: b.color, width: 1.5),
+                          ),
+                          child: Icon(b.icon, size: 9, color: b.color),
+                        )).toList(),
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(height: 8),
               Text(
                 label,
