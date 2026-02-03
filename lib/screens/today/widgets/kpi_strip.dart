@@ -36,17 +36,125 @@ class KpiStrip extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _KpiCard(
-            label: 'STREAK',
-            value: '12',
-            goal: '15',
-            progress: 0.80,
+            label: 'SHOP',
+            value: '3',
+            goal: '10',
+            progress: 0.30,
             color: AppColors.turboOrange,
-            icon: Icons.local_fire_department,
-            suffix: 'gg',
-            onTap: () => context.go('/you'),
+            icon: Icons.storefront,
+            suffix: 'nuovi',
+            onTap: () => _showShopOrders(context),
           ),
         ),
       ],
+    );
+  }
+
+  void _showShopOrders(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.storefront, color: AppColors.turboOrange, size: 22),
+                const SizedBox(width: 10),
+                Text(
+                  'Il tuo Shop',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.earningsGreen.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '€45 comm.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.earningsGreen,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Stats row
+            Row(
+              children: [
+                _ShopStat(label: 'Prodotti attivi', value: '12', color: AppColors.turboOrange),
+                const SizedBox(width: 12),
+                _ShopStat(label: 'Ordini settimana', value: '6', color: AppColors.routeBlue),
+                const SizedBox(width: 12),
+                _ShopStat(label: 'Comm. mese', value: '€180', color: AppColors.earningsGreen),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Ordini in attesa',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _ShopOrderItem(
+              customer: 'Anna V.',
+              product: 'Energy Drink Box',
+              amount: '€15.00',
+              status: 'Nuovo',
+              statusColor: AppColors.routeBlue,
+            ),
+            _ShopOrderItem(
+              customer: 'Paolo G.',
+              product: 'Snack Box',
+              amount: '€12.00',
+              status: 'In corso',
+              statusColor: AppColors.turboOrange,
+            ),
+            _ShopOrderItem(
+              customer: 'Maria L.',
+              product: 'Protein Bar Pack',
+              amount: '€18.00',
+              status: 'Nuovo',
+              statusColor: AppColors.routeBlue,
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.go('/market');
+                },
+                child: Text(
+                  'Vai al Market →',
+                  style: GoogleFonts.inter(
+                    color: AppColors.turboOrange,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -345,6 +453,127 @@ class _KpiCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ShopStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _ShopStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 9,
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopOrderItem extends StatelessWidget {
+  final String customer;
+  final String product;
+  final String amount;
+  final String status;
+  final Color statusColor;
+
+  const _ShopOrderItem({
+    required this.customer,
+    required this.product,
+    required this.amount,
+    required this.status,
+    required this.statusColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  customer,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                ),
+                Text(
+                  product,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            amount,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.earningsGreen,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              status,
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: statusColor,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

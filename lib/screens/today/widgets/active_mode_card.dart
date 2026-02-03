@@ -167,7 +167,7 @@ class ActiveModeCard extends StatelessWidget {
 
     switch (_mode) {
       case 'delivering':
-        label = 'NAVIGA';
+        label = 'ACCETTA E VAI';
         bgColor = AppColors.turboOrange;
         textColor = Colors.white;
         isOutline = false;
@@ -216,12 +216,21 @@ class ActiveModeCard extends StatelessWidget {
                 ),
                 elevation: 0,
               ),
-              child: Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  if (_mode == 'delivering') ...[
+                    const SizedBox(width: 8),
+                    const Icon(Icons.arrow_forward, size: 18),
+                  ],
+                ],
               ),
             ),
     );
