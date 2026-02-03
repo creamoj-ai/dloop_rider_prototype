@@ -12,10 +12,10 @@ class QuickActionsGrid extends StatelessWidget {
       children: [
         Expanded(
           child: _ActionTile(
-            icon: Icons.route,
-            label: 'Route',
+            icon: Icons.smart_toy,
+            label: 'Bot',
             color: AppColors.earningsGreen,
-            onTap: () => context.push('/today/route'),
+            onTap: () => _showBotOptions(context),
           ),
         ),
         const SizedBox(width: 12),
@@ -37,6 +37,122 @@ class QuickActionsGrid extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  void _showBotOptions(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.smart_toy, color: AppColors.earningsGreen, size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  'Bot & Chat',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _botItem(
+              Icons.shopping_bag,
+              'WhatsApp Market Bot',
+              'Gestisci ordini del tuo marketplace',
+              AppColors.earningsGreen,
+              cs,
+              context,
+            ),
+            _botItem(
+              Icons.support_agent,
+              'Supporto Rider',
+              'Parla con il supporto dloop',
+              AppColors.routeBlue,
+              cs,
+              context,
+            ),
+            _botItem(
+              Icons.group,
+              'Community Riders',
+              'Chat gruppo riders della tua zona',
+              AppColors.bonusPurple,
+              cs,
+              context,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _botItem(IconData icon, String title, String subtitle, Color color, ColorScheme cs, BuildContext context) {
+    return InkWell(
+      onTap: () {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Apertura $title...'),
+            backgroundColor: color,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 20),
+          ],
+        ),
+      ),
     );
   }
 

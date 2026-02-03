@@ -71,6 +71,24 @@ class HotZones extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.push('/today/route'),
+            icon: const Icon(Icons.route, size: 18),
+            label: Text(
+              'VEDI ROUTE OTTIMIZZATA',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.earningsGreen,
+              side: BorderSide(color: AppColors.earningsGreen.withOpacity(0.4)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'widgets/kpi_strip.dart';
 import 'widgets/active_mode_card.dart';
 import 'widgets/hot_zones.dart';
+import 'widgets/wellness_card.dart';
 import 'widgets/quick_actions_grid.dart';
 
 class TodayScreen extends StatelessWidget {
@@ -25,6 +26,8 @@ class TodayScreen extends StatelessWidget {
                 HotZones(),
                 SizedBox(height: 24),
                 QuickActionsGrid(),
+                SizedBox(height: 24),
+                WellnessCard(),
                 SizedBox(height: 24),
               ],
             ),

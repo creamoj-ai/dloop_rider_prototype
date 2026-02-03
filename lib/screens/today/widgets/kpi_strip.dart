@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 
@@ -7,28 +8,223 @@ class KpiStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Row(
       children: [
-        Expanded(child: _KpiCard(
-          label: 'GUADAGNO OGGI',
-          value: '€ 142.60',
-          trailing: Icon(Icons.trending_up, size: 16, color: AppColors.earningsGreen),
-        )),
-        const SizedBox(width: 12),
-        Expanded(child: _KpiCard(
-          label: 'ORDINI',
-          value: '8',
-          trailing: Icon(Icons.circle, size: 8, color: cs.onSurfaceVariant),
-        )),
-        const SizedBox(width: 12),
-        Expanded(child: _KpiCard(
-          label: 'STREAK',
-          value: '12 giorni',
-          trailing: Icon(Icons.local_fire_department, size: 16, color: AppColors.turboOrange),
-        )),
+        Expanded(
+          child: _KpiCard(
+            label: 'GUADAGNO',
+            value: '€ 142',
+            goal: '€ 180',
+            progress: 0.79,
+            color: AppColors.earningsGreen,
+            icon: Icons.euro,
+            onTap: () => context.go('/money'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _KpiCard(
+            label: 'ORDINI',
+            value: '8',
+            goal: '12',
+            progress: 0.67,
+            color: AppColors.routeBlue,
+            icon: Icons.inventory_2,
+            onTap: () => _showTodayOrders(context),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _KpiCard(
+            label: 'STREAK',
+            value: '12',
+            goal: '15',
+            progress: 0.80,
+            color: AppColors.turboOrange,
+            icon: Icons.local_fire_department,
+            suffix: 'gg',
+            onTap: () => context.go('/you'),
+          ),
+        ),
       ],
+    );
+  }
+
+  void _showTodayOrders(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.inventory_2, color: AppColors.routeBlue, size: 22),
+                const SizedBox(width: 10),
+                Text(
+                  'Ordini di oggi',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.earningsGreen.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '8 completati',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.earningsGreen,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _OrderItem(
+              time: '14:32',
+              restaurant: 'Pizzeria Da Mario',
+              address: 'Via Roma 15',
+              earning: '€ 4.50',
+              status: 'completed',
+            ),
+            _OrderItem(
+              time: '13:58',
+              restaurant: 'Sushi Zen',
+              address: 'Corso Buenos Aires 12',
+              earning: '€ 5.80',
+              status: 'completed',
+            ),
+            _OrderItem(
+              time: '13:21',
+              restaurant: "McDonald's",
+              address: 'Piazza Duomo 1',
+              earning: '€ 3.90',
+              status: 'completed',
+            ),
+            _OrderItem(
+              time: '12:45',
+              restaurant: 'Poke House',
+              address: 'Via Torino 8',
+              earning: '€ 4.80',
+              status: 'completed',
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.go('/money');
+                },
+                child: Text(
+                  'Vedi tutti in Money →',
+                  style: GoogleFonts.inter(
+                    color: AppColors.routeBlue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderItem extends StatelessWidget {
+  final String time;
+  final String restaurant;
+  final String address;
+  final String earning;
+  final String status;
+
+  const _OrderItem({
+    required this.time,
+    required this.restaurant,
+    required this.address,
+    required this.earning,
+    required this.status,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          // Time
+          SizedBox(
+            width: 45,
+            child: Text(
+              time,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+          // Status dot
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: status == 'completed'
+                  ? AppColors.earningsGreen
+                  : AppColors.turboOrange,
+              shape: BoxShape.circle,
+            ),
+          ),
+          // Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  restaurant,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                ),
+                Text(
+                  address,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Earning
+          Text(
+            earning,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.earningsGreen,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -36,59 +232,119 @@ class KpiStrip extends StatelessWidget {
 class _KpiCard extends StatelessWidget {
   final String label;
   final String value;
-  final Widget? trailing;
+  final String goal;
+  final double progress;
+  final Color color;
+  final IconData icon;
+  final String? suffix;
+  final VoidCallback? onTap;
 
   const _KpiCard({
     required this.label,
     required this.value,
-    this.trailing,
+    required this.goal,
+    required this.progress,
+    required this.color,
+    required this.icon,
+    this.suffix,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final percentage = (progress * 100).toInt();
 
-    return Container(
-      height: 88,
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: cs.onSurfaceVariant,
-              letterSpacing: 0.8,
-            ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 100,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: progress >= 0.75 ? color.withOpacity(0.3) : Colors.transparent,
+            width: 1,
           ),
-          const Spacer(),
-          Row(
-            children: [
-              Flexible(
-                child: Text(
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header: label + icon
+            Row(
+              children: [
+                Icon(icon, size: 12, color: color),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurfaceVariant,
+                      letterSpacing: 0.8,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            // Value
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
                   value,
                   style: GoogleFonts.inter(
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: cs.onSurface,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              if (trailing != null) ...[
-                const SizedBox(width: 4),
-                trailing!,
+                if (suffix != null) ...[
+                  const SizedBox(width: 2),
+                  Text(
+                    suffix!,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 6),
+            // Progress bar + percentage
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: cs.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation(color),
+                      minHeight: 4,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$percentage%',
+                  style: GoogleFonts.inter(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: progress >= 0.75 ? color : cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
