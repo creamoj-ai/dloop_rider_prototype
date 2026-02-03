@@ -50,7 +50,7 @@ class ActiveModeCard extends StatelessWidget {
   String get _chipLabel {
     switch (_mode) {
       case 'delivering':
-        return 'DELIVERING';
+        return 'IN CONSEGNA';
       case 'growing':
         return 'GROWING';
       default:

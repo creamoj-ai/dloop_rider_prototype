@@ -78,14 +78,14 @@ class _AnimatedBottomNav extends StatelessWidget {
                 children: [
                   _NavItem(
                     icon: Icons.bolt,
-                    label: 'Today',
+                    label: 'Oggi',
                     isSelected: currentIndex == 0,
                     badge: _badges[0],
                     onTap: () => onTap(0),
                   ),
                   _NavItem(
                     icon: Icons.wallet,
-                    label: 'Money',
+                    label: 'Guadagni',
                     isSelected: currentIndex == 1,
                     badge: _badges[1],
                     onTap: () => onTap(1),
@@ -99,7 +99,7 @@ class _AnimatedBottomNav extends StatelessWidget {
                   ),
                   _NavItem(
                     icon: Icons.person,
-                    label: 'You',
+                    label: 'Profilo',
                     isSelected: currentIndex == 3,
                     badge: _badges[3],
                     onTap: () => onTap(3),

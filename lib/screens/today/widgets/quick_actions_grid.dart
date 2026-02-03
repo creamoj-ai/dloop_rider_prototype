@@ -16,13 +16,8 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
   int _supportNotifications = 1;
   int _communityNotifications = 12;
 
-  List<_BadgeIcon> get _activeBadges {
-    final badges = <_BadgeIcon>[];
-    if (_whatsappNotifications > 0) badges.add(_BadgeIcon(Icons.shopping_bag, AppColors.earningsGreen));
-    if (_supportNotifications > 0) badges.add(_BadgeIcon(Icons.support_agent, AppColors.routeBlue));
-    if (_communityNotifications > 0) badges.add(_BadgeIcon(Icons.group, AppColors.bonusPurple));
-    return badges;
-  }
+  int get _totalNotifications =>
+      _whatsappNotifications + _supportNotifications + _communityNotifications;
 
   void _markWhatsappRead() => setState(() => _whatsappNotifications = 0);
   void _markSupportRead() => setState(() => _supportNotifications = 0);
@@ -35,17 +30,17 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
         Expanded(
           child: _ActionTile(
             icon: Icons.smart_toy,
-            label: 'Bot',
+            label: 'Assistente',
             color: AppColors.earningsGreen,
             onTap: () => _showBotOptions(context),
-            badges: _activeBadges,
+            badgeCount: _totalNotifications,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _ActionTile(
             icon: Icons.build,
-            label: 'Toolkit',
+            label: 'Strumenti',
             color: AppColors.statsGold,
             onTap: () => _showToolkit(context),
           ),
@@ -54,7 +49,7 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
         Expanded(
           child: _ActionTile(
             icon: Icons.emoji_events,
-            label: 'Motivation',
+            label: 'Obiettivi',
             color: AppColors.bonusPurple,
             onTap: () => _showMotivation(context),
           ),
@@ -82,7 +77,7 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
                 const Icon(Icons.smart_toy, color: AppColors.earningsGreen, size: 24),
                 const SizedBox(width: 10),
                 Text(
-                  'Bot & Chat',
+                  'Assistente & Chat',
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -228,7 +223,7 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Toolkit', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            Text('Strumenti', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
             const SizedBox(height: 16),
             _sheetItem(Icons.calculate, 'Calcolatore guadagni', cs),
             _sheetItem(Icons.timer, 'Timer turno', cs),
@@ -255,7 +250,7 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Motivation', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            Text('Obiettivi', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
             const SizedBox(height: 16),
             _sheetItem(Icons.local_fire_department, 'Streak: 12 giorni consecutivi', cs),
             _sheetItem(Icons.star, 'Valutazione: 4.9 / 5.0', cs),
@@ -282,25 +277,19 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
   }
 }
 
-class _BadgeIcon {
-  final IconData icon;
-  final Color color;
-  const _BadgeIcon(this.icon, this.color);
-}
-
 class _ActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback onTap;
-  final List<_BadgeIcon> badges;
+  final int badgeCount;
 
   const _ActionTile({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
-    this.badges = const [],
+    this.badgeCount = 0,
   });
 
   @override
@@ -322,23 +311,27 @@ class _ActionTile extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   Icon(icon, size: 28, color: color),
-                  if (badges.isNotEmpty)
+                  if (badgeCount > 0)
                     Positioned(
-                      top: -8,
-                      right: -16,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: badges.map((b) => Container(
-                          width: 16,
-                          height: 16,
-                          margin: const EdgeInsets.only(left: 2),
-                          decoration: BoxDecoration(
-                            color: b.color.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: b.color, width: 1.5),
+                      top: -6,
+                      right: -10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.urgentRed,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: cs.surface, width: 1.5),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 18),
+                        child: Text(
+                          badgeCount > 99 ? '99+' : '$badgeCount',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
-                          child: Icon(b.icon, size: 9, color: b.color),
-                        )).toList(),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
                 ],

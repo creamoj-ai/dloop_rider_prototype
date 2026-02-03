@@ -119,10 +119,10 @@ class _HotZonesState extends State<HotZones> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () => context.push('/today/zone'),
-            icon: const Icon(Icons.map, size: 18),
+            onPressed: () => _showExploreOptions(context),
+            icon: const Icon(Icons.explore, size: 18),
             label: Text(
-              'VEDI MAPPA COMPLETA',
+              'ESPLORA ZONE',
               style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
             ),
             style: OutlinedButton.styleFrom(
@@ -133,25 +133,64 @@ class _HotZonesState extends State<HotZones> {
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => context.push('/today/route'),
-            icon: const Icon(Icons.route, size: 18),
-            label: Text(
-              'VEDI ROUTE OTTIMIZZATA',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.earningsGreen,
-              side: BorderSide(color: AppColors.earningsGreen.withOpacity(0.4)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
-        ),
       ],
+    );
+  }
+
+  void _showExploreOptions(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.explore, color: AppColors.routeBlue, size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  'Esplora Zone',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _ExploreOption(
+              icon: Icons.map,
+              title: 'Mappa Completa',
+              subtitle: 'Visualizza tutte le zone sulla mappa',
+              color: AppColors.routeBlue,
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/today/zone');
+              },
+            ),
+            const SizedBox(height: 12),
+            _ExploreOption(
+              icon: Icons.route,
+              title: 'Guadagna di Più',
+              subtitle: 'Percorso smart per più ordini e meno km',
+              color: AppColors.earningsGreen,
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/today/route');
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -238,6 +277,68 @@ class _ZoneCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExploreOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ExploreOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: color, size: 22),
           ],
         ),
       ),

@@ -36,7 +36,7 @@ class KpiStrip extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _KpiCard(
-            label: 'SHOP',
+            label: 'MYSHOP',
             value: '3',
             goal: '10',
             progress: 0.30,
@@ -69,7 +69,7 @@ class KpiStrip extends StatelessWidget {
                 const Icon(Icons.storefront, color: AppColors.turboOrange, size: 22),
                 const SizedBox(width: 10),
                 Text(
-                  'Il tuo Shop',
+                  'MyShop',
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,

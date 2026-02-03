@@ -79,7 +79,7 @@ class _WellnessCardState extends State<WellnessCard> {
         ),
         const SizedBox(width: 8),
         Text(
-          'WELLNESS',
+          'BENESSERE',
           style: GoogleFonts.inter(
             fontSize: 11,
             fontWeight: FontWeight.w700,
