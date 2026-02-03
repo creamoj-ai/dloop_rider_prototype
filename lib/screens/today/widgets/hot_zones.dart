@@ -2,9 +2,45 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
+import '../../../models/zone_data.dart';
+import '../../../services/zones_service.dart';
 
-class HotZones extends StatelessWidget {
+class HotZones extends StatefulWidget {
   const HotZones({super.key});
+
+  @override
+  State<HotZones> createState() => _HotZonesState();
+}
+
+class _HotZonesState extends State<HotZones> {
+  List<ZoneData> _zones = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadZones();
+  }
+
+  Future<void> _loadZones() async {
+    try {
+      final zones = await ZonesService.getHotZones();
+      if (mounted) {
+        setState(() {
+          _zones = zones;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,18 +76,44 @@ class HotZones extends StatelessWidget {
                 ),
               ),
             ),
+            const Spacer(),
+            // Refresh button
+            IconButton(
+              onPressed: _isLoading ? null : () {
+                setState(() => _isLoading = true);
+                _loadZones();
+              },
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+                    )
+                  : const Icon(Icons.refresh, color: Colors.white54, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
           ],
         ),
         const SizedBox(height: 12),
         // Scrollable zone cards
         SizedBox(
           height: 120,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _zones.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _ZoneCard(zone: _zones[i]),
-          ),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: AppColors.turboOrange))
+              : _error != null
+                  ? Center(
+                      child: Text(
+                        'Errore caricamento zone',
+                        style: GoogleFonts.inter(color: Colors.white54, fontSize: 12),
+                      ),
+                    )
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _zones.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, i) => _ZoneCard(zone: _zones[i]),
+                    ),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -94,46 +156,20 @@ class HotZones extends StatelessWidget {
   }
 }
 
-enum _Demand { alta, media, bassa }
-
-class _ZoneData {
-  final String name;
-  final _Demand demand;
-  final String ordersHour;
-  final String distance;
-  final String earning;
-
-  const _ZoneData({
-    required this.name,
-    required this.demand,
-    required this.ordersHour,
-    required this.distance,
-    required this.earning,
-  });
-}
-
-const _zones = [
-  _ZoneData(name: 'Milano Centro', demand: _Demand.alta, ordersHour: '~12 ordini/h', distance: '0.5 km', earning: '€16-20/h'),
-  _ZoneData(name: 'Navigli', demand: _Demand.alta, ordersHour: '~10 ordini/h', distance: '1.2 km', earning: '€14-18/h'),
-  _ZoneData(name: 'Porta Romana', demand: _Demand.media, ordersHour: '~8 ordini/h', distance: '2.0 km', earning: '€12-15/h'),
-  _ZoneData(name: 'Isola', demand: _Demand.media, ordersHour: '~6 ordini/h', distance: '3.1 km', earning: '€10-13/h'),
-  _ZoneData(name: 'Città Studi', demand: _Demand.bassa, ordersHour: '~4 ordini/h', distance: '4.5 km', earning: '€8-10/h'),
-];
-
-Color _demandColor(_Demand d) => switch (d) {
-  _Demand.alta => AppColors.earningsGreen,
-  _Demand.media => AppColors.statsGold,
-  _Demand.bassa => Colors.grey,
+Color _demandColor(ZoneDemand d) => switch (d) {
+  ZoneDemand.alta => AppColors.earningsGreen,
+  ZoneDemand.media => AppColors.statsGold,
+  ZoneDemand.bassa => Colors.grey,
 };
 
-String _demandLabel(_Demand d) => switch (d) {
-  _Demand.alta => 'ALTA',
-  _Demand.media => 'MEDIA',
-  _Demand.bassa => 'BASSA',
+String _demandLabel(ZoneDemand d) => switch (d) {
+  ZoneDemand.alta => 'ALTA',
+  ZoneDemand.media => 'MEDIA',
+  ZoneDemand.bassa => 'BASSA',
 };
 
 class _ZoneCard extends StatelessWidget {
-  final _ZoneData zone;
+  final ZoneData zone;
   const _ZoneCard({required this.zone});
 
   @override
@@ -153,7 +189,7 @@ class _ZoneCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Name + demand badge
+            // Name
             Row(
               children: [
                 Expanded(
@@ -187,7 +223,7 @@ class _ZoneCard extends StatelessWidget {
             ),
             // Stats row
             Text(
-              '${zone.ordersHour}  •  ${zone.distance}',
+              '${zone.ordersHourLabel}  •  ${zone.distanceLabel}',
               style: GoogleFonts.inter(
                 color: Colors.white54,
                 fontSize: 11,
@@ -195,7 +231,7 @@ class _ZoneCard extends StatelessWidget {
             ),
             // Earning
             Text(
-              zone.earning,
+              zone.earningLabel,
               style: GoogleFonts.inter(
                 color: Colors.white,
                 fontSize: 14,
