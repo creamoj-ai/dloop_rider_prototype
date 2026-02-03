@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/dloop_top_bar.dart';
 
 class MarketTabScreen extends StatelessWidget {
   const MarketTabScreen({super.key});
@@ -20,14 +21,25 @@ class MarketTabScreen extends StatelessWidget {
         },
       ),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+        child: Column(
+          children: [
+            DloopTopBar(
+              isOnline: true,
+              notificationCount: 0,
+              searchHint: 'Cerca prodotti...',
+              onSearchTap: () {
+                // TODO: Implementare ricerca prodotti
+              },
+            ),
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                   // --- Dropshipping KPI Strip ---
                   Row(
                     children: [
@@ -75,11 +87,14 @@ class MarketTabScreen extends StatelessWidget {
                   _orderTile(context, 'Maria L.', 'Protein Bar Pack', '€18.00', 'Nuovo'),
                   _orderTile(context, 'Luca R.', 'Premium Water', '€8.50', 'Consegnato'),
                   _orderTile(context, 'Sara B.', 'Coffee Kit', '€22.00', 'In corso'),
-                  const SizedBox(height: 80),
-                ],
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
