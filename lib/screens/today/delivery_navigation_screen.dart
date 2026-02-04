@@ -5,17 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../theme/tokens.dart';
 import '../../providers/earnings_provider.dart';
+import '../../providers/active_orders_provider.dart';
 import '../../services/rush_hour_service.dart';
 
-/// Stati della navigazione consegna
-enum DeliveryPhase {
-  toRestaurant,   // In viaggio verso ristorante
-  atRestaurant,   // Arrivato al ristorante
-  toCustomer,     // In viaggio verso cliente
-  atCustomer,     // Arrivato dal cliente
-}
-
-/// Schermata navigazione consegna (EARN-03)
+/// Schermata gestione ordini multitasking (EARN-03 v2)
 class DeliveryNavigationScreen extends ConsumerStatefulWidget {
   final String restaurantName;
   final String restaurantAddress;
@@ -37,74 +30,62 @@ class DeliveryNavigationScreen extends ConsumerStatefulWidget {
 }
 
 class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScreen> {
-  DeliveryPhase _phase = DeliveryPhase.toRestaurant;
-
-  // Mock data per ordine
-  final List<String> _orderItems = [
-    '2x Pizza Margherita',
-    '1x Coca Cola 33cl',
-    '1x Tiramisù',
-  ];
-
-  double get _baseEarning => widget.distanceKm * 1.50;
-  double get _totalEarning => _baseEarning * RushHourService.getCurrentMultiplier();
-  bool get _isRushHour => RushHourService.isRushHourNow();
-
-  // Tempo stimato in base alla fase
-  int get _estimatedMinutes {
-    switch (_phase) {
-      case DeliveryPhase.toRestaurant:
-        return (widget.distanceKm * 2.5).round(); // ~2.5 min/km
-      case DeliveryPhase.atRestaurant:
-        return 3; // tempo ritiro
-      case DeliveryPhase.toCustomer:
-        return (widget.distanceKm * 3).round(); // ~3 min/km
-      case DeliveryPhase.atCustomer:
-        return 1;
-    }
+  @override
+  void initState() {
+    super.initState();
+    // Aggiungi l'ordine iniziale se non già presente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(activeOrdersProvider);
+      final alreadyExists = state.orders.any((o) =>
+        o.dealerName == widget.restaurantName &&
+        o.customerAddress == widget.customerAddress
+      );
+      if (!alreadyExists) {
+        ref.read(activeOrdersProvider.notifier).acceptOrder(
+          ActiveOrder(
+            id: 'order_${DateTime.now().millisecondsSinceEpoch}',
+            dealerName: widget.restaurantName,
+            dealerAddress: widget.restaurantAddress,
+            customerAddress: widget.customerAddress,
+            distanceKm: widget.distanceKm,
+            orderNotes: widget.orderNotes,
+            acceptedAt: DateTime.now(),
+          ),
+        );
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final ordersState = ref.watch(activeOrdersProvider);
+    final isRushHour = RushHourService.isRushHourNow();
+
+    // Filtra ordini non completati
+    final activeOrders = ordersState.orders
+        .where((o) => o.phase != OrderPhase.completed)
+        .toList();
 
     return Scaffold(
       backgroundColor: cs.surface,
+      floatingActionButton: _buildAddOrderFab(cs, ordersState),
       body: SafeArea(
         child: Column(
           children: [
             // Header
-            _buildHeader(cs),
-            // Mappa (placeholder)
+            _buildHeader(cs, activeOrders, ordersState.totalEarning, isRushHour),
+            // Lista ordini attivi
             Expanded(
-              flex: 3,
-              child: _buildMapPlaceholder(cs),
-            ),
-            // Info card
-            Expanded(
-              flex: 4,
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(Spacing.xl),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildStatusBadge(cs),
-                      const SizedBox(height: Spacing.lg),
-                      _buildDestinationCard(cs),
-                      const SizedBox(height: Spacing.lg),
-                      _buildOrderDetails(cs),
-                      if (widget.orderNotes != null && widget.orderNotes!.isNotEmpty) ...[
-                        const SizedBox(height: Spacing.lg),
-                        _buildNotes(cs),
-                      ],
-                      const SizedBox(height: Spacing.xl),
-                      _buildActionButtons(cs),
-                      const SizedBox(height: Spacing.lg),
-                    ],
-                  ),
-                ),
-              ),
+              child: activeOrders.isEmpty
+                  ? _buildEmptyState(cs)
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(Spacing.lg),
+                      itemCount: activeOrders.length,
+                      itemBuilder: (context, index) {
+                        return _buildOrderCard(cs, activeOrders[index], isRushHour);
+                      },
+                    ),
             ),
           ],
         ),
@@ -112,8 +93,8 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
     );
   }
 
-  /// Header con back button e info ordine
-  Widget _buildHeader(ColorScheme cs) {
+  /// Header con info generali
+  Widget _buildHeader(ColorScheme cs, List<ActiveOrder> activeOrders, double totalEarning, bool isRushHour) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.md),
       decoration: BoxDecoration(
@@ -122,18 +103,20 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
       ),
       child: Row(
         children: [
+          // Back button
           IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => _showExitConfirmation(cs),
+            onPressed: () => _showExitConfirmation(cs, activeOrders.length),
             color: cs.onSurface,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: Spacing.sm),
+          // Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Ordine in corso',
+                  'Ordini attivi',
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -141,17 +124,18 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
                   ),
                 ),
                 Text(
-                  '${widget.distanceKm} km • €${_totalEarning.toStringAsFixed(2)}',
+                  '${activeOrders.length} ${activeOrders.length == 1 ? 'ordine' : 'ordini'} • €${totalEarning.toStringAsFixed(2)}',
                   style: GoogleFonts.inter(
                     fontSize: 13,
-                    color: cs.onSurfaceVariant,
+                    color: AppColors.earningsGreen,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
           ),
-          // Badge rush hour
-          if (_isRushHour)
+          // Rush hour badge
+          if (isRushHour)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
@@ -179,78 +163,159 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
     );
   }
 
-  /// Placeholder mappa con icone percorso
-  Widget _buildMapPlaceholder(ColorScheme cs) {
+  /// Card singolo ordine
+  Widget _buildOrderCard(ColorScheme cs, ActiveOrder order, bool isRushHour) {
+    final phaseColor = _getPhaseColor(order.phase);
+    final isAtLocation = order.phase == OrderPhase.atPickup || order.phase == OrderPhase.atCustomer;
+
     return Container(
-      width: double.infinity,
-      color: cs.surfaceContainerLowest,
-      child: Stack(
+      margin: const EdgeInsets.only(bottom: Spacing.lg),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(Radii.lg),
+        border: Border.all(
+          color: phaseColor.withValues(alpha: 0.4),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Background griglia
-          CustomPaint(
-            size: Size.infinite,
-            painter: _GridPainter(cs.outlineVariant.withValues(alpha: 0.1)),
-          ),
-          // Percorso stilizzato
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+          // Header card con stato
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.md),
+            decoration: BoxDecoration(
+              color: phaseColor.withValues(alpha: 0.1),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(Radii.lg - 1)),
+            ),
+            child: Row(
               children: [
-                // Posizione attuale
-                _buildMapMarker(
-                  cs,
-                  Icons.my_location,
-                  AppColors.routeBlue,
-                  'Tu',
-                  isActive: _phase == DeliveryPhase.toRestaurant || _phase == DeliveryPhase.toCustomer,
+                // Icona stato
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: phaseColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    _getPhaseIcon(order.phase),
+                    size: 18,
+                    color: phaseColor,
+                  ),
                 ),
-                _buildRouteLine(cs, isActive: _phase == DeliveryPhase.toRestaurant),
-                // Ristorante
-                _buildMapMarker(
-                  cs,
-                  Icons.restaurant,
-                  AppColors.turboOrange,
-                  widget.restaurantName,
-                  isActive: _phase == DeliveryPhase.toRestaurant || _phase == DeliveryPhase.atRestaurant,
-                  isCompleted: _phase == DeliveryPhase.toCustomer || _phase == DeliveryPhase.atCustomer,
+                const SizedBox(width: Spacing.md),
+                // Label stato
+                Expanded(
+                  child: Text(
+                    order.phaseLabel,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: phaseColor,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
-                _buildRouteLine(cs, isActive: _phase == DeliveryPhase.toCustomer),
-                // Cliente
-                _buildMapMarker(
-                  cs,
-                  Icons.home,
-                  AppColors.earningsGreen,
-                  widget.customerAddress,
-                  isActive: _phase == DeliveryPhase.toCustomer || _phase == DeliveryPhase.atCustomer,
+                // Guadagno
+                Text(
+                  '€${order.totalEarning.toStringAsFixed(2)}',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.earningsGreen,
+                  ),
                 ),
               ],
             ),
           ),
-          // Info overlay
-          Positioned(
-            top: Spacing.lg,
-            left: Spacing.lg,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
-              decoration: BoxDecoration(
-                color: cs.surface.withValues(alpha: 0.95),
-                borderRadius: BorderRadius.circular(Radii.md),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.timer, size: 16, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 6),
-                  Text(
-                    '$_estimatedMinutes min',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
-                    ),
-                  ),
+          // Contenuto card
+          Padding(
+            padding: const EdgeInsets.all(Spacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Destinazione corrente
+                _buildDestinationRow(cs, order),
+                const SizedBox(height: Spacing.md),
+                // Note (se presenti e in fase ritiro/consegna)
+                if (order.orderNotes != null && isAtLocation) ...[
+                  _buildNotesRow(cs, order.orderNotes!),
+                  const SizedBox(height: Spacing.md),
                 ],
-              ),
+                // Azioni rapide
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildQuickAction(
+                        cs,
+                        Icons.navigation,
+                        'Naviga',
+                        AppColors.routeBlue,
+                        () => _openNavigation(_getCurrentAddress(order)),
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.md),
+                    Expanded(
+                      child: _buildQuickAction(
+                        cs,
+                        Icons.phone,
+                        'Chiama',
+                        AppColors.earningsGreen,
+                        () => _makeCall('+39 333 1234567'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Spacing.lg),
+                // Pulsante azione principale
+                Row(
+                  children: [
+                    // Pulsante annulla (piccolo)
+                    IconButton(
+                      onPressed: () => _showCancelConfirmation(cs, order),
+                      icon: const Icon(Icons.close),
+                      color: AppColors.urgentRed,
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.urgentRed.withValues(alpha: 0.1),
+                      ),
+                      tooltip: 'Annulla ordine',
+                    ),
+                    const SizedBox(width: Spacing.md),
+                    // Pulsante azione principale
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: () => _advanceOrder(order),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: phaseColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(Radii.md),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(_getActionIcon(order.phase), size: 20),
+                              const SizedBox(width: Spacing.sm),
+                              Text(
+                                order.actionLabel,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -258,108 +323,79 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
     );
   }
 
-  Widget _buildMapMarker(ColorScheme cs, IconData icon, Color color, String label, {bool isActive = false, bool isCompleted = false}) {
+  /// Riga destinazione
+  Widget _buildDestinationRow(ColorScheme cs, ActiveOrder order) {
+    final isPickupPhase = order.phase == OrderPhase.toPickup || order.phase == OrderPhase.atPickup;
+    final icon = isPickupPhase ? Icons.store : Icons.home;
+    final title = isPickupPhase ? order.dealerName : 'Cliente';
+    final address = isPickupPhase ? order.dealerAddress : order.customerAddress;
+
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: isCompleted
-                ? AppColors.earningsGreen.withValues(alpha: 0.2)
-                : isActive
-                    ? color.withValues(alpha: 0.2)
-                    : cs.outlineVariant.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: isCompleted ? AppColors.earningsGreen : isActive ? color : cs.outlineVariant,
-              width: 2,
-            ),
-          ),
-          child: Icon(
-            isCompleted ? Icons.check : icon,
-            color: isCompleted ? AppColors.earningsGreen : isActive ? color : cs.outlineVariant,
-            size: 22,
+        Icon(icon, size: 20, color: cs.onSurfaceVariant),
+        const SizedBox(width: Spacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+              ),
+              Text(
+                address,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: Spacing.md),
-        SizedBox(
-          width: 150,
+        // Distanza
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.sm + 2, vertical: Spacing.xs + 2),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(Radii.sm),
+          ),
           child: Text(
-            label,
+            '${order.distanceKm} km',
             style: GoogleFonts.inter(
               fontSize: 12,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-              color: isActive ? cs.onSurface : cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurfaceVariant,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildRouteLine(ColorScheme cs, {bool isActive = false}) {
+  /// Note ordine
+  Widget _buildNotesRow(ColorScheme cs, String notes) {
     return Container(
-      width: 2,
-      height: 30,
-      margin: const EdgeInsets.only(left: 21),
+      padding: const EdgeInsets.all(Spacing.md),
       decoration: BoxDecoration(
-        color: isActive ? AppColors.routeBlue : cs.outlineVariant.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(1),
-      ),
-    );
-  }
-
-  /// Badge stato corrente
-  Widget _buildStatusBadge(ColorScheme cs) {
-    String label;
-    Color color;
-    IconData icon;
-
-    switch (_phase) {
-      case DeliveryPhase.toRestaurant:
-        label = 'IN VIAGGIO VERSO RISTORANTE';
-        color = AppColors.routeBlue;
-        icon = Icons.directions_bike;
-        break;
-      case DeliveryPhase.atRestaurant:
-        label = 'RITIRA L\'ORDINE';
-        color = AppColors.turboOrange;
-        icon = Icons.restaurant;
-        break;
-      case DeliveryPhase.toCustomer:
-        label = 'IN CONSEGNA';
-        color = AppColors.turboOrange;
-        icon = Icons.delivery_dining;
-        break;
-      case DeliveryPhase.atCustomer:
-        label = 'CONSEGNA AL CLIENTE';
-        color = AppColors.earningsGreen;
-        icon = Icons.home;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm + 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(Radii.md),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: AppColors.statsGold.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(Radii.sm),
+        border: Border.all(color: AppColors.statsGold.withValues(alpha: 0.3)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: color,
-              letterSpacing: 0.5,
+          const Icon(Icons.info_outline, size: 16, color: AppColors.statsGold),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: Text(
+              notes,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: AppColors.statsGold,
+              ),
             ),
           ),
         ],
@@ -367,109 +403,27 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
     );
   }
 
-  /// Card destinazione corrente
-  Widget _buildDestinationCard(ColorScheme cs) {
-    final isRestaurantPhase = _phase == DeliveryPhase.toRestaurant || _phase == DeliveryPhase.atRestaurant;
-    final title = isRestaurantPhase ? widget.restaurantName : 'Cliente';
-    final address = isRestaurantPhase ? widget.restaurantAddress : widget.customerAddress;
-    final icon = isRestaurantPhase ? Icons.restaurant : Icons.home;
-    final color = isRestaurantPhase ? AppColors.turboOrange : AppColors.earningsGreen;
-
-    return Container(
-      padding: const EdgeInsets.all(Spacing.lg),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(Radii.lg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(Spacing.sm + 2),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(Radii.md),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: Spacing.md + 2),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.xs),
-                    Text(
-                      address,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: Spacing.lg),
-          // Pulsanti azione rapida
-          Row(
-            children: [
-              Expanded(
-                child: _buildQuickAction(
-                  cs,
-                  Icons.navigation,
-                  'Naviga',
-                  AppColors.routeBlue,
-                  () => _openNavigation(address),
-                ),
-              ),
-              const SizedBox(width: Spacing.md),
-              Expanded(
-                child: _buildQuickAction(
-                  cs,
-                  Icons.phone,
-                  'Chiama',
-                  AppColors.earningsGreen,
-                  () => _makeCall(isRestaurantPhase ? '+39 02 1234567' : '+39 333 1234567'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
+  /// Azione rapida
   Widget _buildQuickAction(ColorScheme cs, IconData icon, String label, Color color, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(Radii.sm + 2),
+      borderRadius: BorderRadius.circular(Radii.sm),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: Spacing.md),
+        padding: const EdgeInsets.symmetric(vertical: Spacing.sm + 2),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(Radii.sm + 2),
+          borderRadius: BorderRadius.circular(Radii.sm),
           border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: color),
+            Icon(icon, size: 16, color: color),
             const SizedBox(width: Spacing.sm),
             Text(
               label,
               style: GoogleFonts.inter(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: color,
               ),
@@ -480,95 +434,259 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
     );
   }
 
-  /// Dettagli ordine
-  Widget _buildOrderDetails(ColorScheme cs) {
+  /// FAB per aggiungere ordini
+  Widget _buildAddOrderFab(ColorScheme cs, ActiveOrdersState state) {
+    return FloatingActionButton.extended(
+      onPressed: () => _showAvailableOrdersSheet(cs, state),
+      backgroundColor: AppColors.earningsGreen,
+      foregroundColor: Colors.white,
+      icon: Badge(
+        label: Text('${state.availableOrders.length}'),
+        backgroundColor: AppColors.turboOrange,
+        child: const Icon(Icons.add_shopping_cart, size: 22),
+      ),
+      label: Text(
+        'AGGIUNGI',
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  /// Stato vuoto
+  Widget _buildEmptyState(ColorScheme cs) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2_outlined, size: 64, color: cs.outlineVariant),
+          const SizedBox(height: Spacing.lg),
+          Text(
+            'Nessun ordine attivo',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: Spacing.sm),
+          Text(
+            'Aggiungi ordini per iniziare',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: Spacing.xl),
+          ElevatedButton.icon(
+            onPressed: () {
+              final state = ref.read(activeOrdersProvider);
+              _showAvailableOrdersSheet(Theme.of(context).colorScheme, state);
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('AGGIUNGI ORDINE'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.earningsGreen,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Sheet ordini disponibili
+  void _showAvailableOrdersSheet(ColorScheme cs, ActiveOrdersState state) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.85,
+        expand: false,
+        builder: (_, scrollController) => Consumer(
+          builder: (context, ref, _) {
+            final currentState = ref.watch(activeOrdersProvider);
+            return Column(
+              children: [
+                // Handle
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(vertical: Spacing.md),
+                  decoration: BoxDecoration(
+                    color: cs.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.add_shopping_cart, color: AppColors.earningsGreen, size: 22),
+                      const SizedBox(width: Spacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ordini disponibili',
+                              style: GoogleFonts.inter(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            Text(
+                              '${currentState.availableOrders.length} nelle vicinanze',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => ref.read(activeOrdersProvider.notifier).refreshAvailableOrders(),
+                        icon: Icon(Icons.refresh, color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: Spacing.md),
+                Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.3)),
+                // Lista
+                Expanded(
+                  child: currentState.availableOrders.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Nessun ordine disponibile',
+                            style: GoogleFonts.inter(color: cs.onSurfaceVariant),
+                          ),
+                        )
+                      : ListView.separated(
+                          controller: scrollController,
+                          padding: const EdgeInsets.all(Spacing.lg),
+                          itemCount: currentState.availableOrders.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: Spacing.md),
+                          itemBuilder: (_, index) {
+                            final order = currentState.availableOrders[index];
+                            return _buildAvailableOrderCard(cs, order);
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Card ordine disponibile
+  Widget _buildAvailableOrderCard(ColorScheme cs, ActiveOrder order) {
+    final isRushHour = RushHourService.isRushHourNow();
+
     return Container(
       padding: const EdgeInsets.all(Spacing.lg),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(Radii.lg),
+        borderRadius: BorderRadius.circular(Radii.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.receipt_long, size: 18, color: cs.onSurfaceVariant),
-              const SizedBox(width: Spacing.sm + 2),
+              Icon(Icons.store, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: Spacing.sm),
+              Expanded(
+                child: Text(
+                  order.dealerName,
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ),
+              if (isRushHour) ...[
+                Text(
+                  '€${order.baseEarning.toStringAsFixed(2)}',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: cs.onSurfaceVariant,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
               Text(
-                'Dettagli ordine',
+                '€${order.totalEarning.toStringAsFixed(2)}',
                 style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurface,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.earningsGreen,
                 ),
               ),
             ],
           ),
+          const SizedBox(height: Spacing.xs),
+          Text(
+            '${order.dealerAddress} → ${order.customerAddress}',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            '${order.distanceKm} km totali',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: Spacing.md),
-          ..._orderItems.map((item) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-            child: Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: cs.onSurfaceVariant,
-                    borderRadius: BorderRadius.circular(3),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                ref.read(activeOrdersProvider.notifier).acceptOrder(order);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${order.dealerName} aggiunto!'),
+                    backgroundColor: AppColors.earningsGreen,
+                    duration: const Duration(seconds: 2),
                   ),
+                );
+              },
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(
+                'ACCETTA ORDINE',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(width: Spacing.sm + 2),
-                Text(
-                  item,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: cs.onSurfaceVariant,
-                  ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.earningsGreen,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Radii.sm),
                 ),
-              ],
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  /// Note ordine
-  Widget _buildNotes(ColorScheme cs) {
-    return Container(
-      padding: const EdgeInsets.all(Spacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.statsGold.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(Radii.lg),
-        border: Border.all(color: AppColors.statsGold.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline, size: 18, color: AppColors.statsGold),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Note cliente',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.statsGold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.orderNotes!,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
@@ -576,154 +694,104 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
     );
   }
 
-  /// Pulsanti azione principali
-  Widget _buildActionButtons(ColorScheme cs) {
-    String primaryLabel;
-    Color primaryColor;
-    IconData primaryIcon;
-    VoidCallback primaryAction;
+  // === HELPERS ===
 
-    switch (_phase) {
-      case DeliveryPhase.toRestaurant:
-        primaryLabel = 'SONO ARRIVATO';
-        primaryColor = AppColors.turboOrange;
-        primaryIcon = Icons.location_on;
-        primaryAction = () => setState(() => _phase = DeliveryPhase.atRestaurant);
-        break;
-      case DeliveryPhase.atRestaurant:
-        primaryLabel = 'ORDINE RITIRATO';
-        primaryColor = AppColors.turboOrange;
-        primaryIcon = Icons.check_circle;
-        primaryAction = () => setState(() => _phase = DeliveryPhase.toCustomer);
-        break;
-      case DeliveryPhase.toCustomer:
-        primaryLabel = 'SONO ARRIVATO';
-        primaryColor = AppColors.earningsGreen;
-        primaryIcon = Icons.location_on;
-        primaryAction = () => setState(() => _phase = DeliveryPhase.atCustomer);
-        break;
-      case DeliveryPhase.atCustomer:
-        primaryLabel = 'CONSEGNATO';
-        primaryColor = AppColors.earningsGreen;
-        primaryIcon = Icons.check_circle;
-        primaryAction = () => _completeDelivery();
-        break;
+  Color _getPhaseColor(OrderPhase phase) {
+    switch (phase) {
+      case OrderPhase.toPickup:
+        return AppColors.routeBlue;
+      case OrderPhase.atPickup:
+        return AppColors.turboOrange;
+      case OrderPhase.toCustomer:
+        return AppColors.turboOrange;
+      case OrderPhase.atCustomer:
+        return AppColors.earningsGreen;
+      case OrderPhase.completed:
+        return AppColors.earningsGreen;
     }
-
-    return Column(
-      children: [
-        // Pulsante principale
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            onPressed: primaryAction,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Radii.md),
-              ),
-              elevation: Elevation.none,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(primaryIcon, size: 20),
-                const SizedBox(width: Spacing.sm + 2),
-                Text(
-                  primaryLabel,
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: Spacing.md),
-        // Pulsante problema
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton(
-            onPressed: () => _showProblemSheet(cs),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.urgentRed,
-              side: BorderSide(color: AppColors.urgentRed.withValues(alpha: 0.5)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Radii.md),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.warning_amber, size: 18),
-                const SizedBox(width: Spacing.sm),
-                Text(
-                  'Segnala problema',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
-  /// Completa la consegna
-  void _completeDelivery() {
-    // Aggiorna guadagni
-    ref.read(earningsProvider.notifier).simulateCompletedOrder(
-      restaurantName: widget.restaurantName,
-      customerAddress: widget.customerAddress,
-      distanceKm: widget.distanceKm,
-      tipAmount: 0,
-    );
-
-    // Feedback
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              _isRushHour ? Icons.local_fire_department : Icons.check_circle,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              '+€${_totalEarning.toStringAsFixed(2)} guadagnati!${_isRushHour ? ' (2x rush hour)' : ''}',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        backgroundColor: AppColors.earningsGreen,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-
-    // Torna alla schermata principale
-    context.go('/today');
+  IconData _getPhaseIcon(OrderPhase phase) {
+    switch (phase) {
+      case OrderPhase.toPickup:
+        return Icons.directions_bike;
+      case OrderPhase.atPickup:
+        return Icons.store;
+      case OrderPhase.toCustomer:
+        return Icons.delivery_dining;
+      case OrderPhase.atCustomer:
+        return Icons.home;
+      case OrderPhase.completed:
+        return Icons.check_circle;
+    }
   }
 
-  /// Apre navigazione esterna
+  IconData _getActionIcon(OrderPhase phase) {
+    switch (phase) {
+      case OrderPhase.toPickup:
+      case OrderPhase.toCustomer:
+        return Icons.location_on;
+      case OrderPhase.atPickup:
+      case OrderPhase.atCustomer:
+        return Icons.check_circle;
+      case OrderPhase.completed:
+        return Icons.check_circle;
+    }
+  }
+
+  String _getCurrentAddress(ActiveOrder order) {
+    final isPickupPhase = order.phase == OrderPhase.toPickup || order.phase == OrderPhase.atPickup;
+    return isPickupPhase ? order.dealerAddress : order.customerAddress;
+  }
+
+  void _advanceOrder(ActiveOrder order) {
+    if (order.phase == OrderPhase.atCustomer) {
+      // Completa ordine
+      ref.read(earningsProvider.notifier).simulateCompletedOrder(
+        restaurantName: order.dealerName,
+        customerAddress: order.customerAddress,
+        distanceKm: order.distanceKm,
+        tipAmount: 0,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              Text(
+                '+€${order.totalEarning.toStringAsFixed(2)} guadagnati!',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.earningsGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      // Rimuovi dopo un attimo per mostrare il completamento
+      Future.delayed(const Duration(milliseconds: 500), () {
+        ref.read(activeOrdersProvider.notifier).removeCompletedOrder(order.id);
+        // Se non ci sono più ordini, torna alla home
+        final remaining = ref.read(activeOrdersProvider).orders
+            .where((o) => o.phase != OrderPhase.completed)
+            .length;
+        if (remaining == 0) {
+          context.go('/today');
+        }
+      });
+    }
+    ref.read(activeOrdersProvider.notifier).advanceOrder(order.id);
+  }
+
   Future<void> _openNavigation(String address) async {
     final encodedAddress = Uri.encodeComponent('$address, Milano');
     final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedAddress');
-
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
 
-  /// Effettua chiamata
   Future<void> _makeCall(String phoneNumber) async {
     final url = Uri.parse('tel:$phoneNumber');
     if (await canLaunchUrl(url)) {
@@ -731,29 +799,62 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
     }
   }
 
-  /// Conferma uscita
-  void _showExitConfirmation(ColorScheme cs) {
+  void _showExitConfirmation(ColorScheme cs, int orderCount) {
+    if (orderCount == 0) {
+      context.go('/today');
+      return;
+    }
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
+        backgroundColor: cs.surface,
+        title: Text(
+          'Uscire dalla gestione ordini?',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: cs.onSurface),
+        ),
+        content: Text(
+          'Hai $orderCount ${orderCount == 1 ? 'ordine attivo' : 'ordini attivi'}. Puoi tornare in qualsiasi momento.',
+          style: GoogleFonts.inter(color: cs.onSurfaceVariant),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Resta', style: GoogleFonts.inter(color: AppColors.earningsGreen)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.go('/today');
+            },
+            child: Text('Esci', style: GoogleFonts.inter(color: cs.onSurfaceVariant)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCancelConfirmation(ColorScheme cs, ActiveOrder order) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
         backgroundColor: cs.surface,
         title: Text(
           'Annullare ordine?',
           style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: cs.onSurface),
         ),
         content: Text(
-          'Se esci perderai questo ordine e potrebbe influire sulla tua valutazione.',
+          'L\'ordine da ${order.dealerName} verrà rimesso tra quelli disponibili.',
           style: GoogleFonts.inter(color: cs.onSurfaceVariant),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Continua', style: GoogleFonts.inter(color: AppColors.earningsGreen)),
+            child: Text('Mantieni', style: GoogleFonts.inter(color: AppColors.earningsGreen)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              context.go('/today');
+              ref.read(activeOrdersProvider.notifier).cancelOrder(order.id);
             },
             child: Text('Annulla ordine', style: GoogleFonts.inter(color: AppColors.urgentRed)),
           ),
@@ -761,85 +862,4 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
       ),
     );
   }
-
-  /// Sheet problemi
-  void _showProblemSheet(ColorScheme cs) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Segnala problema',
-              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface),
-            ),
-            const SizedBox(height: 20),
-            _problemOption(cs, Icons.store_mall_directory, 'Ristorante chiuso'),
-            _problemOption(cs, Icons.timer_off, 'Attesa troppo lunga'),
-            _problemOption(cs, Icons.no_food, 'Ordine non disponibile'),
-            _problemOption(cs, Icons.person_off, 'Cliente non reperibile'),
-            _problemOption(cs, Icons.wrong_location, 'Indirizzo errato'),
-            _problemOption(cs, Icons.support_agent, 'Altro - Contatta supporto'),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _problemOption(ColorScheme cs, IconData icon, String label) {
-    return InkWell(
-      onTap: () {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Problema segnalato: $label'),
-            backgroundColor: AppColors.turboOrange,
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: cs.onSurfaceVariant),
-            const SizedBox(width: 14),
-            Text(label, style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Painter per griglia mappa
-class _GridPainter extends CustomPainter {
-  final Color color;
-  _GridPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1;
-
-    const spacing = 40.0;
-
-    for (double x = 0; x < size.width; x += spacing) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += spacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
