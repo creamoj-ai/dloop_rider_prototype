@@ -109,57 +109,77 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
     _loadDemoData();
   }
 
-  /// Carica ordini demo per testare UI
+  /// Carica ordini demo per testare UI con vari stati
   void _loadDemoData() {
-    // Ordine 1 - mattina, no rush
+    // Ordine 1 - CONSEGNATO - mattina
     _addDemoOrder(
       restaurantName: 'La Piadineria',
       customerAddress: 'Via Dante 23',
       distanceKm: 1.8,
       tipAmount: 0.50,
-      minutesAgo: 180, // 3 ore fa
+      minutesAgo: 180,
+      status: OrderStatus.delivered,
     );
 
-    // Ordine 2 - pranzo rush hour
+    // Ordine 2 - CONSEGNATO - pranzo rush hour
     _addDemoOrder(
       restaurantName: 'Rossopomodoro',
       customerAddress: 'Piazza Duomo 1',
       distanceKm: 2.3,
       tipAmount: 1.00,
-      minutesAgo: 120, // 2 ore fa
+      minutesAgo: 120,
       forceRush: true,
+      status: OrderStatus.delivered,
     );
 
-    // Ordine 3 - pomeriggio
+    // Ordine 3 - RIFIUTATO
+    _addDemoOrder(
+      restaurantName: 'KFC',
+      customerAddress: 'Via Padova 118',
+      distanceKm: 4.5,
+      minutesAgo: 90,
+      status: OrderStatus.cancelled,
+    );
+
+    // Ordine 4 - CONSEGNATO - pomeriggio
     _addDemoOrder(
       restaurantName: 'Sushi Zen',
       customerAddress: 'Corso Italia 88',
       distanceKm: 3.1,
-      tipAmount: 0,
-      minutesAgo: 60, // 1 ora fa
+      minutesAgo: 60,
+      status: OrderStatus.delivered,
     );
 
-    // Ordine 4 - recente rush
+    // Ordine 5 - RITIRATO (in consegna)
     _addDemoOrder(
       restaurantName: 'Pizzeria Da Mario',
       customerAddress: 'Via Roma 15',
       distanceKm: 1.5,
-      tipAmount: 2.00,
-      minutesAgo: 25,
+      minutesAgo: 15,
       forceRush: true,
+      status: OrderStatus.pickedUp,
     );
 
-    // Ordine 5 - molto recente
+    // Ordine 6 - ACCETTATO (da ritirare)
     _addDemoOrder(
       restaurantName: 'Burger King',
       customerAddress: 'Corso Buenos Aires 45',
       distanceKm: 2.0,
-      tipAmount: 0,
-      minutesAgo: 8,
+      minutesAgo: 5,
+      status: OrderStatus.accepted,
+    );
+
+    // Ordine 7 - DA ACCETTARE (pending)
+    _addDemoOrder(
+      restaurantName: 'Poke House',
+      customerAddress: 'Via Montenapoleone 8',
+      distanceKm: 1.2,
+      minutesAgo: 2,
+      status: OrderStatus.pending,
     );
   }
 
-  /// Aggiunge ordine demo con timestamp simulato
+  /// Aggiunge ordine demo con timestamp e stato simulati
   void _addDemoOrder({
     required String restaurantName,
     required String customerAddress,
@@ -167,8 +187,9 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
     double tipAmount = 0,
     int minutesAgo = 0,
     bool forceRush = false,
+    OrderStatus status = OrderStatus.delivered,
   }) {
-    final deliveredAt = DateTime.now().subtract(Duration(minutes: minutesAgo));
+    final timestamp = DateTime.now().subtract(Duration(minutes: minutesAgo));
     final rushMultiplier = forceRush ? 2.0 : 1.0;
     final baseEarning = distanceKm * Order.ratePerKm;
 
@@ -180,14 +201,22 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
       baseEarning: baseEarning,
       tipAmount: tipAmount,
       rushMultiplier: rushMultiplier,
-      status: OrderStatus.delivered,
-      createdAt: deliveredAt.subtract(const Duration(minutes: 15)),
-      deliveredAt: deliveredAt,
+      status: status,
+      createdAt: timestamp.subtract(const Duration(minutes: 15)),
+      acceptedAt: status.index >= OrderStatus.accepted.index ? timestamp.subtract(const Duration(minutes: 10)) : null,
+      pickedUpAt: status.index >= OrderStatus.pickedUp.index ? timestamp.subtract(const Duration(minutes: 5)) : null,
+      deliveredAt: status == OrderStatus.delivered ? timestamp : null,
     );
 
     final updatedOrders = [...state.todayOrders, order];
-    final updatedTarget = state.dailyTarget.addEarning(order.totalEarning);
-    final updatedKm = state.totalKmToday + order.distanceKm;
+
+    // Solo gli ordini consegnati contano per il target
+    final updatedTarget = status == OrderStatus.delivered
+        ? state.dailyTarget.addEarning(order.totalEarning)
+        : state.dailyTarget;
+    final updatedKm = status == OrderStatus.delivered
+        ? state.totalKmToday + order.distanceKm
+        : state.totalKmToday;
 
     state = state.copyWith(
       todayOrders: updatedOrders,

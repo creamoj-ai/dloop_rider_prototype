@@ -20,36 +20,33 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final earnings = ref.watch(earningsProvider);
-    final completedOrders = earnings.todayOrders
-        .where((o) => o.status == OrderStatus.delivered)
+    // Mostra TUTTI gli ordini, ordinati per più recenti prima
+    final allOrders = earnings.todayOrders
         .toList()
         .reversed
-        .toList(); // Più recenti prima
+        .toList();
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
-        color: _isExpanded ? cs.surface : Colors.transparent,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
-        border: _isExpanded
-            ? Border.all(color: AppColors.turboOrange, width: 1)
-            : null,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Header (sempre visibile)
-          _buildHeader(cs, completedOrders.length),
+          _buildHeader(cs, allOrders.length),
           // Lista ordini (solo se espansa)
           if (_isExpanded)
-            _buildOrdersList(cs, completedOrders),
+            _buildOrdersList(cs, allOrders),
         ],
       ),
     );
   }
 
-  /// Header tab con conteggio - colori invertiti, testo centrato
+  /// Header tab con conteggio - sfondo nero, testo arancio centrato
   Widget _buildHeader(ColorScheme cs, int count) {
     return InkWell(
       onTap: () => setState(() => _isExpanded = !_isExpanded),
@@ -57,10 +54,14 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.turboOrange,
+          color: cs.surface,
           borderRadius: _isExpanded
               ? const BorderRadius.vertical(top: Radius.circular(16))
               : BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.turboOrange.withValues(alpha: 0.3),
+            width: 1,
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -68,7 +69,7 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
             const Icon(
               Icons.receipt_long,
               size: 20,
-              color: Colors.white,
+              color: AppColors.turboOrange,
             ),
             const SizedBox(width: 10),
             Text(
@@ -76,14 +77,14 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: AppColors.turboOrange,
               ),
             ),
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: AppColors.turboOrange.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -91,7 +92,7 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  color: AppColors.turboOrange,
                 ),
               ),
             ),
@@ -102,7 +103,7 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
               child: const Icon(
                 Icons.keyboard_arrow_down,
                 size: 22,
-                color: Colors.white,
+                color: AppColors.turboOrange,
               ),
             ),
           ],
@@ -111,7 +112,7 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
     );
   }
 
-  /// Lista ordini completati
+  /// Lista ordini con stato
   Widget _buildOrdersList(ColorScheme cs, List<Order> orders) {
     if (orders.isEmpty) {
       return Padding(
@@ -127,7 +128,7 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Nessuna consegna ancora',
+                'Nessuna attività ancora',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   color: cs.onSurfaceVariant,
@@ -162,18 +163,78 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
     );
   }
 
-  /// Singolo ordine nella lista
+  /// Stato ordine in italiano con colore
+  ({String label, Color color, IconData icon}) _getStatusInfo(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return (
+          label: 'Da accettare',
+          color: AppColors.routeBlue,
+          icon: Icons.hourglass_empty,
+        );
+      case OrderStatus.accepted:
+        return (
+          label: 'Accettato',
+          color: AppColors.turboOrange,
+          icon: Icons.check_circle_outline,
+        );
+      case OrderStatus.pickedUp:
+        return (
+          label: 'Ritirato',
+          color: AppColors.turboOrange,
+          icon: Icons.takeout_dining,
+        );
+      case OrderStatus.delivered:
+        return (
+          label: 'Consegnato',
+          color: AppColors.earningsGreen,
+          icon: Icons.check_circle,
+        );
+      case OrderStatus.cancelled:
+        return (
+          label: 'Rifiutato',
+          color: const Color(0xFFEF4444),
+          icon: Icons.cancel,
+        );
+    }
+  }
+
+  /// Singolo ordine nella lista con stato
   Widget _buildOrderItem(ColorScheme cs, Order order) {
-    final time = order.deliveredAt != null
-        ? '${order.deliveredAt!.hour.toString().padLeft(2, '0')}:${order.deliveredAt!.minute.toString().padLeft(2, '0')}'
-        : '--:--';
+    final statusInfo = _getStatusInfo(order.status);
     final isRush = order.rushMultiplier > 1;
 
+    // Usa l'orario appropriato in base allo stato
+    String time = '--:--';
+    if (order.deliveredAt != null) {
+      time = '${order.deliveredAt!.hour.toString().padLeft(2, '0')}:${order.deliveredAt!.minute.toString().padLeft(2, '0')}';
+    } else if (order.pickedUpAt != null) {
+      time = '${order.pickedUpAt!.hour.toString().padLeft(2, '0')}:${order.pickedUpAt!.minute.toString().padLeft(2, '0')}';
+    } else if (order.acceptedAt != null) {
+      time = '${order.acceptedAt!.hour.toString().padLeft(2, '0')}:${order.acceptedAt!.minute.toString().padLeft(2, '0')}';
+    } else {
+      time = '${order.createdAt.hour.toString().padLeft(2, '0')}:${order.createdAt.minute.toString().padLeft(2, '0')}';
+    }
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Icona stato
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: statusInfo.color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              statusInfo.icon,
+              size: 16,
+              color: statusInfo.color,
+            ),
+          ),
+          const SizedBox(width: 12),
           // Info ordine
           Expanded(
             child: Column(
@@ -195,40 +256,58 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
                     color: cs.onSurfaceVariant,
                   ),
                 ),
+                const SizedBox(height: 4),
+                // Badge stato
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: statusInfo.color.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        statusInfo.label,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: statusInfo.color,
+                        ),
+                      ),
+                    ),
+                    if (isRush) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.earningsGreen.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '2X',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.earningsGreen,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
-          // Guadagno + badge 2X
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '+ € ${order.totalEarning.toStringAsFixed(2)}',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.earningsGreen,
-                ),
-              ),
-              if (isRush) ...[
-                const SizedBox(height: 2),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.earningsGreen.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '2X',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.earningsGreen,
-                    ),
-                  ),
-                ),
-              ],
-            ],
+          // Guadagno
+          Text(
+            '€ ${order.totalEarning.toStringAsFixed(2)}',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: order.status == OrderStatus.delivered
+                  ? AppColors.earningsGreen
+                  : cs.onSurfaceVariant,
+            ),
           ),
         ],
       ),
