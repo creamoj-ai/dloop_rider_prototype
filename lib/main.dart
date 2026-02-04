@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme/app_theme.dart';
 import 'navigation/app_router.dart';
@@ -12,7 +13,11 @@ void main() async {
     anonKey: SupabaseConfig.anonKey,
   );
 
-  runApp(const DloopRiderApp());
+  runApp(
+    const ProviderScope(
+      child: DloopRiderApp(),
+    ),
+  );
 }
 
 class DloopRiderApp extends StatelessWidget {

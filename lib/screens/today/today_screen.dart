@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/dloop_top_bar.dart';
 import 'widgets/kpi_strip.dart';
 import 'widgets/active_mode_card.dart';
+import 'widgets/activity_tab.dart';
 import 'widgets/hot_zones.dart';
 import 'widgets/wellness_card.dart';
 import 'widgets/quick_actions_grid.dart';
@@ -68,19 +69,21 @@ class _TodayScreenState extends State<TodayScreen> {
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 420),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      KpiStrip(),
-                      SizedBox(height: 24),
-                      ActiveModeCard(),
-                      SizedBox(height: 24),
-                      HotZones(),
-                      SizedBox(height: 24),
-                      QuickActionsGrid(),
-                      SizedBox(height: 24),
-                      WellnessCard(),
-                      SizedBox(height: 24),
+                      const KpiStrip(),
+                      const SizedBox(height: 24),
+                      const ActiveModeCard(),
+                      const SizedBox(height: 12),
+                      const ActivityTab(),
+                      const SizedBox(height: 24),
+                      const HotZones(),
+                      const SizedBox(height: 24),
+                      const QuickActionsGrid(),
+                      const SizedBox(height: 24),
+                      const WellnessCard(),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
