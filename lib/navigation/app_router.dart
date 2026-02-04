@@ -7,6 +7,7 @@ import '../screens/auth/signup_page.dart';
 import '../screens/today/today_screen.dart';
 import '../screens/today/zone_map_screen.dart';
 import '../screens/today/route_screen.dart';
+import '../screens/today/delivery_navigation_screen.dart';
 import '../screens/earn/earn_demo_screen.dart';
 import '../screens/money/money_screen.dart';
 import '../screens/money/sub/transactions_screen.dart';
@@ -59,6 +60,19 @@ final appRouter = GoRouter(
             GoRoute(path: 'zone', builder: (context, state) => const ZoneMapScreen()),
             GoRoute(path: 'route', builder: (context, state) => const RouteScreen()),
             GoRoute(path: 'earn', builder: (context, state) => const EarnDemoScreen()),
+            GoRoute(
+              path: 'delivery',
+              builder: (context, state) {
+                final extra = state.extra as Map<String, dynamic>? ?? {};
+                return DeliveryNavigationScreen(
+                  restaurantName: extra['restaurantName'] ?? 'Ristorante',
+                  restaurantAddress: extra['restaurantAddress'] ?? 'Via Roma 1',
+                  customerAddress: extra['customerAddress'] ?? 'Via Cliente 1',
+                  distanceKm: extra['distanceKm'] ?? 2.0,
+                  orderNotes: extra['orderNotes'],
+                );
+              },
+            ),
           ],
         ),
         GoRoute(

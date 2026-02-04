@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 import '../../../providers/earnings_provider.dart';
@@ -380,11 +381,8 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
   void _onCtaTap(BuildContext context) {
     switch (_orderState) {
       case OrderState.newOrder:
-        // Accetta ordine → passa a "da ritirare"
-        setState(() {
-          _orderState = OrderState.toPickup;
-        });
-        _showSnackbar(context, 'Ordine accettato! Vai al ristorante', Icons.restaurant);
+        // Accetta ordine → naviga alla schermata di navigazione
+        _navigateToDelivery(context);
         break;
 
       case OrderState.toPickup:
@@ -400,6 +398,51 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
         _completeOrder(context);
         break;
     }
+  }
+
+  /// Naviga alla schermata di consegna
+  void _navigateToDelivery(BuildContext context) {
+    // Lista indirizzi ristoranti (mock)
+    const restaurantAddresses = [
+      'Via Torino 25',
+      'Corso Italia 12',
+      'Via Dante 8',
+      'Piazza Duomo 3',
+      'Via Montenapoleone 15',
+      'Corso Buenos Aires 88',
+      'Via Brera 22',
+      'Via Paolo Sarpi 44',
+    ];
+
+    // Note ordine random
+    const notes = [
+      null,
+      'Citofono rotto, chiamare',
+      'Consegnare al portiere',
+      'Piano 3, scala B',
+      'Suonare 2 volte',
+      null,
+      'Lasciare fuori dalla porta',
+      null,
+    ];
+
+    final random = Random();
+    final restaurantAddress = restaurantAddresses[random.nextInt(restaurantAddresses.length)];
+    final orderNote = notes[random.nextInt(notes.length)];
+
+    context.push('/today/delivery', extra: {
+      'restaurantName': _currentOrder.restaurantName,
+      'restaurantAddress': restaurantAddress,
+      'customerAddress': _currentOrder.customerAddress,
+      'distanceKm': _currentOrder.distanceKm,
+      'orderNotes': orderNote,
+    });
+
+    // Reset per quando torna
+    setState(() {
+      _orderState = OrderState.newOrder;
+      _currentOrder = _RandomOrder.generate();
+    });
   }
 
   /// Completa l'ordine e genera uno nuovo
