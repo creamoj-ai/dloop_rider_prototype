@@ -15,6 +15,8 @@ class ActivityTab extends ConsumerStatefulWidget {
 
 class _ActivityTabState extends ConsumerState<ActivityTab> {
   bool _isExpanded = false;
+  String _filterStatus = 'tutti'; // tutti, consegnato, in_corso, rifiutato
+  String _sortBy = 'recenti'; // recenti, meno_recenti
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +114,35 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
     );
   }
 
+  /// Filtra ordini per stato
+  List<Order> _filterOrders(List<Order> orders) {
+    var filtered = orders;
+
+    // Applica filtro stato
+    switch (_filterStatus) {
+      case 'consegnato':
+        filtered = orders.where((o) => o.status == OrderStatus.delivered).toList();
+        break;
+      case 'in_corso':
+        filtered = orders.where((o) =>
+          o.status == OrderStatus.pending ||
+          o.status == OrderStatus.accepted ||
+          o.status == OrderStatus.pickedUp
+        ).toList();
+        break;
+      case 'rifiutato':
+        filtered = orders.where((o) => o.status == OrderStatus.cancelled).toList();
+        break;
+    }
+
+    // Applica ordinamento
+    if (_sortBy == 'meno_recenti') {
+      filtered = filtered.reversed.toList();
+    }
+
+    return filtered;
+  }
+
   /// Lista ordini con stato
   Widget _buildOrdersList(ColorScheme cs, List<Order> orders) {
     if (orders.isEmpty) {
@@ -148,17 +179,124 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
       );
     }
 
+    final filteredOrders = _filterOrders(orders);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Column(
         children: [
+          // Barra filtri e ordinamento
+          _buildFiltersBar(cs),
+          const SizedBox(height: 12),
           Divider(
             height: 1,
             color: cs.outlineVariant.withValues(alpha: 0.3),
           ),
-          const SizedBox(height: 12),
-          ...orders.map((order) => _buildOrderItem(cs, order)),
+          const SizedBox(height: 8),
+          // Lista filtrata
+          if (filteredOrders.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'Nessun ordine con questo filtro',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            ...filteredOrders.map((order) => _buildOrderItem(cs, order)),
         ],
+      ),
+    );
+  }
+
+  /// Barra filtri e ordinamento
+  Widget _buildFiltersBar(ColorScheme cs) {
+    return Row(
+      children: [
+        // Filtro stato
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip(cs, 'Tutti', 'tutti'),
+                const SizedBox(width: 6),
+                _buildFilterChip(cs, 'Consegnati', 'consegnato'),
+                const SizedBox(width: 6),
+                _buildFilterChip(cs, 'In corso', 'in_corso'),
+                const SizedBox(width: 6),
+                _buildFilterChip(cs, 'Rifiutati', 'rifiutato'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Ordinamento
+        InkWell(
+          onTap: () {
+            setState(() {
+              _sortBy = _sortBy == 'recenti' ? 'meno_recenti' : 'recenti';
+            });
+          },
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _sortBy == 'recenti' ? Icons.arrow_downward : Icons.arrow_upward,
+                  size: 14,
+                  color: cs.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _sortBy == 'recenti' ? 'Recenti' : 'Meno recenti',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Chip filtro singolo
+  Widget _buildFilterChip(ColorScheme cs, String label, String value) {
+    final isSelected = _filterStatus == value;
+    return InkWell(
+      onTap: () => setState(() => _filterStatus = value),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.turboOrange.withValues(alpha: 0.15)
+              : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+          border: isSelected
+              ? Border.all(color: AppColors.turboOrange.withValues(alpha: 0.5))
+              : null,
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            color: isSelected ? AppColors.turboOrange : cs.onSurfaceVariant,
+          ),
+        ),
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/dloop_top_bar.dart';
+import '../../widgets/invite_sheet.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/gamification_card.dart';
 import 'widgets/lifetime_stats.dart';
@@ -44,6 +45,8 @@ class YouScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                   const GamificationCard(),
                   const SizedBox(height: 24),
+                  _buildInviteSection(context, cs),
+                  const SizedBox(height: 24),
                   const LifetimeStats(),
                   const SizedBox(height: 32),
                 ],
@@ -51,6 +54,77 @@ class YouScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInviteSection(BuildContext context, ColorScheme cs) {
+    return InkWell(
+      onTap: () => InviteSheet.show(context),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.turboOrange.withValues(alpha: 0.2),
+              AppColors.turboOrange.withValues(alpha: 0.05),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.turboOrange.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.turboOrange.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.card_giftcard,
+                color: AppColors.turboOrange,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Invita amici',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Guadagna €10 per ogni rider',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: AppColors.turboOrange,
+            ),
+          ],
+        ),
       ),
     );
   }
