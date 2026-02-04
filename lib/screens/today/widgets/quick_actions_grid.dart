@@ -34,54 +34,62 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
     return Column(
       children: [
         // Prima riga: Assistente + Strumenti
-        Row(
-          children: [
-            Expanded(
-              child: _ActionTile(
-                icon: Icons.smart_toy,
-                label: 'Assistente',
-                subtitle: '$_totalNotifications messaggi',
-                color: AppColors.earningsGreen,
-                onTap: () => _showBotOptions(context),
-                badgeCount: _totalNotifications,
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _ActionTile(
+                  icon: Icons.smart_toy,
+                  label: 'Assistente',
+                  subtitle: '$_totalNotifications messaggi',
+                  color: AppColors.earningsGreen,
+                  onTap: () => _showBotOptions(context),
+                  badgeCount: _totalNotifications,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ActionTile(
-                icon: Icons.build,
-                label: 'Strumenti',
-                color: AppColors.statsGold,
-                onTap: () => _showToolkit(context),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ActionTile(
+                  icon: Icons.build,
+                  label: 'Strumenti',
+                  subtitle: 'Utility rider',
+                  color: AppColors.statsGold,
+                  onTap: () => _showToolkit(context),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         // Seconda riga: Network + Obiettivi
-        Row(
-          children: [
-            Expanded(
-              child: _ActionTile(
-                icon: Icons.people,
-                label: 'Network',
-                subtitle: '$_networkActiveRiders attivi',
-                subtitleExtra: '+€${_networkMonthlyEarnings.toStringAsFixed(0)}/mese',
-                color: AppColors.routeBlue,
-                onTap: () => _showNetworkSheet(context),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _ActionTile(
+                  icon: Icons.people,
+                  label: 'Network',
+                  subtitle: '$_networkActiveRiders attivi',
+                  subtitleExtra: '+€${_networkMonthlyEarnings.toStringAsFixed(0)}/mese',
+                  color: AppColors.routeBlue,
+                  onTap: () => _showNetworkSheet(context),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ActionTile(
-                icon: Icons.emoji_events,
-                label: 'Obiettivi',
-                subtitle: '12 giorni streak',
-                color: AppColors.bonusPurple,
-                onTap: () => _showMotivation(context),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ActionTile(
+                  icon: Icons.emoji_events,
+                  label: 'Obiettivi',
+                  subtitle: '12 giorni streak',
+                  subtitleExtra: 'Top 5% zona',
+                  color: AppColors.bonusPurple,
+                  onTap: () => _showMotivation(context),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
