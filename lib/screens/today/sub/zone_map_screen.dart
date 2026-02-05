@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../theme/tokens.dart';
 
 class ZoneMapScreen extends StatefulWidget {
@@ -229,9 +230,7 @@ class _ZoneMapScreenState extends State<ZoneMapScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Navigazione verso ${zone.name}...')),
-                          ),
+                          onPressed: () => _openGoogleMaps(zone.name),
                           icon: const Icon(Icons.navigation, size: 18),
                           label: Text('VAI IN QUESTA ZONA', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
                           style: ElevatedButton.styleFrom(
@@ -251,6 +250,14 @@ class _ZoneMapScreenState extends State<ZoneMapScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openGoogleMaps(String zoneName) async {
+    final encodedAddress = Uri.encodeComponent('$zoneName, Milano, Italia');
+    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedAddress');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _buildHeatCircle(int index, _MapZone zone) {

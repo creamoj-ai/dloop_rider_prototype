@@ -71,9 +71,10 @@ class LifetimeStats extends StatelessWidget {
   }
 
   void _handleLogout(BuildContext context) {
+    final rootContext = context;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A1E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
@@ -93,7 +94,7 @@ class LifetimeStats extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(
               'Annulla',
               style: GoogleFonts.inter(color: Colors.grey[400]),
@@ -101,10 +102,10 @@ class LifetimeStats extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               await Supabase.instance.client.auth.signOut();
-              if (context.mounted) {
-                context.go('/login');
+              if (rootContext.mounted) {
+                rootContext.go('/login');
               }
             },
             style: ElevatedButton.styleFrom(

@@ -128,7 +128,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 // Title
                 Text(
-                  emailSent ? 'Email inviata!' : 'Recupera password',
+                  emailSent ? 'Richiesta inviata' : 'Recupera password',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 22,
@@ -141,8 +141,8 @@ class _LoginPageState extends State<LoginPage> {
                 // Description
                 Text(
                   emailSent
-                      ? 'Controlla la tua casella di posta e segui le istruzioni per reimpostare la password.'
-                      : 'Inserisci la tua email e ti invieremo un link per reimpostare la password.',
+                      ? 'Se l\'email è associata a un account, riceverai un link entro pochi minuti. Non ricevi nulla? L\'email potrebbe non essere registrata.'
+                      : 'Inserisci l\'email del tuo account. Se non è registrata, non riceverai alcun link.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 14,
