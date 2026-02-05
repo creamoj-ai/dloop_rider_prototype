@@ -58,101 +58,52 @@ class KpiStrip extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.storefront, color: AppColors.turboOrange, size: 22),
-                const SizedBox(width: 10),
-                Text(
-                  'MyShop',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface,
+      isScrollControlled: true,
+      builder: (_) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.storefront, color: AppColors.turboOrange, size: 20),
+                  const SizedBox(width: 8),
+                  Text('MyShop', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: AppColors.earningsGreen.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                    child: Text('€45', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.earningsGreen)),
                   ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.earningsGreen.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '€45 comm.',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.earningsGreen,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Stats row
-            Row(
-              children: [
-                _ShopStat(label: 'Prodotti attivi', value: '12', color: AppColors.turboOrange),
-                const SizedBox(width: 12),
-                _ShopStat(label: 'Ordini settimana', value: '6', color: AppColors.routeBlue),
-                const SizedBox(width: 12),
-                _ShopStat(label: 'Comm. mese', value: '€180', color: AppColors.earningsGreen),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Ordini in attesa',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface,
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            _ShopOrderItem(
-              customer: 'Anna V.',
-              product: 'Energy Drink Box',
-              amount: '€15.00',
-              status: 'Nuovo',
-              statusColor: AppColors.routeBlue,
-            ),
-            _ShopOrderItem(
-              customer: 'Paolo G.',
-              product: 'Snack Box',
-              amount: '€12.00',
-              status: 'In corso',
-              statusColor: AppColors.turboOrange,
-            ),
-            _ShopOrderItem(
-              customer: 'Maria L.',
-              product: 'Protein Bar Pack',
-              amount: '€18.00',
-              status: 'Nuovo',
-              statusColor: AppColors.routeBlue,
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.go('/market');
-                },
-                child: Text(
-                  'Vai al Market →',
-                  style: GoogleFonts.inter(
-                    color: AppColors.turboOrange,
-                    fontWeight: FontWeight.w600,
-                  ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _ShopStat(label: 'Prodotti', value: '12', color: AppColors.turboOrange),
+                  const SizedBox(width: 8),
+                  _ShopStat(label: 'Ordini', value: '6', color: AppColors.routeBlue),
+                  const SizedBox(width: 8),
+                  _ShopStat(label: 'Comm.', value: '€180', color: AppColors.earningsGreen),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text('Ordini in attesa', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
+              const SizedBox(height: 8),
+              _ShopOrderItem(customer: 'Anna V.', product: 'Energy Drink', amount: '€15', status: 'Nuovo', statusColor: AppColors.routeBlue),
+              _ShopOrderItem(customer: 'Paolo G.', product: 'Snack Box', amount: '€12', status: 'In corso', statusColor: AppColors.turboOrange),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () { Navigator.pop(context); context.go('/market'); },
+                  child: Text('Vai al Market →', style: GoogleFonts.inter(color: AppColors.turboOrange, fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -163,91 +114,44 @@ class KpiStrip extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.inventory_2, color: AppColors.routeBlue, size: 22),
-                const SizedBox(width: 10),
-                Text(
-                  'Ordini di oggi',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface,
+      builder: (_) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.inventory_2, color: AppColors.routeBlue, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Ordini oggi', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: AppColors.earningsGreen.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                    child: Text('8 OK', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.earningsGreen)),
                   ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.earningsGreen.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '8 completati',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.earningsGreen,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _OrderItem(
-              time: '14:32',
-              restaurant: 'Pizzeria Da Mario',
-              address: 'Via Roma 15',
-              earning: '€ 4.50',
-              status: 'completed',
-            ),
-            _OrderItem(
-              time: '13:58',
-              restaurant: 'Sushi Zen',
-              address: 'Corso Buenos Aires 12',
-              earning: '€ 5.80',
-              status: 'completed',
-            ),
-            _OrderItem(
-              time: '13:21',
-              restaurant: "McDonald's",
-              address: 'Piazza Duomo 1',
-              earning: '€ 3.90',
-              status: 'completed',
-            ),
-            _OrderItem(
-              time: '12:45',
-              restaurant: 'Poke House',
-              address: 'Via Torino 8',
-              earning: '€ 4.80',
-              status: 'completed',
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.go('/money');
-                },
-                child: Text(
-                  'Vedi tutti in Money →',
-                  style: GoogleFonts.inter(
-                    color: AppColors.routeBlue,
-                    fontWeight: FontWeight.w600,
-                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _OrderItem(time: '14:32', restaurant: 'Pizzeria Mario', address: 'Via Roma 15', earning: '€4.50', status: 'completed'),
+              _OrderItem(time: '13:58', restaurant: 'Sushi Zen', address: 'C.so Buenos Aires', earning: '€5.80', status: 'completed'),
+              _OrderItem(time: '13:21', restaurant: "McDonald's", address: 'Piazza Duomo', earning: '€3.90', status: 'completed'),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () { Navigator.pop(context); context.go('/money'); },
+                  child: Text('Vedi tutti →', style: GoogleFonts.inter(color: AppColors.routeBlue, fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

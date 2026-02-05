@@ -20,23 +20,18 @@ class MarketTabScreen extends StatelessWidget {
         },
       ),
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // Top Bar come SliverToBoxAdapter
-            SliverToBoxAdapter(
-              child: DloopTopBar(
-                isOnline: true,
-                notificationCount: 0,
-                searchHint: 'Cerca prodotti...',
-                onSearchTap: () {},
-              ),
+        child: Column(
+          children: [
+            DloopTopBar(
+              isOnline: true,
+              notificationCount: 0,
+              searchHint: 'Cerca prodotti...',
+              onSearchTap: () {},
             ),
-            // Contenuto
-            SliverPadding(
-              padding: const EdgeInsets.all(12),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // KPI
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(12),
+                children: [
                   _buildKpiRow(),
                   const SizedBox(height: 12),
                   _label('Catalogo'),
@@ -47,7 +42,7 @@ class MarketTabScreen extends StatelessWidget {
                   const SizedBox(height: 6),
                   _buildOrdersList(context),
                   const SizedBox(height: 60),
-                ]),
+                ],
               ),
             ),
           ],
@@ -80,7 +75,10 @@ class MarketTabScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(v, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: c)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(v, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: c)),
+            ),
             Text(l, style: GoogleFonts.inter(fontSize: 8, color: Colors.grey)),
           ],
         ),
@@ -89,22 +87,33 @@ class MarketTabScreen extends StatelessWidget {
   }
 
   Widget _buildProductsGrid(BuildContext ctx) {
-    final products = [
-      ['Energy Drink', '€15', 'B'],
-      ['Snack Box', '€12', 'F'],
-      ['Water', '€8.50', 'B'],
-      ['Protein', '€18', 'F'],
-      ['Electrolyte', '€9.90', 'I'],
-      ['Coffee', '€22', 'B'],
-    ];
-
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: products.map((p) => SizedBox(
-        width: (MediaQuery.of(ctx).size.width - 36) / 2,
-        child: _productCard(p[0], p[1], p[2], ctx),
-      )).toList(),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(child: _productCard('Energy', '€15', 'B', ctx)),
+            const SizedBox(width: 6),
+            Expanded(child: _productCard('Snack', '€12', 'F', ctx)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(child: _productCard('Water', '€8.50', 'B', ctx)),
+            const SizedBox(width: 6),
+            Expanded(child: _productCard('Protein', '€18', 'F', ctx)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(child: _productCard('Electro', '€9.90', 'I', ctx)),
+            const SizedBox(width: 6),
+            Expanded(child: _productCard('Coffee', '€22', 'B', ctx)),
+          ],
+        ),
+      ],
     );
   }
 
@@ -130,7 +139,7 @@ class MarketTabScreen extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(color: AppColors.turboOrange, borderRadius: BorderRadius.circular(4)),
-              child: Text('>', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+              child: const Icon(Icons.send, size: 10, color: Colors.white),
             ),
           ),
         ],
@@ -139,16 +148,14 @@ class MarketTabScreen extends StatelessWidget {
   }
 
   Widget _buildOrdersList(BuildContext ctx) {
-    final orders = [
-      ['Anna V.', '€15', 'OK', AppColors.earningsGreen],
-      ['Paolo G.', '€12', '...', AppColors.turboOrange],
-      ['Maria L.', '€18', 'NEW', AppColors.routeBlue],
-      ['Luca R.', '€8.50', 'OK', AppColors.earningsGreen],
-    ];
-
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: orders.map((o) => _orderRow(o[0] as String, o[1] as String, o[2] as String, o[3] as Color, ctx)).toList(),
+      children: [
+        _orderRow('Anna V.', '€15', 'OK', AppColors.earningsGreen, ctx),
+        _orderRow('Paolo G.', '€12', '...', AppColors.turboOrange, ctx),
+        _orderRow('Maria L.', '€18', 'NEW', AppColors.routeBlue, ctx),
+        _orderRow('Luca R.', '€8.50', 'OK', AppColors.earningsGreen, ctx),
+      ],
     );
   }
 
@@ -159,7 +166,9 @@ class MarketTabScreen extends StatelessWidget {
       decoration: BoxDecoration(color: const Color(0xFF1A1A1E), borderRadius: BorderRadius.circular(6)),
       child: Row(
         children: [
-          Expanded(child: Text(name, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white), maxLines: 1)),
+          Expanded(
+            child: Text(name, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
           Text(amt, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.earningsGreen)),
           const SizedBox(width: 4),
           Container(
@@ -170,7 +179,7 @@ class MarketTabScreen extends StatelessWidget {
           const SizedBox(width: 3),
           GestureDetector(
             onTap: () => ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Chat $name'))),
-            child: Icon(Icons.chat_bubble_outline, size: 10, color: AppColors.bonusPurple),
+            child: const Icon(Icons.chat_bubble_outline, size: 10, color: AppColors.bonusPurple),
           ),
         ],
       ),
