@@ -125,7 +125,7 @@ class _EarningCelebrationPopupState extends State<EarningCelebrationPopup>
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    final popupHeight = screenHeight * 0.65; // 65% dello schermo
+    final maxHeight = screenHeight * 0.7;
 
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -139,45 +139,30 @@ class _EarningCelebrationPopupState extends State<EarningCelebrationPopup>
               child: GestureDetector(
                 onTap: () {}, // Blocca tap passthrough
                 child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  height: popupHeight,
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  constraints: BoxConstraints(maxHeight: maxHeight),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFF1A1A1E),
-                        const Color(0xFF0D0D0F),
-                      ],
+                      colors: [Color(0xFF1A1A1E), Color(0xFF0D0D0F)],
                     ),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: AppColors.earningsGreen.withOpacity(0.5),
-                      width: 2,
-                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.earningsGreen.withOpacity(0.5), width: 2),
                     boxShadow: [
-                      BoxShadow(
-                        color: AppColors.earningsGreen.withOpacity(0.3),
-                        blurRadius: 40,
-                        spreadRadius: 5,
-                      ),
+                      BoxShadow(color: AppColors.earningsGreen.withOpacity(0.3), blurRadius: 30, spreadRadius: 3),
                     ],
                   ),
-                  child: Column(
-                    children: [
-                      // Header con glow
-                      _buildHeader(),
-
-                      // Importo principale
-                      Expanded(
-                        child: _buildMainContent(),
-                      ),
-
-                      // CTA Network
-                      _buildNetworkCTA(context),
-
-                      const SizedBox(height: 20),
-                    ],
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildHeader(),
+                        _buildMainContent(),
+                        _buildNetworkCTA(context),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -190,53 +175,39 @@ class _EarningCelebrationPopupState extends State<EarningCelebrationPopup>
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            AppColors.earningsGreen.withOpacity(0.2),
-            AppColors.earningsGreen.withOpacity(0.05),
-          ],
+          colors: [AppColors.earningsGreen.withOpacity(0.2), AppColors.earningsGreen.withOpacity(0.05)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Icona con glow
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppColors.earningsGreen.withOpacity(0.2),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.earningsGreen.withOpacity(0.5),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
+              boxShadow: [BoxShadow(color: AppColors.earningsGreen.withOpacity(0.4), blurRadius: 16, spreadRadius: 1)],
+            ),
+            child: const Icon(Icons.celebration, size: 28, color: AppColors.earningsGreen),
+          ),
+          if (widget.isRushBonus || widget.hasTip) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.isRushBonus) _buildBadge('🔥 RUSH', AppColors.turboOrange),
+                if (widget.isRushBonus && widget.hasTip) const SizedBox(width: 6),
+                if (widget.hasTip) _buildBadge('💰 TIP', AppColors.statsGold),
               ],
             ),
-            child: const Icon(
-              Icons.celebration,
-              size: 36,
-              color: AppColors.earningsGreen,
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (widget.isRushBonus)
-                _buildBadge('🔥 RUSH 2X', AppColors.turboOrange),
-              if (widget.isRushBonus && widget.hasTip)
-                const SizedBox(width: 8),
-              if (widget.hasTip)
-                _buildBadge('💰 +TIP', AppColors.statsGold),
-            ],
-          ),
+          ],
         ],
       ),
     );
@@ -263,24 +234,15 @@ class _EarningCelebrationPopupState extends State<EarningCelebrationPopup>
 
   Widget _buildMainContent() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Label - guadagno dal network
           Text(
-            'GUADAGNO DAL TUO NETWORK',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.7),
-              letterSpacing: 1.5,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            'GUADAGNO DAL NETWORK',
+            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white70, letterSpacing: 1),
           ),
-          const SizedBox(height: 8),
-          // Importo grande con shimmer - wrapped in FittedBox
+          const SizedBox(height: 6),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: AnimatedBuilder(
@@ -289,55 +251,37 @@ class _EarningCelebrationPopupState extends State<EarningCelebrationPopup>
                 return ShaderMask(
                   shaderCallback: (bounds) {
                     return LinearGradient(
-                      colors: [
-                        AppColors.earningsGreen,
-                        Colors.white,
-                        AppColors.earningsGreen,
-                      ],
+                      colors: [AppColors.earningsGreen, Colors.white, AppColors.earningsGreen],
                       stops: [
-                        _shimmerController.value - 0.3,
-                        _shimmerController.value,
-                        _shimmerController.value + 0.3,
-                      ].map((s) => s.clamp(0.0, 1.0)).toList(),
+                        (_shimmerController.value - 0.3).clamp(0.0, 1.0),
+                        _shimmerController.value.clamp(0.0, 1.0),
+                        (_shimmerController.value + 0.3).clamp(0.0, 1.0),
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ).createShader(bounds);
                   },
                   child: Text(
                     '+€${widget.amount.toStringAsFixed(2)}',
-                    style: GoogleFonts.inter(
-                      fontSize: 52,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      height: 1,
-                    ),
+                    style: GoogleFonts.inter(fontSize: 44, fontWeight: FontWeight.w800, color: Colors.white, height: 1),
                   ),
                 );
               },
             ),
           ),
-          const SizedBox(height: 12),
-          // Fonte - network member
+          const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            constraints: const BoxConstraints(maxWidth: 280),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.people, size: 16, color: Colors.white70),
-                const SizedBox(width: 8),
+                const Icon(Icons.people, size: 14, color: Colors.white70),
+                const SizedBox(width: 6),
                 Flexible(
                   child: Text(
                     widget.source,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white70),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -345,21 +289,13 @@ class _EarningCelebrationPopupState extends State<EarningCelebrationPopup>
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          // Frase motivazionale
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              _motivationalPhrase,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.statsGold,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+          const SizedBox(height: 14),
+          Text(
+            _motivationalPhrase,
+            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.statsGold),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -368,76 +304,52 @@ class _EarningCelebrationPopupState extends State<EarningCelebrationPopup>
 
   Widget _buildNetworkCTA(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Divider decorativo
           Container(
             height: 1,
-            margin: const EdgeInsets.only(bottom: 20),
+            margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  AppColors.routeBlue.withOpacity(0.5),
-                  Colors.transparent,
+              gradient: LinearGradient(colors: [Colors.transparent, AppColors.routeBlue.withOpacity(0.4), Colors.transparent]),
+            ),
+          ),
+          Text(
+            _networkCTA,
+            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.white70),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => _goToNetwork(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.routeBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.people_alt, size: 14),
+                  const SizedBox(width: 6),
+                  Text('VAI AL NETWORK', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
           ),
-          // CTA Text
-          Text(
-            _networkCTA,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withOpacity(0.8),
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-          // Bottone Network
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => _goToNetwork(context),
-              icon: const Icon(Icons.people_alt, size: 18),
-              label: Flexible(
-                child: Text(
-                  'VAI AL TUO NETWORK',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.routeBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Link skip
+          const SizedBox(height: 4),
           TextButton(
             onPressed: _dismiss,
-            child: Text(
-              'Continua a consegnare',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: Colors.white.withOpacity(0.5),
-              ),
-            ),
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
+            child: Text('Continua', style: GoogleFonts.inter(fontSize: 11, color: Colors.white38)),
           ),
         ],
       ),
