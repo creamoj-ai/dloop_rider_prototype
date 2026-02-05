@@ -189,8 +189,8 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
-                Text(subtitle, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant)),
+                Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(subtitle, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
               ]),
             ),
             Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 20),
@@ -256,7 +256,7 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
       child: Row(children: [
         Icon(icon, size: 20, color: cs.onSurfaceVariant),
         const SizedBox(width: 12),
-        Text(text, style: GoogleFonts.inter(fontSize: 14, color: cs.onSurface)),
+        Expanded(child: Text(text, style: GoogleFonts.inter(fontSize: 14, color: cs.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis)),
       ]),
     );
   }

@@ -385,6 +385,8 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
                     fontWeight: FontWeight.w500,
                     color: cs.onSurface,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -393,6 +395,8 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
                     fontSize: 12,
                     color: cs.onSurfaceVariant,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 // Badge stato

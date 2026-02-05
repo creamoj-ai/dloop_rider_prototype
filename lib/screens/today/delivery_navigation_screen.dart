@@ -214,6 +214,8 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
                       color: phaseColor,
                       letterSpacing: 0.5,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 // Guadagno
@@ -297,15 +299,20 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(_getActionIcon(order.phase), size: 20),
                               const SizedBox(width: Spacing.sm),
-                              Text(
-                                order.actionLabel,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5,
+                              Flexible(
+                                child: Text(
+                                  order.actionLabel,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -345,6 +352,8 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
                   fontWeight: FontWeight.w600,
                   color: cs.onSurface,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 address,
@@ -352,6 +361,8 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
                   fontSize: 13,
                   color: cs.onSurfaceVariant,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -396,6 +407,8 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
                 fontSize: 12,
                 color: AppColors.statsGold,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -617,6 +630,8 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
                     fontWeight: FontWeight.w600,
                     color: cs.onSurface,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (isRushHour) ...[
@@ -647,6 +662,8 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
               fontSize: 12,
               color: cs.onSurfaceVariant,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             '${order.distanceKm} km totali',

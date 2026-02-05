@@ -267,6 +267,8 @@ class _ZoneCard extends StatelessWidget {
                 color: Colors.white54,
                 fontSize: 11,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             // Earning
             Text(
@@ -327,6 +329,8 @@ class _ExploreOption extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       color: cs.onSurface,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     subtitle,
@@ -334,6 +338,8 @@ class _ExploreOption extends StatelessWidget {
                       fontSize: 12,
                       color: cs.onSurfaceVariant,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
