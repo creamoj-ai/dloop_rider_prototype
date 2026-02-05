@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/dloop_top_bar.dart';
+import '../../widgets/earning_notification.dart';
+import '../../providers/earnings_provider.dart';
 import 'widgets/kpi_strip.dart';
 import 'widgets/active_mode_card.dart';
 import 'widgets/activity_tab.dart';
@@ -7,16 +10,17 @@ import 'widgets/hot_zones.dart';
 import 'widgets/wellness_card.dart';
 import 'widgets/quick_actions_grid.dart';
 
-class TodayScreen extends StatefulWidget {
+class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
 
   @override
-  State<TodayScreen> createState() => _TodayScreenState();
+  ConsumerState<TodayScreen> createState() => _TodayScreenState();
 }
 
-class _TodayScreenState extends State<TodayScreen> {
+class _TodayScreenState extends ConsumerState<TodayScreen> {
   bool _isOnline = true;
   int _notificationCount = 3;
+  int _lastNetworkEarningsCount = 0;
 
   void _showSearch() {
     showModalBottomSheet(
@@ -31,9 +35,9 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   void _showNotifications() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Notifiche in arrivo...')),
-    );
+    // Simula arrivo di un nuovo guadagno dal Network (per demo)
+    final networkNotifier = ref.read(networkEarningsProvider.notifier);
+    networkNotifier.simulateNewNetworkEarning();
   }
 
   void _toggleOnline() {
@@ -50,47 +54,68 @@ class _TodayScreenState extends State<TodayScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          // Top Bar stile Revolut
-          DloopTopBar(
-            isOnline: _isOnline,
-            notificationCount: _notificationCount,
-            onSearchTap: _showSearch,
-            onNotificationTap: _showNotifications,
-            onQuickActionTap: _toggleOnline,
-            searchHint: 'Cerca zone, ordini...',
-          ),
-          // Contenuto scrollabile
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const KpiStrip(),
-                      const SizedBox(height: 24),
-                      const ActiveModeCard(),
-                      const SizedBox(height: 12),
-                      const ActivityTab(),
-                      const SizedBox(height: 24),
-                      const HotZones(),
-                      const SizedBox(height: 24),
-                      const QuickActionsGrid(),
-                      const SizedBox(height: 24),
-                      const WellnessCard(),
-                      const SizedBox(height: 24),
-                    ],
+    final notificationController = ref.watch(earningNotificationControllerProvider);
+    final networkState = ref.watch(networkEarningsProvider);
+
+    // Rileva nuovi guadagni dal Network e mostra popup celebration
+    if (networkState.networkEarnings.length > _lastNetworkEarningsCount && _lastNetworkEarningsCount > 0) {
+      // Nuovo guadagno dal Network! Mostra popup
+      final latestEarning = networkState.networkEarnings.last;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notificationController.show(
+          amount: latestEarning.amount,
+          source: latestEarning.description,
+          hasTip: false,
+          isRushBonus: latestEarning.description.contains('Bonus'),
+        );
+      });
+    }
+    _lastNetworkEarningsCount = networkState.networkEarnings.length;
+
+    return EarningNotificationOverlay(
+      controller: notificationController,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Top Bar stile Revolut
+            DloopTopBar(
+              isOnline: _isOnline,
+              notificationCount: _notificationCount,
+              onSearchTap: _showSearch,
+              onNotificationTap: _showNotifications,
+              onQuickActionTap: _toggleOnline,
+              searchHint: 'Cerca zone, ordini...',
+            ),
+            // Contenuto scrollabile
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const KpiStrip(),
+                        const SizedBox(height: 24),
+                        const ActiveModeCard(),
+                        const SizedBox(height: 12),
+                        const ActivityTab(),
+                        const SizedBox(height: 24),
+                        const HotZones(),
+                        const SizedBox(height: 24),
+                        const QuickActionsGrid(),
+                        const SizedBox(height: 24),
+                        const WellnessCard(),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

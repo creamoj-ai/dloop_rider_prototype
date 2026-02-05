@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';
 import '../models/daily_target.dart';
+import '../models/earning.dart';
 import '../services/rush_hour_service.dart';
+import '../widgets/earning_notification.dart';
+import '../data/mock_data.dart';
 
 /// Stato globale per i guadagni del rider
 class EarningsState {
@@ -388,3 +391,91 @@ final dailyProgressProvider = Provider<double>((ref) {
   final state = ref.watch(earningsProvider);
   return state.dailyTarget.progress;
 });
+
+/// Controller per le notifiche di incasso (singleton)
+final earningNotificationControllerProvider = Provider<EarningNotificationController>((ref) {
+  return EarningNotificationController();
+});
+
+/// Stato per tracciare guadagni dal Network
+class NetworkEarningsState {
+  final List<Earning> networkEarnings;
+  final int notifiedCount;
+
+  const NetworkEarningsState({
+    this.networkEarnings = const [],
+    this.notifiedCount = 0,
+  });
+
+  NetworkEarningsState copyWith({
+    List<Earning>? networkEarnings,
+    int? notifiedCount,
+  }) {
+    return NetworkEarningsState(
+      networkEarnings: networkEarnings ?? this.networkEarnings,
+      notifiedCount: notifiedCount ?? this.notifiedCount,
+    );
+  }
+}
+
+/// Notifier per i guadagni Network
+class NetworkEarningsNotifier extends StateNotifier<NetworkEarningsState> {
+  NetworkEarningsNotifier() : super(const NetworkEarningsState()) {
+    _loadInitialData();
+  }
+
+  void _loadInitialData() {
+    // Carica solo guadagni Network dai mock data
+    final networkEarnings = MockData.transactions
+        .where((e) => e.type == EarningType.network && e.status == EarningStatus.completed)
+        .toList();
+
+    state = NetworkEarningsState(
+      networkEarnings: networkEarnings,
+      notifiedCount: networkEarnings.length, // Non notificare quelli iniziali
+    );
+  }
+
+  /// Simula arrivo di un nuovo guadagno Network (per demo/test)
+  Earning? simulateNewNetworkEarning() {
+    final names = ['Marco', 'Giulia', 'Andrea', 'Francesca', 'Luca', 'Sara'];
+    final types = ['Commissione rete', 'Bonus referral', 'Bonus attivazione'];
+
+    final random = DateTime.now().millisecondsSinceEpoch % names.length;
+    final typeRandom = DateTime.now().millisecondsSinceEpoch % types.length;
+    final amount = 2.0 + (DateTime.now().millisecondsSinceEpoch % 2000) / 100; // €2-22
+
+    final newEarning = Earning(
+      id: 'net_${DateTime.now().millisecondsSinceEpoch}',
+      type: EarningType.network,
+      description: '${types[typeRandom]} - ${names[random]}',
+      amount: amount,
+      dateTime: DateTime.now(),
+      status: EarningStatus.completed,
+    );
+
+    state = state.copyWith(
+      networkEarnings: [...state.networkEarnings, newEarning],
+    );
+
+    return newEarning;
+  }
+
+  /// Segna come notificato fino all'ultimo guadagno
+  void markAsNotified() {
+    state = state.copyWith(notifiedCount: state.networkEarnings.length);
+  }
+
+  /// Controlla se ci sono nuovi guadagni non notificati
+  List<Earning> getUnnotifiedEarnings() {
+    if (state.networkEarnings.length <= state.notifiedCount) {
+      return [];
+    }
+    return state.networkEarnings.sublist(state.notifiedCount);
+  }
+}
+
+/// Provider per i guadagni Network
+final networkEarningsProvider = StateNotifierProvider<NetworkEarningsNotifier, NetworkEarningsState>(
+  (ref) => NetworkEarningsNotifier(),
+);
