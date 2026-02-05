@@ -68,6 +68,258 @@ class _LoginPageState extends State<LoginPage> {
     return 'Errore: $error';
   }
 
+  void _showForgotPasswordDialog() {
+    final resetEmailController = TextEditingController(text: _emailController.text);
+    bool isResetting = false;
+    String? resetError;
+    bool emailSent = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[700],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Icon
+                Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: emailSent
+                          ? AppColors.earningsGreen.withOpacity(0.15)
+                          : AppColors.turboOrange.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      emailSent ? Icons.mark_email_read : Icons.lock_reset,
+                      size: 32,
+                      color: emailSent ? AppColors.earningsGreen : AppColors.turboOrange,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Title
+                Text(
+                  emailSent ? 'Email inviata!' : 'Recupera password',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Description
+                Text(
+                  emailSent
+                      ? 'Controlla la tua casella di posta e segui le istruzioni per reimpostare la password.'
+                      : 'Inserisci la tua email e ti invieremo un link per reimpostare la password.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: Colors.grey[400],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                if (!emailSent) ...[
+                  // Error message
+                  if (resetError != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.urgentRed.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.urgentRed.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppColors.urgentRed,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              resetError!,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: AppColors.urgentRed,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Email field
+                  TextFormField(
+                    controller: resetEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      color: Colors.white,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'nome@esempio.com',
+                      hintStyle: GoogleFonts.inter(
+                        fontSize: 15,
+                        color: Colors.grey[600],
+                      ),
+                      prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[500], size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFF0D0D0F),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[800]!, width: 1),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.turboOrange, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Send button
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: isResetting
+                          ? null
+                          : () async {
+                              final email = resetEmailController.text.trim();
+                              if (email.isEmpty || !email.contains('@')) {
+                                setModalState(() {
+                                  resetError = 'Inserisci un\'email valida';
+                                });
+                                return;
+                              }
+
+                              setModalState(() {
+                                isResetting = true;
+                                resetError = null;
+                              });
+
+                              try {
+                                await Supabase.instance.client.auth.resetPasswordForEmail(email);
+                                setModalState(() {
+                                  emailSent = true;
+                                  isResetting = false;
+                                });
+                              } on AuthException catch (e) {
+                                setModalState(() {
+                                  resetError = e.message;
+                                  isResetting = false;
+                                });
+                              } catch (e) {
+                                setModalState(() {
+                                  resetError = 'Errore di connessione. Riprova.';
+                                  isResetting = false;
+                                });
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.turboOrange,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: AppColors.turboOrange.withOpacity(0.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: isResetting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              'INVIA LINK',
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                    ),
+                  ),
+                ] else ...[
+                  // Success - close button
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.earningsGreen,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        'HO CAPITO',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -216,17 +468,7 @@ class _LoginPageState extends State<LoginPage> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {
-                            // TODO: Implement forgot password
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Funzione in arrivo...'),
-                                backgroundColor: AppColors.turboOrange,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            );
-                          },
+                          onPressed: _showForgotPasswordDialog,
                           child: Text(
                             'Password dimenticata?',
                             style: GoogleFonts.inter(
