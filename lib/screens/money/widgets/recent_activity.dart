@@ -70,10 +70,12 @@ class RecentActivity extends StatelessWidget {
                       Text(
                         tx.desc,
                         style: GoogleFonts.inter(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w500,
                           color: Colors.white,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         tx.time,
