@@ -35,6 +35,15 @@ class DloopTopBar extends StatelessWidget {
             isOnline: isOnline,
             onTap: () => context.go('/you'),
           ),
+          const SizedBox(width: 8),
+
+          // Quick action (bolt/flash) - next to profile
+          _IconButtonWithBadge(
+            icon: Icons.bolt,
+            badgeCount: 0,
+            isAccent: true,
+            onTap: onQuickActionTap,
+          ),
           const SizedBox(width: 12),
 
           // Search bar (espandibile)
@@ -51,15 +60,6 @@ class DloopTopBar extends StatelessWidget {
             icon: Icons.notifications_outlined,
             badgeCount: notificationCount,
             onTap: onNotificationTap,
-          ),
-          const SizedBox(width: 4),
-
-          // Quick action (bolt/flash)
-          _IconButtonWithBadge(
-            icon: Icons.bolt,
-            badgeCount: 0,
-            isAccent: true,
-            onTap: onQuickActionTap,
           ),
         ],
       ),

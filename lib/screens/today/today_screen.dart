@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../widgets/dloop_top_bar.dart';
-import '../you/widgets/profile_header.dart';
 import 'widgets/kpi_strip.dart';
 import 'widgets/active_mode_card.dart';
 import 'widgets/activity_tab.dart';
@@ -74,8 +73,6 @@ class _TodayScreenState extends State<TodayScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const KpiStrip(),
-                      const SizedBox(height: 24),
-                      const ProfileHeader(),
                       const SizedBox(height: 24),
                       const ActiveModeCard(),
                       const SizedBox(height: 12),
