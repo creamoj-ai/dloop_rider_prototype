@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/dloop_top_bar.dart';
 import '../../widgets/invite_sheet.dart';
+import '../../widgets/header_sheets.dart';
 import 'widgets/balance_hero.dart';
 import 'widgets/income_streams.dart';
 import 'widgets/recent_activity.dart';
@@ -22,7 +23,9 @@ class MoneyScreen extends StatelessWidget {
             isOnline: true,
             notificationCount: 2,
             searchHint: 'Cerca transazioni...',
-            onSearchTap: () {},
+            onSearchTap: () => SearchSheet.show(context, hint: 'Cerca transazioni...'),
+            onNotificationTap: () => NotificationsSheet.show(context),
+            onQuickActionTap: () => QuickActionsSheet.show(context),
           ),
           Expanded(
             child: SingleChildScrollView(

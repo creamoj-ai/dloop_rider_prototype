@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/dloop_top_bar.dart';
+import '../../widgets/header_sheets.dart';
 
 class MarketTabScreen extends StatelessWidget {
   const MarketTabScreen({super.key});
@@ -26,7 +27,9 @@ class MarketTabScreen extends StatelessWidget {
               isOnline: true,
               notificationCount: 0,
               searchHint: 'Cerca prodotti...',
-              onSearchTap: () {},
+              onSearchTap: () => SearchSheet.show(context, hint: 'Cerca prodotti...'),
+              onNotificationTap: () => NotificationsSheet.show(context),
+              onQuickActionTap: () => QuickActionsSheet.show(context),
             ),
             Expanded(
               child: ListView(

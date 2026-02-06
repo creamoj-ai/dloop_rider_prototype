@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/dloop_top_bar.dart';
 import '../../widgets/invite_sheet.dart';
+import '../../widgets/header_sheets.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/gamification_card.dart';
 import 'widgets/lifetime_stats.dart';
@@ -21,9 +22,9 @@ class YouScreen extends StatelessWidget {
             isOnline: true,
             notificationCount: 1,
             searchHint: 'Cerca impostazioni...',
-            onSearchTap: () {
-              // TODO: Implementare ricerca impostazioni
-            },
+            onSearchTap: () => SearchSheet.show(context, hint: 'Cerca impostazioni...'),
+            onNotificationTap: () => NotificationsSheet.show(context),
+            onQuickActionTap: () => QuickActionsSheet.show(context),
           ),
           Expanded(
             child: SingleChildScrollView(
