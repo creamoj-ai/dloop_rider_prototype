@@ -1,18 +1,21 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 import '../../../models/zone_data.dart';
 import '../../../services/zones_service.dart';
+import '../../../providers/rest_mode_provider.dart';
 
-class HotZones extends StatefulWidget {
+class HotZones extends ConsumerStatefulWidget {
   const HotZones({super.key});
 
   @override
-  State<HotZones> createState() => _HotZonesState();
+  ConsumerState<HotZones> createState() => _HotZonesState();
 }
 
-class _HotZonesState extends State<HotZones> {
+class _HotZonesState extends ConsumerState<HotZones> {
   List<ZoneData> _zones = [];
   bool _isLoading = true;
   String? _error;
@@ -44,96 +47,175 @@ class _HotZonesState extends State<HotZones> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final restMode = ref.watch(restModeProvider);
+    final isResting = restMode.isResting;
+
+    return Stack(
       children: [
-        // Header
-        Row(
+        // Main content
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.local_fire_department, color: AppColors.turboOrange, size: 22),
-            const SizedBox(width: 8),
-            Text(
-              'ZONE CALDE',
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+            // Header
+            Row(
+              children: [
+                Icon(
+                  isResting ? Icons.bedtime : Icons.local_fire_department,
+                  color: isResting ? AppColors.routeBlue : AppColors.turboOrange,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isResting ? 'MODALITÀ RIPOSO' : 'ZONE CALDE',
+                  style: GoogleFonts.inter(
+                    color: isResting ? AppColors.routeBlue : Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                if (!isResting)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.urgentRed,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'LIVE',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                if (isResting)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.routeBlue.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'PAUSA',
+                      style: GoogleFonts.inter(
+                        color: AppColors.routeBlue,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                const Spacer(),
+                // Refresh button (hidden during rest)
+                if (!isResting)
+                  IconButton(
+                    onPressed: _isLoading ? null : () {
+                      setState(() => _isLoading = true);
+                      _loadZones();
+                    },
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+                          )
+                        : const Icon(Icons.refresh, color: Colors.white54, size: 20),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.urgentRed,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                'LIVE',
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
+            const SizedBox(height: 12),
+            // Scrollable zone cards OR rest mode message
+            SizedBox(
+              height: 120,
+              child: isResting
+                  ? _buildRestModeContent()
+                  : _isLoading
+                      ? const Center(child: CircularProgressIndicator(color: AppColors.turboOrange))
+                      : _error != null
+                          ? Center(
+                              child: Text(
+                                'Errore caricamento zone',
+                                style: GoogleFonts.inter(color: Colors.white54, fontSize: 12),
+                              ),
+                            )
+                          : ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _zones.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 12),
+                              itemBuilder: (context, i) => _ZoneCard(zone: _zones[i]),
+                            ),
+            ),
+            const SizedBox(height: 12),
+            if (!isResting)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showExploreOptions(context),
+                  icon: const Icon(Icons.explore, size: 18),
+                  label: Text(
+                    'ESPLORA ZONE',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.routeBlue,
+                    side: BorderSide(color: AppColors.routeBlue.withOpacity(0.4)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
               ),
-            ),
-            const Spacer(),
-            // Refresh button
-            IconButton(
-              onPressed: _isLoading ? null : () {
-                setState(() => _isLoading = true);
-                _loadZones();
-              },
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
-                    )
-                  : const Icon(Icons.refresh, color: Colors.white54, size: 20),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
           ],
         ),
-        const SizedBox(height: 12),
-        // Scrollable zone cards
-        SizedBox(
-          height: 120,
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.turboOrange))
-              : _error != null
-                  ? Center(
-                      child: Text(
-                        'Errore caricamento zone',
-                        style: GoogleFonts.inter(color: Colors.white54, fontSize: 12),
-                      ),
-                    )
-                  : ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _zones.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, i) => _ZoneCard(zone: _zones[i]),
-                    ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _showExploreOptions(context),
-            icon: const Icon(Icons.explore, size: 18),
-            label: Text(
-              'ESPLORA ZONE',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.routeBlue,
-              side: BorderSide(color: AppColors.routeBlue.withOpacity(0.4)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
-        ),
       ],
+    );
+  }
+
+  Widget _buildRestModeContent() {
+    final restMode = ref.watch(restModeProvider);
+    final minutes = restMode.remainingSeconds ~/ 60;
+    final seconds = restMode.remainingSeconds % 60;
+    final timeStr = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.routeBlue.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.routeBlue.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.self_improvement, color: AppColors.routeBlue, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                timeStr,
+                style: GoogleFonts.inter(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.routeBlue,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Rilassati, le zone calde torneranno dopo la pausa',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.white54,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 

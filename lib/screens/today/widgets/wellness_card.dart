@@ -1,16 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
+import '../../../providers/rest_mode_provider.dart';
 
-class WellnessCard extends StatefulWidget {
+class WellnessCard extends ConsumerStatefulWidget {
   const WellnessCard({super.key});
 
   @override
-  State<WellnessCard> createState() => _WellnessCardState();
+  ConsumerState<WellnessCard> createState() => _WellnessCardState();
 }
 
-class _WellnessCardState extends State<WellnessCard> {
+class _WellnessCardState extends ConsumerState<WellnessCard> {
   bool _isExpanded = false;
   bool _isResting = false;
   int? _selectedMinutes;
@@ -56,10 +58,14 @@ class _WellnessCardState extends State<WellnessCard> {
       _isExpanded = true;
     });
 
+    // Update global rest mode
+    ref.read(restModeProvider.notifier).startRest(minutes);
+
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 0) {
         setState(() => _remainingSeconds--);
+        ref.read(restModeProvider.notifier).updateTime(_remainingSeconds);
       } else {
         _endBreak(completed: true);
       }
@@ -89,6 +95,9 @@ class _WellnessCardState extends State<WellnessCard> {
       _remainingSeconds = 0;
       if (completed) _stressIndex = (_stressIndex - 0.2).clamp(0.1, 1.0);
     });
+
+    // End global rest mode
+    ref.read(restModeProvider.notifier).endRest();
 
     if (completed) {
       ScaffoldMessenger.of(context).showSnackBar(

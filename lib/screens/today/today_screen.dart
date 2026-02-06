@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/dloop_top_bar.dart';
 import '../../widgets/earning_notification.dart';
+import '../../widgets/header_sheets.dart';
 import '../../providers/earnings_provider.dart';
 import 'widgets/kpi_strip.dart';
 import 'widgets/active_mode_card.dart';
@@ -81,9 +82,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             DloopTopBar(
               isOnline: _isOnline,
               notificationCount: _notificationCount,
-              onSearchTap: _showSearch,
-              onNotificationTap: _showNotifications,
-              onQuickActionTap: _toggleOnline,
+              onSearchTap: () => SearchSheet.show(context, hint: 'Cerca zone, ordini...'),
+              onNotificationTap: () => NotificationsSheet.show(context),
+              onQuickActionTap: () => QuickActionsSheet.show(context),
               searchHint: 'Cerca zone, ordini...',
             ),
             // Contenuto scrollabile
