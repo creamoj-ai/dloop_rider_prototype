@@ -817,13 +817,14 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
   }
 
   void _showExitConfirmation(ColorScheme cs, int orderCount) {
+    if (!mounted) return;
     if (orderCount == 0) {
       context.go('/today');
       return;
     }
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: cs.surface,
         title: Text(
           'Uscire dalla gestione ordini?',
@@ -835,13 +836,13 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text('Resta', style: GoogleFonts.inter(color: AppColors.earningsGreen)),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              context.go('/today');
+              Navigator.pop(dialogContext);
+              if (mounted) context.go('/today');
             },
             child: Text('Esci', style: GoogleFonts.inter(color: cs.onSurfaceVariant)),
           ),
@@ -851,9 +852,10 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
   }
 
   void _showCancelConfirmation(ColorScheme cs, ActiveOrder order) {
+    if (!mounted) return;
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: cs.surface,
         title: Text(
           'Annullare ordine?',
@@ -865,13 +867,13 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text('Mantieni', style: GoogleFonts.inter(color: AppColors.earningsGreen)),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              ref.read(activeOrdersProvider.notifier).cancelOrder(order.id);
+              Navigator.pop(dialogContext);
+              if (mounted) ref.read(activeOrdersProvider.notifier).cancelOrder(order.id);
             },
             child: Text('Annulla ordine', style: GoogleFonts.inter(color: AppColors.urgentRed)),
           ),

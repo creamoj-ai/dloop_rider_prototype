@@ -63,6 +63,13 @@ class EarningsBreakdownCard extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             _BreakdownItem(
+              label: 'Attesa ristorante',
+              amount: breakdown['hold'] ?? 0,
+              color: Colors.deepPurpleAccent,
+              icon: Icons.hourglass_bottom,
+            ),
+            const SizedBox(height: 12),
+            _BreakdownItem(
               label: 'Performance Bonus',
               amount: breakdown['bonus'] ?? 0,
               color: Colors.amber,

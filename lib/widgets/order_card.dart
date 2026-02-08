@@ -118,13 +118,19 @@ class OrderCard extends StatelessWidget {
     return Column(
       children: [
         _EarningRow(
-          label: 'Base (${order.distanceKm.toStringAsFixed(1)}km × €${Order.ratePerKm.toStringAsFixed(2)})',
+          label: 'Base (${order.distanceKm.toStringAsFixed(1)}km × €${Order.defaultRatePerKm.toStringAsFixed(2)})',
           amount: order.baseEarning,
         ),
         if (order.isRushHour)
           _EarningRow(
             label: '🔥 Rush Hour (×${order.rushMultiplier.toInt()})',
             amount: order.rushBonus,
+            isBonus: true,
+          ),
+        if (order.holdCost > 0)
+          _EarningRow(
+            label: '⏱ Attesa (${order.holdMinutes} min)',
+            amount: order.holdCost,
             isBonus: true,
           ),
         if (order.bonusEarning > 0)

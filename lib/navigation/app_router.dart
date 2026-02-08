@@ -16,6 +16,7 @@ import '../screens/money/sub/analytics_screen.dart';
 import '../screens/market/market_tab_screen.dart';
 import '../screens/money/sub/market_screen.dart';
 import '../screens/you/you_screen.dart';
+import '../screens/you/pricing_settings_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -94,6 +95,9 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/you',
           pageBuilder: (context, state) => const NoTransitionPage(child: YouScreen()),
+          routes: [
+            GoRoute(path: 'pricing', builder: (context, state) => const PricingSettingsScreen()),
+          ],
         ),
       ],
     ),

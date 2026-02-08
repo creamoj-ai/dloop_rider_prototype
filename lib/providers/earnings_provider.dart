@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';
+import '../models/rider.dart';
 import '../models/daily_target.dart';
 import '../models/earning.dart';
 import '../services/rush_hour_service.dart';
@@ -66,13 +67,14 @@ class EarningsState {
 
   /// Breakdown guadagni di oggi
   Map<String, double> get todayBreakdown {
-    double base = 0, bonus = 0, tips = 0, rush = 0;
+    double base = 0, bonus = 0, tips = 0, rush = 0, hold = 0;
 
     for (var order in todayOrders.where((o) => o.status == OrderStatus.delivered)) {
       base += order.baseEarning;
       bonus += order.bonusEarning;
       tips += order.tipAmount;
       rush += order.rushBonus;
+      hold += order.holdCost;
     }
 
     return {
@@ -80,7 +82,8 @@ class EarningsState {
       'bonus': bonus,
       'tips': tips,
       'rush': rush,
-      'total': base + bonus + tips + rush,
+      'hold': hold,
+      'total': base + bonus + tips + rush + hold,
     };
   }
 
@@ -124,7 +127,7 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
       status: OrderStatus.delivered,
     );
 
-    // Ordine 2 - CONSEGNATO - pranzo rush hour
+    // Ordine 2 - CONSEGNATO - pranzo rush hour + attesa
     _addDemoOrder(
       restaurantName: 'Rossopomodoro',
       customerAddress: 'Piazza Duomo 1',
@@ -132,6 +135,7 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
       tipAmount: 1.00,
       minutesAgo: 120,
       forceRush: true,
+      holdMinutes: 12, // 12 min attesa = 7 min pagati
       status: OrderStatus.delivered,
     );
 
@@ -144,12 +148,13 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
       status: OrderStatus.cancelled,
     );
 
-    // Ordine 4 - CONSEGNATO - pomeriggio
+    // Ordine 4 - CONSEGNATO - lunga distanza + attesa
     _addDemoOrder(
       restaurantName: 'Sushi Zen',
       customerAddress: 'Corso Italia 88',
-      distanceKm: 3.1,
+      distanceKm: 6.2, // lunga distanza: attiva bonus extra/km
       minutesAgo: 60,
+      holdMinutes: 8, // 8 min attesa = 3 min pagati
       status: OrderStatus.delivered,
     );
 
@@ -190,11 +195,14 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
     double tipAmount = 0,
     int minutesAgo = 0,
     bool forceRush = false,
+    int holdMinutes = 0,
     OrderStatus status = OrderStatus.delivered,
   }) {
     final timestamp = DateTime.now().subtract(Duration(minutes: minutesAgo));
     final rushMultiplier = forceRush ? 2.0 : 1.0;
-    final baseEarning = distanceKm * Order.ratePerKm;
+    const pricing = RiderPricing();
+    final baseEarning = pricing.calculateBaseEarning(distanceKm);
+    final holdCost = pricing.calculateHoldCost(holdMinutes);
 
     final order = Order(
       id: 'demo_${DateTime.now().millisecondsSinceEpoch}_$minutesAgo',
@@ -204,6 +212,8 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
       baseEarning: baseEarning,
       tipAmount: tipAmount,
       rushMultiplier: rushMultiplier,
+      holdCost: holdCost,
+      holdMinutes: holdMinutes,
       status: status,
       createdAt: timestamp.subtract(const Duration(minutes: 15)),
       acceptedAt: status.index >= OrderStatus.accepted.index ? timestamp.subtract(const Duration(minutes: 10)) : null,

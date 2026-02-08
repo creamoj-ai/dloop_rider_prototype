@@ -1,4 +1,5 @@
 import '../services/rush_hour_service.dart';
+import 'rider.dart';
 
 /// Order Status enum
 enum OrderStatus {
@@ -20,10 +21,13 @@ class Order {
   final double distanceKm;
 
   // Breakdown guadagni
-  final double baseEarning;     // distanceKm * ratePerKm
+  final double baseEarning;     // calcolato con distance tiers
   final double bonusEarning;    // Bonus performance
   final double tipAmount;       // Mancia cliente
   final double rushMultiplier;  // 1.0 normale, 2.0 rush hour
+  final double holdCost;        // Costo attesa al ristorante
+  final int holdMinutes;        // Minuti di attesa al ristorante
+  final double minGuarantee;    // Minimo garantito per questa consegna
 
   final OrderStatus status;
   final DateTime createdAt;
@@ -31,8 +35,8 @@ class Order {
   final DateTime? pickedUpAt;
   final DateTime? deliveredAt;
 
-  // Rate per km configurabile
-  static const double ratePerKm = 1.50; // €1.50/km
+  // Rate per km default (usato quando non c'è RiderPricing)
+  static const double defaultRatePerKm = 1.50;
 
   Order({
     required this.id,
@@ -45,6 +49,9 @@ class Order {
     this.bonusEarning = 0,
     this.tipAmount = 0,
     this.rushMultiplier = 1.0,
+    this.holdCost = 0,
+    this.holdMinutes = 0,
+    this.minGuarantee = 3.00,
     this.status = OrderStatus.pending,
     required this.createdAt,
     this.acceptedAt,
@@ -52,13 +59,14 @@ class Order {
     this.deliveredAt,
   });
 
-  /// Calcola guadagno totale
+  /// Calcola guadagno totale (con minimo garantito)
   double get totalEarning {
     final baseWithRush = baseEarning * rushMultiplier;
-    return baseWithRush + bonusEarning + tipAmount;
+    final subtotal = baseWithRush + bonusEarning + tipAmount + holdCost;
+    return subtotal < minGuarantee ? minGuarantee : subtotal;
   }
 
-  /// Guadagno base con rush (senza bonus/tip)
+  /// Guadagno base con rush (senza bonus/tip/hold)
   double get baseWithRush => baseEarning * rushMultiplier;
 
   /// Bonus rush hour (la parte extra)
@@ -69,8 +77,21 @@ class Order {
   /// È in rush hour?
   bool get isRushHour => rushMultiplier > 1;
 
+  /// Il minimo garantito è stato applicato?
+  bool get minGuaranteeApplied {
+    final subtotal = baseWithRush + bonusEarning + tipAmount + holdCost;
+    return subtotal < minGuarantee;
+  }
+
   /// Tempo stimato consegna (minuti)
-  int get estimatedMinutes => (distanceKm * 4).round(); // ~4 min/km
+  int get estimatedMinutes => (distanceKm * 4).round();
+
+  /// Fascia distanza
+  String get distanceTier {
+    if (distanceKm <= 2.0) return 'corta';
+    if (distanceKm <= 5.0) return 'media';
+    return 'lunga';
+  }
 
   /// Factory per creare un nuovo ordine con calcolo automatico
   factory Order.create({
@@ -82,8 +103,13 @@ class Order {
     required double distanceKm,
     double bonusEarning = 0,
     double tipAmount = 0,
+    int holdMinutes = 0,
+    RiderPricing? pricing,
   }) {
+    final riderPricing = pricing ?? const RiderPricing();
     final multiplier = RushHourService.getCurrentMultiplier();
+    final baseEarning = riderPricing.calculateBaseEarning(distanceKm);
+    final holdCost = riderPricing.calculateHoldCost(holdMinutes);
 
     return Order(
       id: id,
@@ -92,10 +118,13 @@ class Order {
       customerName: customerName,
       customerAddress: customerAddress,
       distanceKm: distanceKm,
-      baseEarning: distanceKm * ratePerKm,
+      baseEarning: baseEarning,
       bonusEarning: bonusEarning,
       tipAmount: tipAmount,
       rushMultiplier: multiplier,
+      holdCost: holdCost,
+      holdMinutes: holdMinutes,
+      minGuarantee: riderPricing.minDeliveryFee,
       status: OrderStatus.pending,
       createdAt: DateTime.now(),
     );
@@ -114,6 +143,9 @@ class Order {
       bonusEarning: bonusEarning,
       tipAmount: tipAmount,
       rushMultiplier: rushMultiplier,
+      holdCost: holdCost,
+      holdMinutes: holdMinutes,
+      minGuarantee: minGuarantee,
       status: newStatus,
       createdAt: createdAt,
       acceptedAt: newStatus == OrderStatus.accepted ? DateTime.now() : acceptedAt,
@@ -135,6 +167,9 @@ class Order {
       bonusEarning: bonusEarning,
       tipAmount: tipAmount + tip,
       rushMultiplier: rushMultiplier,
+      holdCost: holdCost,
+      holdMinutes: holdMinutes,
+      minGuarantee: minGuarantee,
       status: status,
       createdAt: createdAt,
       acceptedAt: acceptedAt,
@@ -143,13 +178,35 @@ class Order {
     );
   }
 
-  /// Per debug/logging
+  /// Aggiorna attesa (hold)
+  Order updateHold(int minutes, RiderPricing pricing) {
+    return Order(
+      id: id,
+      restaurantName: restaurantName,
+      restaurantAddress: restaurantAddress,
+      customerName: customerName,
+      customerAddress: customerAddress,
+      distanceKm: distanceKm,
+      baseEarning: baseEarning,
+      bonusEarning: bonusEarning,
+      tipAmount: tipAmount,
+      rushMultiplier: rushMultiplier,
+      holdCost: pricing.calculateHoldCost(minutes),
+      holdMinutes: minutes,
+      minGuarantee: minGuarantee,
+      status: status,
+      createdAt: createdAt,
+      acceptedAt: acceptedAt,
+      pickedUpAt: pickedUpAt,
+      deliveredAt: deliveredAt,
+    );
+  }
+
   @override
   String toString() {
     return 'Order($id: $restaurantName -> $customerAddress, ${distanceKm}km, €$totalEarning)';
   }
 
-  /// Serializzazione per Supabase
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -162,6 +219,9 @@ class Order {
       'bonus_earning': bonusEarning,
       'tip_amount': tipAmount,
       'rush_multiplier': rushMultiplier,
+      'hold_cost': holdCost,
+      'hold_minutes': holdMinutes,
+      'min_guarantee': minGuarantee,
       'status': status.name,
       'created_at': createdAt.toIso8601String(),
       'accepted_at': acceptedAt?.toIso8601String(),
@@ -170,7 +230,6 @@ class Order {
     };
   }
 
-  /// Deserializzazione da Supabase
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
       id: json['id'] as String,
@@ -183,6 +242,9 @@ class Order {
       bonusEarning: (json['bonus_earning'] as num?)?.toDouble() ?? 0,
       tipAmount: (json['tip_amount'] as num?)?.toDouble() ?? 0,
       rushMultiplier: (json['rush_multiplier'] as num?)?.toDouble() ?? 1.0,
+      holdCost: (json['hold_cost'] as num?)?.toDouble() ?? 0,
+      holdMinutes: (json['hold_minutes'] as int?) ?? 0,
+      minGuarantee: (json['min_guarantee'] as num?)?.toDouble() ?? 3.00,
       status: OrderStatus.values.firstWhere(
         (s) => s.name == json['status'],
         orElse: () => OrderStatus.pending,

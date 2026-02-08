@@ -516,7 +516,7 @@ class _NuovoOrdineCard extends StatelessWidget {
 
     // Calcola guadagno stimato
     const distanceKm = 2.5;
-    final baseEarning = distanceKm * Order.ratePerKm;
+    final baseEarning = distanceKm * Order.defaultRatePerKm;
     final totalEarning = baseEarning * multiplier + 1.0; // +1 bonus
 
     return Container(
