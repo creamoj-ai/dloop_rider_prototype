@@ -222,6 +222,7 @@ class Order {
       'hold_cost': holdCost,
       'hold_minutes': holdMinutes,
       'min_guarantee': minGuarantee,
+      'distance_tier': distanceTier,
       'status': status.name,
       'created_at': createdAt.toIso8601String(),
       'accepted_at': acceptedAt?.toIso8601String(),

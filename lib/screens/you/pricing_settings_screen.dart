@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/rider.dart';
+import '../../services/pricing_service.dart';
 import '../../theme/tokens.dart';
 
 /// Provider per le impostazioni tariffe del rider
@@ -10,22 +12,91 @@ final riderPricingProvider = StateNotifierProvider<RiderPricingNotifier, RiderPr
 );
 
 class RiderPricingNotifier extends StateNotifier<RiderPricing> {
-  RiderPricingNotifier() : super(const RiderPricing());
+  RiderPricingNotifier() : super(const RiderPricing()) {
+    _loadFromSupabase();
+  }
 
-  void updateRatePerKm(double value) => state = state.copyWith(ratePerKm: value);
-  void updateMinDeliveryFee(double value) => state = state.copyWith(minDeliveryFee: value);
-  void updateHoldCostPerMin(double value) => state = state.copyWith(holdCostPerMin: value);
-  void updateHoldFreeMinutes(int value) => state = state.copyWith(holdFreeMinutes: value);
-  void updateShortDistanceMax(double value) => state = state.copyWith(shortDistanceMax: value);
-  void updateMediumDistanceMax(double value) => state = state.copyWith(mediumDistanceMax: value);
-  void updateLongDistanceBonus(double value) => state = state.copyWith(longDistanceBonus: value);
+  Timer? _saveTimer;
+
+  Future<void> _loadFromSupabase() async {
+    try {
+      final pricing = await PricingService.getRiderPricing();
+      state = pricing;
+    } catch (_) {
+      // Keep defaults
+    }
+  }
+
+  void _debouncedSave() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 800), () {
+      PricingService.saveRiderPricing(state);
+    });
+  }
+
+  void flushSave() {
+    _saveTimer?.cancel();
+    PricingService.saveRiderPricing(state);
+  }
+
+  void updateRatePerKm(double value) {
+    state = state.copyWith(ratePerKm: value);
+    _debouncedSave();
+  }
+
+  void updateMinDeliveryFee(double value) {
+    state = state.copyWith(minDeliveryFee: value);
+    _debouncedSave();
+  }
+
+  void updateHoldCostPerMin(double value) {
+    state = state.copyWith(holdCostPerMin: value);
+    _debouncedSave();
+  }
+
+  void updateHoldFreeMinutes(int value) {
+    state = state.copyWith(holdFreeMinutes: value);
+    _debouncedSave();
+  }
+
+  void updateShortDistanceMax(double value) {
+    state = state.copyWith(shortDistanceMax: value);
+    _debouncedSave();
+  }
+
+  void updateMediumDistanceMax(double value) {
+    state = state.copyWith(mediumDistanceMax: value);
+    _debouncedSave();
+  }
+
+  void updateLongDistanceBonus(double value) {
+    state = state.copyWith(longDistanceBonus: value);
+    _debouncedSave();
+  }
+
+  @override
+  void dispose() {
+    _saveTimer?.cancel();
+    super.dispose();
+  }
 }
 
-class PricingSettingsScreen extends ConsumerWidget {
+class PricingSettingsScreen extends ConsumerStatefulWidget {
   const PricingSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PricingSettingsScreen> createState() => _PricingSettingsScreenState();
+}
+
+class _PricingSettingsScreenState extends ConsumerState<PricingSettingsScreen> {
+  @override
+  void dispose() {
+    ref.read(riderPricingProvider.notifier).flushSave();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final pricing = ref.watch(riderPricingProvider);
     final cs = Theme.of(context).colorScheme;
 

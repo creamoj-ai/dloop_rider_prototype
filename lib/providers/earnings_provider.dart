@@ -4,6 +4,8 @@ import '../models/rider.dart';
 import '../models/daily_target.dart';
 import '../models/earning.dart';
 import '../services/rush_hour_service.dart';
+import '../services/orders_service.dart';
+import '../services/earnings_service.dart';
 import '../widgets/earning_notification.dart';
 import '../data/mock_data.dart';
 
@@ -111,8 +113,40 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
   EarningsNotifier() : super(EarningsState(
     dailyTarget: DailyTarget(date: DateTime.now()),
   )) {
-    // Carica dati mock per demo
+    _loadFromSupabase();
+  }
+
+  /// Try loading from Supabase, fall back to demo data
+  Future<void> _loadFromSupabase() async {
+    try {
+      final orders = await OrdersService.getTodayOrders();
+      if (orders.isNotEmpty) {
+        _applyOrders(orders);
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback to demo data
     _loadDemoData();
+  }
+
+  /// Apply a list of orders to state (used after Supabase load)
+  void _applyOrders(List<Order> orders) {
+    var target = DailyTarget(date: DateTime.now());
+    double km = 0;
+
+    for (final order in orders) {
+      if (order.status == OrderStatus.delivered) {
+        target = target.addEarning(order.totalEarning);
+        km += order.distanceKm;
+      }
+    }
+
+    state = state.copyWith(
+      todayOrders: orders,
+      dailyTarget: target,
+      totalKmToday: km,
+    );
   }
 
   /// Carica ordini demo per testare UI con vari stati
@@ -252,6 +286,9 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
   void acceptOrder(Order order) {
     final acceptedOrder = order.copyWithStatus(OrderStatus.accepted);
     state = state.copyWith(activeOrder: acceptedOrder);
+
+    // Persist to Supabase
+    OrdersService.createOrder(acceptedOrder);
   }
 
   /// Segna ordine come ritirato
@@ -259,6 +296,9 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
     if (state.activeOrder == null) return;
     final pickedUpOrder = state.activeOrder!.copyWithStatus(OrderStatus.pickedUp);
     state = state.copyWith(activeOrder: pickedUpOrder);
+
+    // Persist status change
+    OrdersService.updateOrderStatus(pickedUpOrder.id, OrderStatus.pickedUp);
   }
 
   /// Completa la consegna
@@ -287,6 +327,18 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
       totalKmToday: updatedKm,
       clearActiveOrder: true,
     );
+
+    // Persist order status + create earning record
+    OrdersService.updateOrderStatus(completedOrder.id, OrderStatus.delivered);
+    EarningsService.createEarning(Earning(
+      id: 'earn_${DateTime.now().millisecondsSinceEpoch}',
+      type: EarningType.delivery,
+      description: 'Consegna ${completedOrder.restaurantName}',
+      amount: completedOrder.totalEarning,
+      dateTime: DateTime.now(),
+      status: EarningStatus.completed,
+      orderId: completedOrder.id,
+    ));
   }
 
   /// Annulla ordine attivo
@@ -299,6 +351,9 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
       todayOrders: updatedOrders,
       clearActiveOrder: true,
     );
+
+    // Persist cancellation
+    OrdersService.updateOrderStatus(cancelledOrder.id, OrderStatus.cancelled);
   }
 
   /// Simula un ordine completato (per testing/demo)
@@ -434,15 +489,31 @@ class NetworkEarningsNotifier extends StateNotifier<NetworkEarningsState> {
     _loadInitialData();
   }
 
-  void _loadInitialData() {
-    // Carica solo guadagni Network dai mock data
+  Future<void> _loadInitialData() async {
+    // Try Supabase first
+    try {
+      final earnings = await EarningsService.getEarnings();
+      final networkEarnings = earnings
+          .where((e) => e.type == EarningType.network && e.status == EarningStatus.completed)
+          .toList();
+
+      if (networkEarnings.isNotEmpty) {
+        state = NetworkEarningsState(
+          networkEarnings: networkEarnings,
+          notifiedCount: networkEarnings.length,
+        );
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback to mock data
     final networkEarnings = MockData.transactions
         .where((e) => e.type == EarningType.network && e.status == EarningStatus.completed)
         .toList();
 
     state = NetworkEarningsState(
       networkEarnings: networkEarnings,
-      notifiedCount: networkEarnings.length, // Non notificare quelli iniziali
+      notifiedCount: networkEarnings.length,
     );
   }
 
@@ -467,6 +538,9 @@ class NetworkEarningsNotifier extends StateNotifier<NetworkEarningsState> {
     state = state.copyWith(
       networkEarnings: [...state.networkEarnings, newEarning],
     );
+
+    // Persist to Supabase
+    EarningsService.createEarning(newEarning);
 
     return newEarning;
   }
