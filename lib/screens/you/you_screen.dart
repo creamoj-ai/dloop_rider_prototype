@@ -6,8 +6,10 @@ import '../../widgets/dloop_top_bar.dart';
 import '../../widgets/invite_sheet.dart';
 import '../../widgets/header_sheets.dart';
 import 'widgets/profile_header.dart';
-import 'widgets/gamification_card.dart';
-import 'widgets/lifetime_stats.dart';
+import 'widgets/today_stats_card.dart';
+import 'widgets/stats_only_card.dart';
+import 'widgets/expandable_gamification_card.dart';
+import 'widgets/account_section.dart';
 
 class YouScreen extends StatelessWidget {
   const YouScreen({super.key});
@@ -32,26 +34,26 @@ class YouScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Column(
                 children: [
+                  // 1. Profile Header
                   const ProfileHeader(),
                   const SizedBox(height: 24),
-                  // Today snapshot pills
-                  Row(
-                    children: [
-                      _pill(cs, 'Ordini', '8', AppColors.turboOrange),
-                      const SizedBox(width: 10),
-                      _pill(cs, 'Ore', '6.5h', AppColors.earningsGreen),
-                      const SizedBox(width: 10),
-                      _pill(cs, 'Guadagno', '\u20AC142.60', AppColors.bonusPurple),
-                    ],
-                  ),
+                  // 2. Le Mie Statistiche di Oggi
+                  const TodayStatsCard(),
                   const SizedBox(height: 24),
-                  const GamificationCard(),
-                  const SizedBox(height: 24),
-                  _buildPricingSection(context, cs),
-                  const SizedBox(height: 24),
+                  // 3. Invita Amici
                   _buildInviteSection(context, cs),
                   const SizedBox(height: 24),
-                  const LifetimeStats(),
+                  // 4. Le Mie Tariffe
+                  _buildPricingSection(context, cs),
+                  const SizedBox(height: 24),
+                  // 5. Statistiche Lifetime
+                  const StatsOnlyCard(),
+                  const SizedBox(height: 24),
+                  // 6. Gamification (espandibile)
+                  const ExpandableGamificationCard(),
+                  const SizedBox(height: 24),
+                  // 7. Account
+                  const AccountSection(),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -198,25 +200,6 @@ class YouScreen extends StatelessWidget {
               size: 16,
               color: AppColors.turboOrange,
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _pill(ColorScheme cs, String label, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            Text(value, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-            Text(label, style: GoogleFonts.inter(fontSize: 11, color: color)),
           ],
         ),
       ),

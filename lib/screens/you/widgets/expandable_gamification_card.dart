@@ -1,0 +1,122 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../theme/tokens.dart';
+import '../../../widgets/dloop_card.dart';
+
+class ExpandableGamificationCard extends StatefulWidget {
+  const ExpandableGamificationCard({super.key});
+
+  @override
+  State<ExpandableGamificationCard> createState() => _ExpandableGamificationCardState();
+}
+
+class _ExpandableGamificationCardState extends State<ExpandableGamificationCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return DloopCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header cliccabile
+          InkWell(
+            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.emoji_events,
+                    size: 18,
+                    color: AppColors.statsGold,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'GAMIFICATION',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    color: cs.onSurfaceVariant,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Contenuto espandibile
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Column(
+              children: [
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _stat(Icons.local_fire_department, '12 giorni', 'Streak', AppColors.turboOrange),
+                    _stat(Icons.star, '12', 'Livello', AppColors.bonusPurple),
+                    _stat(Icons.emoji_events, '8/20', 'Badge', AppColors.statsGold),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 60,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      _badge(Icons.shopping_bag, 'First Order', AppColors.turboOrange),
+                      _badge(Icons.flash_on, 'Speed Demon', AppColors.urgentRed),
+                      _badge(Icons.people, 'Network Builder', AppColors.earningsGreen),
+                      _badge(Icons.trending_up, 'Top Earner', AppColors.statsGold),
+                      _badge(Icons.favorite, 'Loyal Rider', AppColors.bonusPurple),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stat(IconData icon, String value, String label, Color color) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 22),
+        const SizedBox(height: 4),
+        Text(value, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+        Text(label, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF9E9E9E))),
+      ],
+    );
+  }
+
+  Widget _badge(IconData icon, String label, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: color.withOpacity(0.2),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: GoogleFonts.inter(fontSize: 9, color: const Color(0xFF9E9E9E)), overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    );
+  }
+}
