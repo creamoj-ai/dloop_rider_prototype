@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/dloop_card.dart';
+import '../../../providers/user_provider.dart';
 
-class AccountSection extends StatelessWidget {
+class AccountSection extends ConsumerWidget {
   const AccountSection({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
 
     return DloopCard(
@@ -32,15 +34,15 @@ class AccountSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          _menuItem(context, Icons.settings, 'Impostazioni', null),
-          _menuItem(context, Icons.support_agent, 'Supporto', null),
-          _menuItem(context, Icons.logout, 'Logout', Colors.red),
+          _menuItem(context, ref, Icons.settings, 'Impostazioni', null),
+          _menuItem(context, ref, Icons.support_agent, 'Supporto', null),
+          _menuItem(context, ref, Icons.logout, 'Logout', Colors.red),
         ],
       ),
     );
   }
 
-  Widget _menuItem(BuildContext context, IconData icon, String label, Color? color) {
+  Widget _menuItem(BuildContext context, WidgetRef ref, IconData icon, String label, Color? color) {
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
@@ -60,7 +62,7 @@ class AccountSection extends StatelessWidget {
       ),
       onTap: () {
         if (label == 'Logout') {
-          _handleLogout(context);
+          _handleLogout(context, ref);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(label)),
@@ -70,7 +72,7 @@ class AccountSection extends StatelessWidget {
     );
   }
 
-  void _handleLogout(BuildContext context) {
+  void _handleLogout(BuildContext context, WidgetRef ref) {
     final rootContext = context;
     showDialog(
       context: context,
@@ -103,7 +105,13 @@ class AccountSection extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
+
+              // Pulisci il provider
+              ref.read(currentUserProvider.notifier).logout();
+
+              // Logout da Supabase Auth
               await Supabase.instance.client.auth.signOut();
+
               if (rootContext.mounted) {
                 rootContext.go('/login');
               }

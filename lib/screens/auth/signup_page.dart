@@ -40,13 +40,28 @@ class _SignupPageState extends State<SignupPage> {
     });
 
     try {
-      await Supabase.instance.client.auth.signUp(
+      // Parse nome e cognome
+      final fullName = _nameController.text.trim();
+      final nameParts = fullName.split(' ');
+      final firstName = nameParts.first;
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+      // Signup con Supabase Auth
+      final response = await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         data: {
-          'full_name': _nameController.text.trim(),
+          'full_name': fullName,
         },
       );
+
+      // Il trigger automatico ha creato il profilo, ora aggiorniamo first_name e last_name
+      if (response.user != null) {
+        await Supabase.instance.client.from('users').update({
+          'first_name': firstName,
+          'last_name': lastName,
+        }).eq('id', response.user!.id);
+      }
 
       if (mounted) {
         _showSuccessDialog();
