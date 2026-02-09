@@ -34,6 +34,10 @@ class YouScreen extends StatelessWidget {
                   const ProfileHeader(),
                   const SizedBox(height: 24),
                   // Today snapshot pills
+                  Center(
+                    child: Text('OGGI', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF9E9E9E), letterSpacing: 1)),
+                  ),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       _pill(cs, 'Ordini', '8', AppColors.turboOrange),
@@ -46,9 +50,9 @@ class YouScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                   const GamificationCard(),
                   const SizedBox(height: 24),
-                  _buildInviteSection(context, cs),
-                  const SizedBox(height: 24),
                   const LifetimeStats(),
+                  const SizedBox(height: 24),
+                  _buildInviteSection(context, cs),
                   const SizedBox(height: 32),
                 ],
               ),

@@ -18,23 +18,8 @@ class GamificationCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _stat(Icons.local_fire_department, '12 giorni', 'Streak', AppColors.turboOrange),
-              _stat(Icons.star, '12', 'Livello', AppColors.bonusPurple),
               _stat(Icons.emoji_events, '8/20', 'Badge', AppColors.statsGold),
             ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 60,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _badge(Icons.shopping_bag, 'First Order', AppColors.turboOrange),
-                _badge(Icons.flash_on, 'Speed Demon', AppColors.urgentRed),
-                _badge(Icons.people, 'Network Builder', AppColors.earningsGreen),
-                _badge(Icons.trending_up, 'Top Earner', AppColors.statsGold),
-                _badge(Icons.favorite, 'Loyal Rider', AppColors.bonusPurple),
-              ],
-            ),
           ),
         ],
       ),

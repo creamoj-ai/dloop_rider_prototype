@@ -25,10 +25,7 @@ class LifetimeStats extends StatelessWidget {
             children: [
               _gridStat('1.247', 'Ordini totali'),
               _gridStat('\u20AC 18.450', 'Guadagno totale'),
-              _gridStat('3.820', 'Km percorsi'),
               _gridStat('4.8 \u2605', 'Rating medio'),
-              _gridStat('\u20AC 87.40', 'Best day'),
-              _gridStat('892', 'Ore totali'),
             ],
           ),
           const Divider(color: Color(0xFF252529), height: 32),
