@@ -148,7 +148,7 @@ class UserService {
               'total_orders': user.totalOrders + 1,
               'total_earnings': user.totalEarnings + earnings,
             })
-            .eq('id', userId);
+            .eq('id', user.id);
 
         return true;
       } catch (e) {
