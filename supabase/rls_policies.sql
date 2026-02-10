@@ -39,3 +39,15 @@ CREATE POLICY "Users can view own earnings"
 CREATE POLICY "Users can insert own earnings"
   ON earnings FOR INSERT
   WITH CHECK (rider_id = auth.uid());
+
+-- users: SELECT/UPDATE where id = auth.uid()
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own profile"
+  ON users FOR SELECT
+  USING (id = auth.uid());
+
+CREATE POLICY "Users can update own profile"
+  ON users FOR UPDATE
+  USING (id = auth.uid())
+  WITH CHECK (id = auth.uid());
