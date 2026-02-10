@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';
 import '../models/rider.dart';
@@ -110,24 +111,38 @@ class EarningsState {
 
 /// Notifier per gestire lo stato dei guadagni
 class EarningsNotifier extends StateNotifier<EarningsState> {
+  StreamSubscription<List<Order>>? _ordersSub;
+
   EarningsNotifier() : super(EarningsState(
     dailyTarget: DailyTarget(date: DateTime.now()),
   )) {
-    _loadFromSupabase();
+    _subscribeToOrders();
   }
 
-  /// Try loading from Supabase, fall back to demo data
-  Future<void> _loadFromSupabase() async {
+  /// Subscribe to real-time orders stream, fall back to demo data
+  void _subscribeToOrders() {
     try {
-      final orders = await OrdersService.getTodayOrders();
-      if (orders.isNotEmpty) {
-        _applyOrders(orders);
-        return;
-      }
-    } catch (_) {}
+      _ordersSub = OrdersService.subscribeToOrders().listen(
+        (orders) {
+          if (orders.isNotEmpty) {
+            _applyOrders(orders);
+          } else if (state.todayOrders.isEmpty) {
+            _loadDemoData();
+          }
+        },
+        onError: (_) {
+          if (state.todayOrders.isEmpty) _loadDemoData();
+        },
+      );
+    } catch (_) {
+      _loadDemoData();
+    }
+  }
 
-    // Fallback to demo data
-    _loadDemoData();
+  @override
+  void dispose() {
+    _ordersSub?.cancel();
+    super.dispose();
   }
 
   /// Apply a list of orders to state (used after Supabase load)

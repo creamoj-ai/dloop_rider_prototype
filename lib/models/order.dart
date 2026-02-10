@@ -232,33 +232,54 @@ class Order {
   }
 
   factory Order.fromJson(Map<String, dynamic> json) {
+    // Helper: Supabase may return DECIMAL as String
+    double _num(dynamic v, [double fallback = 0]) =>
+        double.tryParse(v?.toString() ?? '') ?? fallback;
+
+    int _int(dynamic v, [int fallback = 0]) =>
+        int.tryParse(v?.toString() ?? '') ?? fallback;
+
+    // DB uses pickup_address / delivery_address; model uses restaurant_ / customer_
+    final pickupAddr = json['pickup_address'] as String?;
+    final restaurantName = json['restaurant_name'] as String? ??
+        pickupAddr?.split(',').first ?? 'Ordine';
+
+    // Map status — DB uses 'picked_up', Dart enum uses 'pickedUp'
+    final rawStatus = (json['status'] as String?) ?? 'pending';
+    final statusName = rawStatus.replaceAll('_', '').toLowerCase();
+
     return Order(
-      id: json['id'] as String,
-      restaurantName: json['restaurant_name'] as String,
-      restaurantAddress: json['restaurant_address'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
+      restaurantName: restaurantName,
+      restaurantAddress: json['restaurant_address'] as String? ?? pickupAddr ?? '',
       customerName: json['customer_name'] as String? ?? '',
-      customerAddress: json['customer_address'] as String,
-      distanceKm: (json['distance_km'] as num).toDouble(),
-      baseEarning: (json['base_earning'] as num).toDouble(),
-      bonusEarning: (json['bonus_earning'] as num?)?.toDouble() ?? 0,
-      tipAmount: (json['tip_amount'] as num?)?.toDouble() ?? 0,
-      rushMultiplier: (json['rush_multiplier'] as num?)?.toDouble() ?? 1.0,
-      holdCost: (json['hold_cost'] as num?)?.toDouble() ?? 0,
-      holdMinutes: (json['hold_minutes'] as int?) ?? 0,
-      minGuarantee: (json['min_guarantee'] as num?)?.toDouble() ?? 3.00,
+      customerAddress: json['customer_address'] as String? ?? json['delivery_address'] as String? ?? '',
+      distanceKm: _num(json['distance_km']),
+      baseEarning: _num(json['base_earning'] ?? json['base_earnings']),
+      bonusEarning: _num(json['bonus_earning'] ?? json['bonus_earnings']),
+      tipAmount: _num(json['tip_amount']),
+      rushMultiplier: _num(json['rush_multiplier'], 1.0),
+      holdCost: _num(json['hold_cost']),
+      holdMinutes: _int(json['hold_minutes']),
+      minGuarantee: _num(json['min_guarantee'], 3.0),
       status: OrderStatus.values.firstWhere(
-        (s) => s.name == json['status'],
-        orElse: () => OrderStatus.pending,
+        (s) => s.name.toLowerCase() == statusName,
+        orElse: () => OrderStatus.values.firstWhere(
+          (s) => s.name == rawStatus,
+          orElse: () => OrderStatus.pending,
+        ),
       ),
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
       acceptedAt: json['accepted_at'] != null
-          ? DateTime.parse(json['accepted_at'] as String)
+          ? DateTime.tryParse(json['accepted_at'] as String)
           : null,
       pickedUpAt: json['picked_up_at'] != null
-          ? DateTime.parse(json['picked_up_at'] as String)
+          ? DateTime.tryParse(json['picked_up_at'] as String)
           : null,
       deliveredAt: json['delivered_at'] != null
-          ? DateTime.parse(json['delivered_at'] as String)
+          ? DateTime.tryParse(json['delivered_at'] as String)
           : null,
     );
   }
