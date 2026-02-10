@@ -65,6 +65,9 @@ class ActiveSessionNotifier extends StateNotifier<ActiveSessionState> {
     load();
   }
 
+  /// Reload data (for pull-to-refresh or manual retry)
+  Future<void> reload() => load();
+
   Future<void> load() async {
     state = state.copyWith(isLoading: true);
     try {

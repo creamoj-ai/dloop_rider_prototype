@@ -1,26 +1,31 @@
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import '../models/user.dart';
+import '../utils/retry.dart';
 
 class UserService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   // ========================================
-  // GET: Profilo utente corrente
+  // GET: Profilo utente corrente (with retry)
   // ========================================
   Future<User?> getCurrentUser() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return null;
+
     try {
-      final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) return null;
+      return await retry(() async {
+        final response = await _supabase
+            .from('users')
+            .select()
+            .eq('id', userId)
+            .single();
 
-      final response = await _supabase
-          .from('users')
-          .select()
-          .eq('id', userId)
-          .single();
-
-      return User.fromJson(response);
+        return User.fromJson(response);
+      }, onRetry: (attempt, e) {
+        print('⚡ UserService.getCurrentUser retry $attempt: $e');
+      });
     } catch (e) {
-      print('❌ Error getting current user: $e');
+      print('❌ UserService.getCurrentUser failed after retries: $e');
       return null;
     }
   }
@@ -44,7 +49,7 @@ class UserService {
   }
 
   // ========================================
-  // UPDATE: Aggiorna profilo
+  // UPDATE: Aggiorna profilo (with retry)
   // ========================================
   Future<User?> updateProfile({
     String? firstName,
@@ -52,26 +57,30 @@ class UserService {
     String? phone,
     String? avatarUrl,
   }) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return null;
+
     try {
-      final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) throw Exception('User not authenticated');
+      return await retry(() async {
+        final updates = <String, dynamic>{};
+        if (firstName != null) updates['first_name'] = firstName;
+        if (lastName != null) updates['last_name'] = lastName;
+        if (phone != null) updates['phone'] = phone;
+        if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
 
-      final updates = <String, dynamic>{};
-      if (firstName != null) updates['first_name'] = firstName;
-      if (lastName != null) updates['last_name'] = lastName;
-      if (phone != null) updates['phone'] = phone;
-      if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
+        final response = await _supabase
+            .from('users')
+            .update(updates)
+            .eq('id', userId)
+            .select()
+            .single();
 
-      final response = await _supabase
-          .from('users')
-          .update(updates)
-          .eq('id', userId)
-          .select()
-          .single();
-
-      return User.fromJson(response);
+        return User.fromJson(response);
+      }, onRetry: (attempt, e) {
+        print('⚡ UserService.updateProfile retry $attempt: $e');
+      });
     } catch (e) {
-      print('❌ Error updating profile: $e');
+      print('❌ UserService.updateProfile failed after retries: $e');
       return null;
     }
   }

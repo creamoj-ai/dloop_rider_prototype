@@ -1,63 +1,78 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/earning.dart';
+import '../utils/retry.dart';
 
 class EarningsService {
   static final _client = Supabase.instance.client;
 
   static String? get _riderId => _client.auth.currentUser?.id;
 
-  /// Fetch earnings for the current rider
+  /// Fetch transactions for the current rider (with retry)
   static Future<List<Earning>> getEarnings({DateTime? since}) async {
+    final riderId = _riderId;
+    if (riderId == null) return [];
+
     try {
-      final riderId = _riderId;
-      if (riderId == null) return [];
+      return await retry(() async {
+        var query = _client
+            .from('transactions')
+            .select()
+            .eq('rider_id', riderId);
 
-      var query = _client
-          .from('earnings')
-          .select()
-          .eq('rider_id', riderId);
+        if (since != null) {
+          query = query.gte('processed_at', since.toIso8601String());
+        }
 
-      if (since != null) {
-        query = query.gte('date_time', since.toIso8601String());
-      }
+        final response = await query.order('processed_at', ascending: false);
 
-      final response = await query.order('date_time', ascending: false);
-
-      return (response as List)
-          .map((json) => Earning.fromJson(json))
-          .toList();
+        return (response as List)
+            .map((json) => Earning.fromJson(json))
+            .toList();
+      }, onRetry: (attempt, e) {
+        print('⚡ EarningsService.getEarnings retry $attempt: $e');
+      });
     } catch (e) {
+      print('❌ EarningsService.getEarnings failed after retries: $e');
       return [];
     }
   }
 
-  /// Create a new earning record
+  /// Create a new transaction record (with retry)
   static Future<void> createEarning(Earning earning) async {
-    try {
-      final riderId = _riderId;
-      if (riderId == null) return;
+    final riderId = _riderId;
+    if (riderId == null) return;
 
-      await _client.from('earnings').insert({
-        'rider_id': riderId,
-        ...earning.toJson(),
+    try {
+      await retry(() async {
+        await _client.from('transactions').insert({
+          'rider_id': riderId,
+          ...earning.toJson(),
+        });
+      }, onRetry: (attempt, e) {
+        print('⚡ EarningsService.createEarning retry $attempt: $e');
       });
     } catch (e) {
-      // Silently fail — local state is source of truth
+      print('❌ EarningsService.createEarning failed after retries: $e');
     }
   }
 
-  /// Subscribe to real-time earnings updates
+  /// Subscribe to real-time transaction updates (with auto-reconnect)
   static Stream<List<Earning>> subscribeToEarnings() {
     final riderId = _riderId;
     if (riderId == null) {
       return Stream.value([]);
     }
 
-    return _client
-        .from('earnings')
-        .stream(primaryKey: ['id'])
-        .eq('rider_id', riderId)
-        .order('date_time', ascending: false)
-        .map((data) => data.map((json) => Earning.fromJson(json)).toList());
+    return retryStream(
+      () => _client
+          .from('transactions')
+          .stream(primaryKey: ['id'])
+          .eq('rider_id', riderId)
+          .order('processed_at', ascending: false)
+          .map((data) => data.map((json) => Earning.fromJson(json)).toList()),
+      onReconnect: (attempt, e) {
+        print('⚡ EarningsService.subscribeToEarnings reconnect $attempt: $e');
+      },
+    );
   }
 }

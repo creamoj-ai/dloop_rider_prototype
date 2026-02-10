@@ -22,28 +22,45 @@ class Earning {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'type': type.name,
+    'type': _typeToDb(type),
     'description': description,
     'amount': amount,
-    'date_time': dateTime.toIso8601String(),
+    'processed_at': dateTime.toIso8601String(),
     'status': status.name,
-    'order_id': orderId,
   };
 
   factory Earning.fromJson(Map<String, dynamic> json) => Earning(
-    id: json['id'] as String,
-    type: EarningType.values.firstWhere(
-      (e) => e.name == json['type'],
-      orElse: () => EarningType.delivery,
-    ),
+    id: json['id']?.toString() ?? '',
+    type: _typeFromDb(json['type'] as String? ?? ''),
     description: json['description'] as String? ?? '',
-    amount: (json['amount'] as num).toDouble(),
-    dateTime: DateTime.parse(json['date_time'] as String),
+    amount: double.tryParse(json['amount']?.toString() ?? '') ?? 0.0,
+    dateTime: DateTime.tryParse(
+      json['processed_at'] as String? ?? json['date_time'] as String? ?? '',
+    ) ?? DateTime.now(),
     status: EarningStatus.values.firstWhere(
       (s) => s.name == json['status'],
       orElse: () => EarningStatus.completed,
     ),
     orderId: json['order_id'] as String?,
   );
+
+  // DB uses order_earning/commission/market_sale/bonus/tip
+  static String _typeToDb(EarningType type) {
+    switch (type) {
+      case EarningType.delivery: return 'order_earning';
+      case EarningType.network: return 'commission';
+      case EarningType.market: return 'market_sale';
+    }
+  }
+
+  static EarningType _typeFromDb(String dbType) {
+    switch (dbType) {
+      case 'order_earning': return EarningType.delivery;
+      case 'commission': return EarningType.network;
+      case 'market_sale': return EarningType.market;
+      case 'bonus': return EarningType.network;
+      case 'tip': return EarningType.delivery;
+      default: return EarningType.delivery;
+    }
+  }
 }

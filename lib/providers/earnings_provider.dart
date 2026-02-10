@@ -7,6 +7,7 @@ import '../models/earning.dart';
 import '../services/rush_hour_service.dart';
 import '../services/orders_service.dart';
 import '../services/earnings_service.dart';
+import '../utils/retry.dart';
 import '../widgets/earning_notification.dart';
 import '../data/mock_data.dart';
 
@@ -130,13 +131,20 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
             _loadDemoData();
           }
         },
-        onError: (_) {
+        onError: (e) {
+          print('⚡ EarningsNotifier stream error: $e');
           if (state.todayOrders.isEmpty) _loadDemoData();
         },
       );
     } catch (_) {
       _loadDemoData();
     }
+  }
+
+  /// Reload: cancel stream and re-subscribe
+  void reload() {
+    _ordersSub?.cancel();
+    _subscribeToOrders();
   }
 
   @override
