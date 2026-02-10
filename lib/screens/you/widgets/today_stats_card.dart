@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/dloop_card.dart';
+import '../../../providers/orders_stream_provider.dart';
+import '../../../providers/session_provider.dart';
 
-class TodayStatsCard extends StatelessWidget {
+class TodayStatsCard extends ConsumerWidget {
   const TodayStatsCard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final completedOrders = ref.watch(todayCompletedOrdersProvider);
+    final totalEarnings = ref.watch(todayStreamEarningsProvider);
+    final session = ref.watch(activeSessionProvider);
+
+    final ordersCount = completedOrders.length;
+    final hours = session.activeMinutes / 60.0;
+    final hoursStr = hours > 0
+        ? '${hours.toStringAsFixed(1)}h'
+        : '0h';
+    final earningsStr = totalEarnings.toStringAsFixed(2);
 
     return DloopCard(
       child: Column(
@@ -32,7 +44,7 @@ class TodayStatsCard extends StatelessWidget {
               _statColumn(
                 context,
                 icon: Icons.shopping_bag_outlined,
-                value: '8',
+                value: '$ordersCount',
                 label: 'Ordini',
                 color: AppColors.turboOrange,
               ),
@@ -40,7 +52,7 @@ class TodayStatsCard extends StatelessWidget {
               _statColumn(
                 context,
                 icon: Icons.schedule,
-                value: '6.5h',
+                value: hoursStr,
                 label: 'Ore',
                 color: AppColors.earningsGreen,
               ),
@@ -48,7 +60,7 @@ class TodayStatsCard extends StatelessWidget {
               _statColumn(
                 context,
                 icon: Icons.euro,
-                value: '142.60',
+                value: earningsStr,
                 label: 'Guadagno',
                 color: AppColors.bonusPurple,
               ),

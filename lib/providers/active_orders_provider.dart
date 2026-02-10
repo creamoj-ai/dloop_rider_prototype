@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/order.dart';
+import '../services/orders_service.dart';
 import '../services/rush_hour_service.dart';
 
 /// Stati di un ordine attivo
@@ -32,6 +35,35 @@ class ActiveOrder {
     required this.acceptedAt,
     this.phase = OrderPhase.toPickup,
   });
+
+  /// Create from DB Order
+  factory ActiveOrder.fromOrder(Order order) {
+    OrderPhase phase;
+    switch (order.status) {
+      case OrderStatus.pending:
+        phase = OrderPhase.toPickup;
+        break;
+      case OrderStatus.accepted:
+        phase = OrderPhase.toPickup;
+        break;
+      case OrderStatus.pickedUp:
+        phase = OrderPhase.toCustomer;
+        break;
+      default:
+        phase = OrderPhase.completed;
+    }
+
+    return ActiveOrder(
+      id: order.id,
+      dealerName: order.restaurantName,
+      dealerAddress: order.restaurantAddress,
+      customerAddress: order.customerAddress,
+      distanceKm: order.distanceKm,
+      orderNotes: null,
+      acceptedAt: order.acceptedAt ?? order.createdAt,
+      phase: phase,
+    );
+  }
 
   /// Guadagno base
   double get baseEarning => distanceKm * 1.50;
@@ -85,7 +117,7 @@ class ActiveOrder {
     );
   }
 
-  /// Genera ordine random
+  /// Genera ordine random (fallback demo)
   static ActiveOrder generate() {
     final random = Random();
 
@@ -170,11 +202,63 @@ class ActiveOrdersState {
   }
 }
 
-/// Notifier per gestire ordini attivi
+/// Notifier per gestire ordini attivi — wired to Supabase real-time
 class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
-  ActiveOrdersNotifier() : super(ActiveOrdersState(
-    availableOrders: List.generate(4, (_) => ActiveOrder.generate()),
-  ));
+  StreamSubscription<List<Order>>? _ordersSub;
+
+  ActiveOrdersNotifier() : super(const ActiveOrdersState()) {
+    _subscribeToOrders();
+  }
+
+  void _subscribeToOrders() {
+    _ordersSub = OrdersService.subscribeToOrders().listen(
+      (orders) {
+        // Pending orders → available (rider can accept)
+        final pending = orders
+            .where((o) => o.status == OrderStatus.pending)
+            .map((o) => ActiveOrder.fromOrder(o))
+            .toList();
+
+        // Accepted/picked up → active orders (rider is working on)
+        final active = orders
+            .where((o) =>
+                o.status == OrderStatus.accepted ||
+                o.status == OrderStatus.pickedUp)
+            .map((o) {
+              // Preserve local phase if we already have this order
+              final existing = state.orders.where((a) => a.id == o.id);
+              if (existing.isNotEmpty) return existing.first;
+              return ActiveOrder.fromOrder(o);
+            })
+            .toList();
+
+        state = state.copyWith(
+          orders: active,
+          availableOrders: pending,
+        );
+
+        // If no data at all, add demo fallback
+        if (orders.isEmpty && state.orders.isEmpty && state.availableOrders.isEmpty) {
+          _loadDemoOrders();
+        }
+      },
+      onError: (_) {
+        if (state.availableOrders.isEmpty) _loadDemoOrders();
+      },
+    );
+  }
+
+  void _loadDemoOrders() {
+    state = state.copyWith(
+      availableOrders: List.generate(4, (_) => ActiveOrder.generate()),
+    );
+  }
+
+  /// Reload: cancel stream and re-subscribe
+  void reload() {
+    _ordersSub?.cancel();
+    _subscribeToOrders();
+  }
 
   /// Accetta un ordine disponibile
   void acceptOrder(ActiveOrder order) {
@@ -182,13 +266,11 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
       orders: [...state.orders, order.copyWith(phase: OrderPhase.toPickup)],
       availableOrders: state.availableOrders.where((o) => o.id != order.id).toList(),
     );
-    // Rigenera ordini disponibili se pochi
-    if (state.availableOrders.length < 2) {
-      refreshAvailableOrders();
-    }
+    // Persist to Supabase
+    OrdersService.updateOrderStatus(order.id, OrderStatus.accepted);
   }
 
-  /// Avanza fase di un ordine
+  /// Avanza fase di un ordine (persists DB-relevant transitions)
   void advanceOrder(String orderId) {
     state = state.copyWith(
       orders: state.orders.map((order) {
@@ -200,12 +282,16 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
               break;
             case OrderPhase.atPickup:
               nextPhase = OrderPhase.toCustomer;
+              // Persist: rider picked up the order
+              OrdersService.updateOrderStatus(orderId, OrderStatus.pickedUp);
               break;
             case OrderPhase.toCustomer:
               nextPhase = OrderPhase.atCustomer;
               break;
             case OrderPhase.atCustomer:
               nextPhase = OrderPhase.completed;
+              // Persist: order delivered
+              OrdersService.updateOrderStatus(orderId, OrderStatus.delivered);
               break;
             case OrderPhase.completed:
               nextPhase = OrderPhase.completed;
@@ -227,19 +313,28 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
 
   /// Annulla ordine
   void cancelOrder(String orderId) {
-    final order = state.orders.firstWhere((o) => o.id == orderId);
+    final order = state.orders.where((o) => o.id == orderId);
     state = state.copyWith(
       orders: state.orders.where((o) => o.id != orderId).toList(),
-      // Rimetti l'ordine tra quelli disponibili
-      availableOrders: [...state.availableOrders, order.copyWith(phase: OrderPhase.toPickup)],
+      availableOrders: order.isNotEmpty
+          ? [...state.availableOrders, order.first.copyWith(phase: OrderPhase.toPickup)]
+          : state.availableOrders,
     );
+    // Persist cancellation
+    OrdersService.updateOrderStatus(orderId, OrderStatus.cancelled);
   }
 
-  /// Aggiorna lista ordini disponibili
+  /// Aggiorna lista ordini disponibili (demo fallback)
   void refreshAvailableOrders() {
     state = state.copyWith(
       availableOrders: List.generate(3 + Random().nextInt(3), (_) => ActiveOrder.generate()),
     );
+  }
+
+  @override
+  void dispose() {
+    _ordersSub?.cancel();
+    super.dispose();
   }
 }
 
