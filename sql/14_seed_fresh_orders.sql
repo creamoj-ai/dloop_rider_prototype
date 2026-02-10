@@ -9,19 +9,11 @@
 DO $$
 DECLARE
   v_rider_id UUID;
-  v_zone_id  UUID;
 BEGIN
   SELECT id INTO v_rider_id FROM auth.users WHERE email = 'creamoj@gmail.com';
   IF v_rider_id IS NULL THEN
     RAISE EXCEPTION 'creamoj@gmail.com not found in auth.users. Sign up first.';
   END IF;
-
-  -- Get first zone (if zones table exists)
-  BEGIN
-    SELECT id INTO v_zone_id FROM public.zones LIMIT 1;
-  EXCEPTION WHEN OTHERS THEN
-    v_zone_id := NULL;
-  END;
 
   -- Clear old non-completed orders for this rider (keep completed history)
   DELETE FROM public.orders
@@ -31,13 +23,13 @@ BEGIN
   -- === 2 PENDING orders (rider can accept) ===
 
   INSERT INTO public.orders (
-    rider_id, zone_id, order_number, platform, status,
+    rider_id, order_number, platform, status,
     pickup_address, delivery_address,
     distance_km, base_earnings, bonus_earnings, tip_amount, total_earnings,
     estimated_duration_minutes, customer_name, customer_notes,
     rush_hour, created_at
   ) VALUES (
-    v_rider_id, v_zone_id, 'DL-2026-5001', 'deliveroo', 'pending',
+    v_rider_id, 'DL-2026-5001', 'deliveroo', 'pending',
     'Pizzeria Da Mario, Via Spaccanapoli 15',
     'Via Roma 15, Milano',
     1.8, 4.50, 0.00, 0.00, 4.50,
@@ -46,13 +38,13 @@ BEGIN
   );
 
   INSERT INTO public.orders (
-    rider_id, zone_id, order_number, platform, status,
+    rider_id, order_number, platform, status,
     pickup_address, delivery_address,
     distance_km, base_earnings, bonus_earnings, tip_amount, total_earnings,
     estimated_duration_minutes, customer_name, customer_notes,
     rush_hour, created_at
   ) VALUES (
-    v_rider_id, v_zone_id, 'JE-2026-5002', 'justeat', 'pending',
+    v_rider_id, 'JE-2026-5002', 'justeat', 'pending',
     'Sushi Zen, Via Toledo 120',
     'Corso Buenos Aires 88, Milano',
     2.5, 6.25, 0.00, 0.00, 6.25,
@@ -63,13 +55,13 @@ BEGIN
   -- === 1 ACCEPTED order (rider en route to pickup) ===
 
   INSERT INTO public.orders (
-    rider_id, zone_id, order_number, platform, status,
+    rider_id, order_number, platform, status,
     pickup_address, delivery_address,
     distance_km, base_earnings, bonus_earnings, tip_amount, total_earnings,
     estimated_duration_minutes, customer_name, customer_notes,
     rush_hour, created_at, accepted_at
   ) VALUES (
-    v_rider_id, v_zone_id, 'GL-2026-5003', 'glovo', 'accepted',
+    v_rider_id, 'GL-2026-5003', 'glovo', 'accepted',
     'Burger King, Piazza Duomo 3',
     'Via Dante 23, Milano',
     2.0, 5.00, 1.00, 0.00, 6.00,
@@ -80,13 +72,13 @@ BEGIN
   -- === 1 PICKED_UP order (rider delivering) ===
 
   INSERT INTO public.orders (
-    rider_id, zone_id, order_number, platform, status,
+    rider_id, order_number, platform, status,
     pickup_address, delivery_address,
     distance_km, base_earnings, bonus_earnings, tip_amount, total_earnings,
     estimated_duration_minutes, customer_name, customer_notes,
     rush_hour, created_at, accepted_at, picked_up_at
   ) VALUES (
-    v_rider_id, v_zone_id, 'UE-2026-5004', 'uber_eats', 'picked_up',
+    v_rider_id, 'UE-2026-5004', 'uber_eats', 'picked_up',
     'Poke House, Corso Buenos Aires 88',
     'Via Montenapoleone 8, Milano',
     1.5, 3.75, 0.50, 0.00, 4.25,
@@ -97,13 +89,13 @@ BEGIN
   -- === 2 COMPLETED orders (today's history) ===
 
   INSERT INTO public.orders (
-    rider_id, zone_id, order_number, platform, status,
+    rider_id, order_number, platform, status,
     pickup_address, delivery_address,
     distance_km, base_earnings, bonus_earnings, tip_amount, total_earnings,
     estimated_duration_minutes, customer_name,
     rush_hour, created_at, accepted_at, picked_up_at, delivered_at
   ) VALUES (
-    v_rider_id, v_zone_id, 'DL-2026-5005', 'deliveroo', 'completed',
+    v_rider_id, 'DL-2026-5005', 'deliveroo', 'completed',
     'La Piadineria, Via Paolo Sarpi 44',
     'Via Brera 22, Milano',
     1.2, 3.00, 0.00, 0.50, 3.50,
@@ -112,13 +104,13 @@ BEGIN
   );
 
   INSERT INTO public.orders (
-    rider_id, zone_id, order_number, platform, status,
+    rider_id, order_number, platform, status,
     pickup_address, delivery_address,
     distance_km, base_earnings, bonus_earnings, tip_amount, total_earnings,
     estimated_duration_minutes, customer_name,
     rush_hour, created_at, accepted_at, picked_up_at, delivered_at
   ) VALUES (
-    v_rider_id, v_zone_id, 'GL-2026-5006', 'glovo', 'completed',
+    v_rider_id, 'GL-2026-5006', 'glovo', 'completed',
     'Rossopomodoro, Piazza Duomo 1',
     'Corso Italia 42, Milano',
     3.1, 7.75, 2.00, 1.00, 10.75,
