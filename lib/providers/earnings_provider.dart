@@ -310,8 +310,10 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
     final acceptedOrder = order.copyWithStatus(OrderStatus.accepted);
     state = state.copyWith(activeOrder: acceptedOrder);
 
-    // Persist to Supabase
-    OrdersService.createOrder(acceptedOrder);
+    // Persist to Supabase (skip demo orders)
+    if (!order.id.startsWith('demo_') && !order.id.startsWith('order_')) {
+      OrdersService.createOrder(acceptedOrder);
+    }
   }
 
   /// Segna ordine come ritirato
@@ -320,8 +322,10 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
     final pickedUpOrder = state.activeOrder!.copyWithStatus(OrderStatus.pickedUp);
     state = state.copyWith(activeOrder: pickedUpOrder);
 
-    // Persist status change
-    OrdersService.updateOrderStatus(pickedUpOrder.id, OrderStatus.pickedUp);
+    // Persist status change (skip demo orders)
+    if (!pickedUpOrder.id.startsWith('demo_') && !pickedUpOrder.id.startsWith('order_')) {
+      OrdersService.updateOrderStatus(pickedUpOrder.id, OrderStatus.pickedUp);
+    }
   }
 
   /// Completa la consegna
@@ -351,17 +355,19 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
       clearActiveOrder: true,
     );
 
-    // Persist order status + create earning record
-    OrdersService.updateOrderStatus(completedOrder.id, OrderStatus.delivered);
-    EarningsService.createEarning(Earning(
-      id: 'earn_${DateTime.now().millisecondsSinceEpoch}',
-      type: EarningType.delivery,
-      description: 'Consegna ${completedOrder.restaurantName}',
-      amount: completedOrder.totalEarning,
-      dateTime: DateTime.now(),
-      status: EarningStatus.completed,
-      orderId: completedOrder.id,
-    ));
+    // Persist order status + create earning record (skip demo orders)
+    if (!completedOrder.id.startsWith('demo_') && !completedOrder.id.startsWith('order_')) {
+      OrdersService.updateOrderStatus(completedOrder.id, OrderStatus.delivered);
+      EarningsService.createEarning(Earning(
+        id: '',
+        type: EarningType.delivery,
+        description: 'Consegna ${completedOrder.restaurantName}',
+        amount: completedOrder.totalEarning,
+        dateTime: DateTime.now(),
+        status: EarningStatus.completed,
+        orderId: completedOrder.id,
+      ));
+    }
   }
 
   /// Annulla ordine attivo
@@ -375,8 +381,10 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
       clearActiveOrder: true,
     );
 
-    // Persist cancellation
-    OrdersService.updateOrderStatus(cancelledOrder.id, OrderStatus.cancelled);
+    // Persist cancellation (skip demo orders)
+    if (!cancelledOrder.id.startsWith('demo_') && !cancelledOrder.id.startsWith('order_')) {
+      OrdersService.updateOrderStatus(cancelledOrder.id, OrderStatus.cancelled);
+    }
   }
 
   /// Simula un ordine completato (per testing/demo)
@@ -562,8 +570,10 @@ class NetworkEarningsNotifier extends StateNotifier<NetworkEarningsState> {
       networkEarnings: [...state.networkEarnings, newEarning],
     );
 
-    // Persist to Supabase
-    EarningsService.createEarning(newEarning);
+    // Persist to Supabase (only real earnings, skip net_ demo IDs)
+    if (!newEarning.id.startsWith('net_')) {
+      EarningsService.createEarning(newEarning);
+    }
 
     return newEarning;
   }

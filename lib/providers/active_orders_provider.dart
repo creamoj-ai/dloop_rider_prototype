@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';
+import '../models/earning.dart';
 import '../services/orders_service.dart';
+import '../services/earnings_service.dart';
 import '../services/rush_hour_service.dart';
 
 /// Stati di un ordine attivo
@@ -23,6 +25,7 @@ class ActiveOrder {
   final double distanceKm;
   final String? orderNotes;
   final DateTime acceptedAt;
+  final bool isDemo;
   OrderPhase phase;
 
   ActiveOrder({
@@ -33,6 +36,7 @@ class ActiveOrder {
     required this.distanceKm,
     this.orderNotes,
     required this.acceptedAt,
+    this.isDemo = false,
     this.phase = OrderPhase.toPickup,
   });
 
@@ -113,6 +117,7 @@ class ActiveOrder {
       distanceKm: distanceKm,
       orderNotes: orderNotes,
       acceptedAt: acceptedAt,
+      isDemo: isDemo,
       phase: phase ?? this.phase,
     );
   }
@@ -162,13 +167,14 @@ class ActiveOrder {
     final distance = 0.8 + random.nextDouble() * 3.5;
 
     return ActiveOrder(
-      id: 'order_${DateTime.now().millisecondsSinceEpoch}_${random.nextInt(1000)}',
+      id: 'demo_${DateTime.now().millisecondsSinceEpoch}_${random.nextInt(1000)}',
       dealerName: dealer.$1,
       dealerAddress: dealer.$2,
       customerAddress: customerAddresses[random.nextInt(customerAddresses.length)],
       distanceKm: double.parse(distance.toStringAsFixed(1)),
       orderNotes: notes[random.nextInt(notes.length)],
       acceptedAt: DateTime.now(),
+      isDemo: true,
     );
   }
 }
@@ -266,8 +272,10 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
       orders: [...state.orders, order.copyWith(phase: OrderPhase.toPickup)],
       availableOrders: state.availableOrders.where((o) => o.id != order.id).toList(),
     );
-    // Persist to Supabase
-    OrdersService.updateOrderStatus(order.id, OrderStatus.accepted);
+    // Persist to Supabase (skip demo orders)
+    if (!order.isDemo) {
+      OrdersService.updateOrderStatus(order.id, OrderStatus.accepted);
+    }
   }
 
   /// Avanza fase di un ordine (persists DB-relevant transitions)
@@ -282,16 +290,28 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
               break;
             case OrderPhase.atPickup:
               nextPhase = OrderPhase.toCustomer;
-              // Persist: rider picked up the order
-              OrdersService.updateOrderStatus(orderId, OrderStatus.pickedUp);
+              if (!order.isDemo) {
+                OrdersService.updateOrderStatus(orderId, OrderStatus.pickedUp);
+              }
               break;
             case OrderPhase.toCustomer:
               nextPhase = OrderPhase.atCustomer;
               break;
             case OrderPhase.atCustomer:
               nextPhase = OrderPhase.completed;
-              // Persist: order delivered
-              OrdersService.updateOrderStatus(orderId, OrderStatus.delivered);
+              if (!order.isDemo) {
+                OrdersService.updateOrderStatus(orderId, OrderStatus.delivered);
+                // Auto-create transaction for the completed delivery
+                EarningsService.createEarning(Earning(
+                  id: '',
+                  type: EarningType.delivery,
+                  description: 'Consegna ${order.dealerName} → ${order.customerAddress}',
+                  amount: order.totalEarning,
+                  dateTime: DateTime.now(),
+                  status: EarningStatus.completed,
+                  orderId: orderId,
+                ));
+              }
               break;
             case OrderPhase.completed:
               nextPhase = OrderPhase.completed;
@@ -314,14 +334,17 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
   /// Annulla ordine
   void cancelOrder(String orderId) {
     final order = state.orders.where((o) => o.id == orderId);
+    final isDemo = order.isNotEmpty && order.first.isDemo;
     state = state.copyWith(
       orders: state.orders.where((o) => o.id != orderId).toList(),
       availableOrders: order.isNotEmpty
           ? [...state.availableOrders, order.first.copyWith(phase: OrderPhase.toPickup)]
           : state.availableOrders,
     );
-    // Persist cancellation
-    OrdersService.updateOrderStatus(orderId, OrderStatus.cancelled);
+    // Persist cancellation (skip demo orders)
+    if (!isDemo) {
+      OrdersService.updateOrderStatus(orderId, OrderStatus.cancelled);
+    }
   }
 
   /// Aggiorna lista ordini disponibili (demo fallback)

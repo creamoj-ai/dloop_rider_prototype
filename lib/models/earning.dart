@@ -27,6 +27,7 @@ class Earning {
     'amount': amount,
     'processed_at': dateTime.toIso8601String(),
     'status': status.name,
+    if (orderId != null && orderId!.isNotEmpty) 'order_id': orderId,
   };
 
   factory Earning.fromJson(Map<String, dynamic> json) => Earning(
