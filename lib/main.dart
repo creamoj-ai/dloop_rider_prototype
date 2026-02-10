@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'theme/app_theme.dart';
 import 'navigation/app_router.dart';
 import 'config/supabase_config.dart';
@@ -11,6 +12,8 @@ void main() async {
 
   // Load environment variables
   await dotenv.load(fileName: ".env");
+
+  await initializeDateFormatting('it_IT', null);
 
   await Supabase.initialize(
     url: SupabaseConfig.url,

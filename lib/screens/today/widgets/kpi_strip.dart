@@ -222,6 +222,8 @@ class _OrderItem extends StatelessWidget {
                     fontSize: 11,
                     color: cs.onSurfaceVariant,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

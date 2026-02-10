@@ -45,7 +45,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
               children: List.generate(filters.length, (i) {
                 final sel = _filterIndex == i;
                 return Padding(
@@ -69,6 +71,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   ),
                 );
               }),
+            ),
             ),
           ),
           Expanded(

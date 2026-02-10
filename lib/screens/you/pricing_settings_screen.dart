@@ -91,7 +91,11 @@ class PricingSettingsScreen extends ConsumerStatefulWidget {
 class _PricingSettingsScreenState extends ConsumerState<PricingSettingsScreen> {
   @override
   void dispose() {
-    ref.read(riderPricingProvider.notifier).flushSave();
+    try {
+      ref.read(riderPricingProvider.notifier).flushSave();
+    } catch (_) {
+      // Provider may already be disposed
+    }
     super.dispose();
   }
 
@@ -335,7 +339,10 @@ class _PricingSlider extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
+            Flexible(
+              child: Text(label, style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -397,7 +404,10 @@ class _PricingIntSlider extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
+            Flexible(
+              child: Text(label, style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -513,8 +523,10 @@ class _TierRow extends StatelessWidget {
           )),
         ),
         Text(desc, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant)),
-        const Spacer(),
-        Text(detail, style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant)),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(detail, style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis),
+        ),
       ],
     );
   }

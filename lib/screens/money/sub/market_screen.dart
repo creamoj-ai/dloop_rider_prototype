@@ -33,7 +33,7 @@ class MarketScreen extends StatelessWidget {
               crossAxisCount: 2,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: 1.4,
+              childAspectRatio: 1.2,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               children: [
