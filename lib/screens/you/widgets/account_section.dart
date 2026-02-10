@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/dloop_card.dart';
 import '../../../providers/user_provider.dart';
+import '../../../services/push_notification_service.dart';
 
 class AccountSection extends ConsumerWidget {
   const AccountSection({super.key});
@@ -63,6 +64,8 @@ class AccountSection extends ConsumerWidget {
       onTap: () {
         if (label == 'Logout') {
           _handleLogout(context, ref);
+        } else if (label == 'Supporto') {
+          context.push('/you/support');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(label)),
@@ -108,6 +111,9 @@ class AccountSection extends ConsumerWidget {
 
               // Pulisci il provider
               ref.read(currentUserProvider.notifier).logout();
+
+              // Remove FCM token before logout
+              await PushNotificationService.removeToken();
 
               // Logout da Supabase Auth
               await Supabase.instance.client.auth.signOut();

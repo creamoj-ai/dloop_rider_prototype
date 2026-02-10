@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../widgets/dloop_top_bar.dart';
 import '../../widgets/earning_notification.dart';
+import '../../widgets/in_app_notification_banner.dart';
 import '../../widgets/header_sheets.dart';
 import '../../providers/earnings_provider.dart';
+import '../../providers/notifications_provider.dart';
 import 'widgets/kpi_strip.dart';
 import 'widgets/active_mode_card.dart';
 import 'widgets/activity_tab.dart';
@@ -20,8 +23,9 @@ class TodayScreen extends ConsumerStatefulWidget {
 
 class _TodayScreenState extends ConsumerState<TodayScreen> {
   bool _isOnline = true;
-  int _notificationCount = 3;
   int _lastNetworkEarningsCount = 0;
+  final _bannerController = InAppNotificationController();
+  int _lastNotificationsCount = 0;
 
   void _showSearch() {
     showModalBottomSheet(
@@ -36,9 +40,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   }
 
   void _showNotifications() {
-    // Simula arrivo di un nuovo guadagno dal Network (per demo)
-    final networkNotifier = ref.read(networkEarningsProvider.notifier);
-    networkNotifier.simulateNewNetworkEarning();
+    context.push('/today/notifications');
   }
 
   void _toggleOnline() {
@@ -57,6 +59,24 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   Widget build(BuildContext context) {
     final notificationController = ref.watch(earningNotificationControllerProvider);
     final networkState = ref.watch(networkEarningsProvider);
+    final notifState = ref.watch(notificationsProvider);
+    final unreadCount = notifState.unreadCount;
+
+    // Show banner for new notifications
+    if (notifState.notifications.length > _lastNotificationsCount && _lastNotificationsCount > 0) {
+      final latest = notifState.notifications.first;
+      if (!latest.isRead) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _bannerController.show(
+            title: latest.title,
+            body: latest.body,
+            type: latest.type,
+            onTap: () => context.push('/today/notifications'),
+          );
+        });
+      }
+    }
+    _lastNotificationsCount = notifState.notifications.length;
 
     // Rileva nuovi guadagni dal Network e mostra popup celebration
     if (networkState.networkEarnings.length > _lastNetworkEarningsCount && _lastNetworkEarningsCount > 0) {
@@ -73,15 +93,17 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     }
     _lastNetworkEarningsCount = networkState.networkEarnings.length;
 
-    return EarningNotificationOverlay(
-      controller: notificationController,
-      child: SafeArea(
+    return InAppNotificationOverlay(
+      controller: _bannerController,
+      child: EarningNotificationOverlay(
+        controller: notificationController,
+        child: SafeArea(
         child: Column(
           children: [
             // Top Bar stile Revolut
             DloopTopBar(
               isOnline: _isOnline,
-              notificationCount: _notificationCount,
+              notificationCount: unreadCount,
               onSearchTap: () => SearchSheet.show(context, hint: 'Cerca zone, ordini...'),
               onNotificationTap: () => NotificationsSheet.show(context),
               onQuickActionTap: () => QuickActionsSheet.show(context),
@@ -117,6 +139,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -1,32 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/dloop_top_bar.dart';
 import '../../widgets/invite_sheet.dart';
 import '../../widgets/header_sheets.dart';
+import '../../providers/notifications_provider.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/today_stats_card.dart';
 import 'widgets/stats_only_card.dart';
 import 'widgets/expandable_gamification_card.dart';
 import 'widgets/account_section.dart';
 
-class YouScreen extends StatelessWidget {
+class YouScreen extends ConsumerWidget {
   const YouScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final unreadCount = ref.watch(unreadNotificationsCountProvider);
 
     return SafeArea(
       child: Column(
         children: [
           DloopTopBar(
             isOnline: true,
-            notificationCount: 1,
+            notificationCount: unreadCount,
             searchHint: 'Cerca impostazioni...',
             onSearchTap: () => SearchSheet.show(context, hint: 'Cerca impostazioni...'),
-            onNotificationTap: () => NotificationsSheet.show(context),
+            onNotificationTap: () => context.push('/today/notifications'),
             onQuickActionTap: () => QuickActionsSheet.show(context),
           ),
           Expanded(
