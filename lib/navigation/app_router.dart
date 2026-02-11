@@ -17,6 +17,7 @@ import '../screens/market/market_tab_screen.dart';
 import '../screens/money/sub/market_screen.dart';
 import '../screens/you/you_screen.dart';
 import '../screens/you/pricing_settings_screen.dart';
+import '../screens/you/settings_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
 import '../screens/support/support_chat_screen.dart';
 
@@ -100,6 +101,7 @@ final appRouter = GoRouter(
           pageBuilder: (context, state) => const NoTransitionPage(child: YouScreen()),
           routes: [
             GoRoute(path: 'pricing', builder: (context, state) => const PricingSettingsScreen()),
+            GoRoute(path: 'settings', builder: (context, state) => const SettingsScreen()),
             GoRoute(path: 'support', builder: (context, state) => const SupportChatScreen()),
           ],
         ),

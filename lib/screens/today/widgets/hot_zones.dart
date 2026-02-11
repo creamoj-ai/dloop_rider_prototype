@@ -266,7 +266,7 @@ class _HotZonesState extends ConsumerState<HotZones> {
               color: AppColors.earningsGreen,
               onTap: () {
                 Navigator.pop(context);
-                context.push('/today/route');
+                context.push('/today/zone');
               },
             ),
             const SizedBox(height: 8),

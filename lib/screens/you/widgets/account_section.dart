@@ -66,10 +66,8 @@ class AccountSection extends ConsumerWidget {
           _handleLogout(context, ref);
         } else if (label == 'Supporto') {
           context.push('/you/support');
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(label)),
-          );
+        } else if (label == 'Impostazioni') {
+          context.push('/you/settings');
         }
       },
     );
