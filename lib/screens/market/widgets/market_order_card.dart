@@ -54,20 +54,27 @@ class MarketOrderCard extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            '\u20AC${order.totalPrice.toStringAsFixed(2)}',
-            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.earningsGreen),
+          Flexible(
+            flex: 0,
+            child: Text(
+              '\u20AC${order.totalPrice.toStringAsFixed(2)}',
+              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.earningsGreen),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           const SizedBox(width: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: _statusColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: Text(
-              order.statusLabel,
-              style: GoogleFonts.inter(fontSize: 7, fontWeight: FontWeight.w600, color: _statusColor),
+          Flexible(
+            flex: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: _statusColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                order.statusLabel,
+                style: GoogleFonts.inter(fontSize: 7, fontWeight: FontWeight.w600, color: _statusColor),
+              ),
             ),
           ),
           const SizedBox(width: 3),

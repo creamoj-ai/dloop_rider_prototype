@@ -64,7 +64,7 @@ class MarketScreen extends ConsumerWidget {
                         crossAxisCount: 2,
                         mainAxisSpacing: 10,
                         crossAxisSpacing: 10,
-                        childAspectRatio: 1.2,
+                        childAspectRatio: 1.4,
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         children: entry.value
@@ -103,8 +103,11 @@ class MarketScreen extends ConsumerWidget {
         decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12)),
         child: Column(
           children: [
-            Text(value,
-                style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(value,
+                  style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
             const SizedBox(height: 4),
             Text(label, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF9E9E9E))),
           ],
@@ -133,16 +136,22 @@ class MarketScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(price,
-                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: catColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
+              Flexible(
+                child: Text(price,
+                    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: catColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(category,
+                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: catColor),
+                      overflow: TextOverflow.ellipsis),
                 ),
-                child: Text(category,
-                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: catColor)),
               ),
             ],
           ),
@@ -168,8 +177,10 @@ class MarketScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(customer,
-                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
-                Text(product, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF9E9E9E))),
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(product, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF9E9E9E)),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),

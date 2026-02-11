@@ -305,9 +305,11 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Icon(icon, size: 20, color: AppColors.turboOrange),
         const SizedBox(width: 8),
-        Text(title, style: GoogleFonts.inter(
-          fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface,
-        )),
+        Expanded(
+          child: Text(title, style: GoogleFonts.inter(
+            fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface,
+          ), overflow: TextOverflow.ellipsis),
+        ),
       ],
     );
   }
@@ -522,7 +524,9 @@ class _TierRow extends StatelessWidget {
             fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface,
           )),
         ),
-        Text(desc, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant)),
+        Flexible(
+          child: Text(desc, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+        ),
         const SizedBox(width: 4),
         Expanded(
           child: Text(detail, style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis),
