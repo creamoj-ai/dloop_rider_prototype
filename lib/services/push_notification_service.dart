@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../navigation/app_router.dart';
 
 /// Top-level handler for background FCM messages
 @pragma('vm:entry-point')
@@ -130,8 +131,7 @@ class PushNotificationService {
 
   /// Handle notification tap (background → opened)
   static void _handleNotificationOpen(RemoteMessage message) {
-    // TODO: Navigate based on message.data['type']
-    print('📩 Notification opened: ${message.data}');
+    _navigateByType(message.data);
   }
 
   /// Handle local notification tap
@@ -139,9 +139,26 @@ class PushNotificationService {
     if (response.payload == null) return;
     try {
       final data = jsonDecode(response.payload!) as Map<String, dynamic>;
-      print('📩 Local notification tapped: $data');
-      // TODO: Navigate based on data['type']
+      _navigateByType(data);
     } catch (_) {}
+  }
+
+  /// Navigate to the right screen based on notification type
+  static void _navigateByType(Map<String, dynamic> data) {
+    final type = data['type'] as String?;
+    if (type == null) {
+      appRouter.go('/today/notifications');
+      return;
+    }
+
+    if (type.startsWith('order') || type == 'new_order') {
+      appRouter.go('/today');
+    } else if (type == 'support_message') {
+      appRouter.go('/you/support');
+    } else {
+      // earnings, achievements, system → notifications screen
+      appRouter.go('/today/notifications');
+    }
   }
 
   /// Determine notification channel based on type
