@@ -1,20 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../theme/tokens.dart';
+import '../../../models/earning.dart';
+import '../../../providers/transactions_provider.dart';
 
-class RecentActivity extends StatelessWidget {
+class RecentActivity extends ConsumerWidget {
   const RecentActivity({super.key});
 
+  static const _typeIcons = {
+    EarningType.delivery: Icons.bolt,
+    EarningType.network: Icons.eco,
+    EarningType.market: Icons.shopping_cart,
+  };
+
+  static const _typeColors = {
+    EarningType.delivery: AppColors.turboOrange,
+    EarningType.network: AppColors.earningsGreen,
+    EarningType.market: AppColors.bonusPurple,
+  };
+
   @override
-  Widget build(BuildContext context) {
-    final items = [
-      _Tx('Consegna Via Roma', '12 min fa', '+\u20AC 4.80', Icons.bolt, AppColors.turboOrange),
-      _Tx('Commissione Dealer Marco', '1h fa', '+\u20AC 2.40', Icons.eco, AppColors.earningsGreen),
-      _Tx('Vendita Box Premium', '2h fa', '+\u20AC 15.00', Icons.shopping_cart, AppColors.bonusPurple),
-      _Tx('Consegna Piazza Duomo', '3h fa', '+\u20AC 5.20', Icons.bolt, AppColors.turboOrange),
-      _Tx('Commissione Cliente Anna', '4h fa', '+\u20AC 1.80', Icons.eco, AppColors.earningsGreen),
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final transactions = ref.watch(recentTransactionsProvider);
 
     return Column(
       children: [
@@ -43,70 +52,88 @@ class RecentActivity extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        ...items.map((tx) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(12),
+        if (transactions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: Text(
+                'Nessuna transazione recente',
+                style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF9E9E9E)),
+              ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: tx.color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
+          )
+        else
+          ...transactions.map((tx) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: (_typeColors[tx.type] ?? AppColors.routeBlue).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      _typeIcons[tx.type] ?? Icons.bolt,
+                      color: _typeColors[tx.type] ?? AppColors.routeBlue,
+                      size: 20,
+                    ),
                   ),
-                  child: Icon(tx.icon, color: tx.color, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tx.desc,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tx.description,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        tx.time,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: const Color(0xFF9E9E9E),
+                        Text(
+                          _formatRelativeTime(tx.dateTime),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF9E9E9E),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Text(
-                  tx.amount,
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.earningsGreen,
+                  Text(
+                    '+\u20AC ${tx.amount.toStringAsFixed(2)}',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.earningsGreen,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        )),
+          )),
       ],
     );
   }
-}
 
-class _Tx {
-  final String desc, time, amount;
-  final IconData icon;
-  final Color color;
-  _Tx(this.desc, this.time, this.amount, this.icon, this.color);
+  String _formatRelativeTime(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return 'adesso';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min fa';
+    if (diff.inHours < 24) return '${diff.inHours}h fa';
+    if (diff.inDays == 1) return 'ieri';
+    if (diff.inDays < 7) return '${diff.inDays} giorni fa';
+    return '${dateTime.day}/${dateTime.month}';
+  }
 }

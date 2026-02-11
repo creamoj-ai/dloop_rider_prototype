@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../theme/tokens.dart';
+import '../../../models/earning.dart';
+import '../../../providers/transactions_provider.dart';
+import '../../../providers/earnings_provider.dart';
 
-class IncomeStreams extends StatefulWidget {
+class IncomeStreams extends ConsumerStatefulWidget {
   const IncomeStreams({super.key});
 
   @override
-  State<IncomeStreams> createState() => _IncomeStreamsState();
+  ConsumerState<IncomeStreams> createState() => _IncomeStreamsState();
 }
 
-class _IncomeStreamsState extends State<IncomeStreams> {
+class _IncomeStreamsState extends ConsumerState<IncomeStreams> {
   final _controller = PageController(viewportFraction: 0.92);
   int _currentPage = 0;
 
@@ -22,13 +26,44 @@ class _IncomeStreamsState extends State<IncomeStreams> {
 
   @override
   Widget build(BuildContext context) {
+    final monthly = ref.watch(monthlyByTypeProvider);
+    final earningsState = ref.watch(earningsProvider);
+    final todayTxs = ref.watch(todayTransactionsProvider);
+
+    final deliveryMonthly = monthly[EarningType.delivery];
+    final networkMonthly = monthly[EarningType.network];
+    final marketMonthly = monthly[EarningType.market];
+
+    final todayDeliveries = todayTxs.where((t) => t.type == EarningType.delivery).length;
+
     final cards = [
-      _StreamData('CONSEGNE', Icons.delivery_dining, '\u20AC 2.400/mese',
-          '8 oggi', '\u20AC 14.80/h', AppColors.turboOrange, '/money/analytics'),
-      _StreamData('NETWORK', Icons.people, '\u20AC 340/mese',
-          '4 dealer', '5 clienti', AppColors.earningsGreen, '/money/network'),
-      _StreamData('MARKET', Icons.shopping_cart, '\u20AC 180/mese',
-          '12 prodotti', '6 ordini/sett', AppColors.bonusPurple, '/money/market'),
+      _StreamData(
+        'CONSEGNE',
+        Icons.delivery_dining,
+        '\u20AC ${deliveryMonthly?.total.toStringAsFixed(0) ?? '0'}/mese',
+        '$todayDeliveries oggi',
+        '\u20AC ${earningsState.hourlyRate.toStringAsFixed(2)}/h',
+        AppColors.turboOrange,
+        '/money/analytics',
+      ),
+      _StreamData(
+        'NETWORK',
+        Icons.people,
+        '\u20AC ${networkMonthly?.total.toStringAsFixed(0) ?? '0'}/mese',
+        '${networkMonthly?.count ?? 0} commissioni',
+        'questo mese',
+        AppColors.earningsGreen,
+        '/money/network',
+      ),
+      _StreamData(
+        'MARKET',
+        Icons.shopping_cart,
+        '\u20AC ${marketMonthly?.total.toStringAsFixed(0) ?? '0'}/mese',
+        '${marketMonthly?.count ?? 0} vendite',
+        'questo mese',
+        AppColors.bonusPurple,
+        '/money/market',
+      ),
     ];
 
     return Column(
@@ -118,7 +153,7 @@ class _IncomeStreamsState extends State<IncomeStreams> {
                 shape: BoxShape.circle,
                 color: i == _currentPage
                     ? AppColors.turboOrange
-                    : const Color(0xFF9E9E9E).withOpacity(0.3),
+                    : const Color(0xFF9E9E9E).withValues(alpha: 0.3),
               ),
             );
           }),

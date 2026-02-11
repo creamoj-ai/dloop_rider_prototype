@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
+import '../../../models/earning.dart';
+import '../../../providers/transactions_provider.dart';
 
-class HistoryBottomSheet extends StatefulWidget {
+class HistoryBottomSheet extends ConsumerStatefulWidget {
   const HistoryBottomSheet({super.key});
 
   static void show(BuildContext context) {
@@ -15,10 +18,10 @@ class HistoryBottomSheet extends StatefulWidget {
   }
 
   @override
-  State<HistoryBottomSheet> createState() => _HistoryBottomSheetState();
+  ConsumerState<HistoryBottomSheet> createState() => _HistoryBottomSheetState();
 }
 
-class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
+class _HistoryBottomSheetState extends ConsumerState<HistoryBottomSheet> {
   DateTime? _startDate;
   DateTime? _endDate;
   int _selectedMonth = DateTime.now().month;
@@ -26,60 +29,39 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
   bool _isCalendarExpanded = true;
   bool _isRangeMode = false;
 
-  // Mock data per demo
-  final Map<String, List<_DayActivity>> _mockData = {
-    '2026-02-05': [
-      _DayActivity('09:32', 'Pizzeria Mario', 'Via Roma 15', 4.50, 'earn'),
-      _DayActivity('10:15', 'Sushi Zen', 'C.so Italia 8', 5.80, 'earn'),
-      _DayActivity('10:58', "McDonald's", 'P.za Duomo 1', 3.90, 'earn'),
-      _DayActivity('12:30', 'Comm. Network', 'Marco R.', 2.50, 'network'),
-      _DayActivity('14:20', 'Burger King', 'Via Padova 22', 4.20, 'earn'),
-      _DayActivity('15:45', 'Market Sale', 'Energy Box', 15.00, 'market'),
-      _DayActivity('17:10', 'Poke House', 'Via Torino 8', 5.50, 'earn'),
-    ],
-    '2026-02-04': [
-      _DayActivity('10:00', 'KFC', 'C.so Buenos Aires', 4.80, 'earn'),
-      _DayActivity('11:30', 'Pizza Hut', 'Via Montenapoleone', 5.20, 'earn'),
-      _DayActivity('13:00', 'Comm. Network', 'Anna V.', 3.00, 'network'),
-      _DayActivity('15:00', 'Market Sale', 'Protein Bar', 18.00, 'market'),
-    ],
-    '2026-02-03': [
-      _DayActivity('09:00', 'Starbucks', 'P.za Cordusio', 3.50, 'earn'),
-      _DayActivity('10:30', 'Domino\'s', 'Via Dante', 4.90, 'earn'),
-      _DayActivity('12:00', 'Five Guys', 'C.so Vittorio Emanuele', 6.20, 'earn'),
-    ],
-    '2026-02-02': [
-      _DayActivity('11:00', 'Roadhouse', 'Via Larga', 5.00, 'earn'),
-      _DayActivity('14:00', 'Old Wild West', 'C.so Como', 4.50, 'earn'),
-    ],
-    '2026-02-01': [
-      _DayActivity('09:30', 'Eataly', 'P.za XXV Aprile', 6.80, 'earn'),
-      _DayActivity('12:00', 'Comm. Network', 'Luigi B.', 4.00, 'network'),
-    ],
-  };
-
   @override
   void initState() {
     super.initState();
     _startDate = DateTime.now();
   }
 
-  List<_DayActivity> get _activitiesForSelection {
-    List<_DayActivity> all = [];
+  /// Group all transactions by date key, filtered to selection
+  List<Earning> get _activitiesForSelection {
+    final allTxs = ref.read(allTransactionsProvider);
 
     if (_isRangeMode && _startDate != null && _endDate != null) {
-      // Range mode
-      for (var date = _startDate!; !date.isAfter(_endDate!); date = date.add(const Duration(days: 1))) {
-        final key = _dateKey(date);
-        all.addAll(_mockData[key] ?? []);
-      }
+      final startDay = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+      final endDay = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
+      return allTxs.where((t) =>
+        t.dateTime.isAfter(startDay.subtract(const Duration(seconds: 1))) &&
+        t.dateTime.isBefore(endDay.add(const Duration(seconds: 1)))
+      ).toList();
     } else if (_startDate != null) {
-      // Single day mode
-      final key = _dateKey(_startDate!);
-      all = _mockData[key] ?? [];
+      final dayStart = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
+      return allTxs.where((t) =>
+        t.dateTime.isAfter(dayStart.subtract(const Duration(seconds: 1))) &&
+        t.dateTime.isBefore(dayEnd)
+      ).toList();
     }
 
-    return all;
+    return [];
+  }
+
+  /// Get set of date keys that have transactions (for calendar dots)
+  Set<String> get _datesWithData {
+    final allTxs = ref.read(allTransactionsProvider);
+    return allTxs.map((t) => _dateKey(t.dateTime)).toSet();
   }
 
   String _dateKey(DateTime date) {
@@ -91,7 +73,7 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
   }
 
   int get _ordersForSelection {
-    return _activitiesForSelection.where((a) => a.type == 'earn').length;
+    return _activitiesForSelection.where((a) => a.type == EarningType.delivery).length;
   }
 
   int get _daysInSelection {
@@ -112,25 +94,29 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
           } else {
             _endDate = date;
           }
-          _isCalendarExpanded = false; // Chiudi dopo selezione range
+          _isCalendarExpanded = false;
         }
       } else {
         _startDate = date;
         _endDate = null;
-        _isCalendarExpanded = false; // Chiudi dopo selezione singola
+        _isCalendarExpanded = false;
       }
     });
   }
 
   bool _isInRange(DateTime date) {
     if (_startDate == null) return false;
-    if (_endDate == null) return date == _startDate;
+    if (_endDate == null) {
+      return date.year == _startDate!.year && date.month == _startDate!.month && date.day == _startDate!.day;
+    }
     return !date.isBefore(_startDate!) && !date.isAfter(_endDate!);
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // Watch to trigger rebuilds on new transactions
+    ref.watch(allTransactionsProvider);
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
@@ -173,11 +159,10 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
-          Icon(Icons.history, color: AppColors.routeBlue, size: 20),
+          const Icon(Icons.history, color: AppColors.routeBlue, size: 20),
           const SizedBox(width: 8),
           Text('Storico', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
           const Spacer(),
-          // Toggle calendario
           GestureDetector(
             onTap: () => setState(() => _isCalendarExpanded = !_isCalendarExpanded),
             child: Container(
@@ -189,7 +174,7 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.calendar_month, size: 14, color: AppColors.routeBlue),
+                  const Icon(Icons.calendar_month, size: 14, color: AppColors.routeBlue),
                   const SizedBox(width: 4),
                   Icon(
                     _isCalendarExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
@@ -300,6 +285,7 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
     final firstDay = DateTime(_selectedYear, _selectedMonth, 1);
     final lastDay = DateTime(_selectedYear, _selectedMonth + 1, 0);
     final startWeekday = (firstDay.weekday - 1) % 7;
+    final datesWithData = _datesWithData;
 
     List<Widget> dayWidgets = [];
 
@@ -313,7 +299,7 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
       final isStart = _startDate != null && date.year == _startDate!.year && date.month == _startDate!.month && date.day == _startDate!.day;
       final isEnd = _endDate != null && date.year == _endDate!.year && date.month == _endDate!.month && date.day == _endDate!.day;
       final isToday = date.day == DateTime.now().day && date.month == DateTime.now().month && date.year == DateTime.now().year;
-      final hasData = _mockData.containsKey(_dateKey(date));
+      final hasData = datesWithData.contains(_dateKey(date));
 
       dayWidgets.add(
         GestureDetector(
@@ -388,7 +374,7 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today, size: 14, color: AppColors.routeBlue),
+            const Icon(Icons.calendar_today, size: 14, color: AppColors.routeBlue),
             const SizedBox(width: 8),
             Text(dateLabel, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface)),
             if (_isRangeMode && _daysInSelection > 1) ...[
@@ -403,13 +389,13 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(6)),
-              child: Text('📦 $_ordersForSelection', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: cs.onSurface)),
+              child: Text('$_ordersForSelection', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: cs.onSurface)),
             ),
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(color: AppColors.earningsGreen.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
-              child: Text('€${_totalForSelection.toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.earningsGreen)),
+              child: Text('\u20AC${_totalForSelection.toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.earningsGreen)),
             ),
           ],
         ),
@@ -427,7 +413,7 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
           children: [
             Icon(Icons.inbox_outlined, size: 36, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
             const SizedBox(height: 6),
-            Text('Nessuna attività', style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant)),
+            Text('Nessuna attivita', style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant)),
           ],
         ),
       );
@@ -440,9 +426,14 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
     );
   }
 
-  Widget _buildActivityTile(_DayActivity a, ColorScheme cs) {
-    final color = a.type == 'earn' ? AppColors.routeBlue : a.type == 'network' ? AppColors.bonusPurple : AppColors.turboOrange;
-    final icon = a.type == 'earn' ? Icons.delivery_dining : a.type == 'network' ? Icons.people : Icons.storefront;
+  Widget _buildActivityTile(Earning tx, ColorScheme cs) {
+    final color = tx.type == EarningType.delivery ? AppColors.routeBlue
+        : tx.type == EarningType.network ? AppColors.bonusPurple
+        : AppColors.turboOrange;
+    final icon = tx.type == EarningType.delivery ? Icons.delivery_dining
+        : tx.type == EarningType.network ? Icons.people
+        : Icons.storefront;
+    final time = '${tx.dateTime.hour.toString().padLeft(2, '0')}:${tx.dateTime.minute.toString().padLeft(2, '0')}';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 5),
@@ -450,7 +441,7 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
       decoration: BoxDecoration(color: cs.surfaceContainerHighest.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: [
-          SizedBox(width: 36, child: Text(a.time, style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant))),
+          SizedBox(width: 36, child: Text(time, style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant))),
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(5)),
@@ -461,12 +452,17 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(a.title, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(a.subtitle, style: GoogleFonts.inter(fontSize: 9, color: cs.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(tx.description, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  tx.type == EarningType.delivery ? 'Consegna'
+                      : tx.type == EarningType.network ? 'Network'
+                      : 'Market',
+                  style: GoogleFonts.inter(fontSize: 9, color: cs.onSurfaceVariant),
+                ),
               ],
             ),
           ),
-          Text('€${a.amount.toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.earningsGreen)),
+          Text('\u20AC${tx.amount.toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.earningsGreen)),
         ],
       ),
     );
@@ -487,7 +483,7 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Export PDF in arrivo...'), backgroundColor: AppColors.routeBlue),
+                const SnackBar(content: Text('Export PDF in arrivo...'), backgroundColor: AppColors.routeBlue),
               );
             },
             icon: const Icon(Icons.picture_as_pdf, size: 16),
@@ -503,13 +499,4 @@ class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
       ),
     );
   }
-}
-
-class _DayActivity {
-  final String time;
-  final String title;
-  final String subtitle;
-  final double amount;
-  final String type;
-  _DayActivity(this.time, this.title, this.subtitle, this.amount, this.type);
 }

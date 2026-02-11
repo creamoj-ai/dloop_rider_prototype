@@ -1,20 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
+import '../../../models/earning.dart';
+import '../../../providers/transactions_provider.dart';
 
-class BalanceHero extends StatefulWidget {
+class BalanceHero extends ConsumerStatefulWidget {
   const BalanceHero({super.key});
 
   @override
-  State<BalanceHero> createState() => _BalanceHeroState();
+  ConsumerState<BalanceHero> createState() => _BalanceHeroState();
 }
 
-class _BalanceHeroState extends State<BalanceHero> {
+class _BalanceHeroState extends ConsumerState<BalanceHero> {
   bool _isPendingExpanded = false;
+
+  static const _typeLabels = {
+    EarningType.delivery: 'Consegne',
+    EarningType.network: 'Network',
+    EarningType.market: 'Market',
+  };
+
+  static const _typeColors = {
+    EarningType.delivery: AppColors.turboOrange,
+    EarningType.network: AppColors.earningsGreen,
+    EarningType.market: AppColors.bonusPurple,
+  };
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final balance = ref.watch(completedBalanceProvider);
+    final pendingTotal = ref.watch(pendingBalanceProvider);
+    final pendingByType = ref.watch(pendingByTypeProvider);
+
+    // Format balance Italian style (1.847,50)
+    final balanceFormatted = _formatEuro(balance);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -30,7 +50,7 @@ class _BalanceHeroState extends State<BalanceHero> {
         ),
         const SizedBox(height: 8),
         Text(
-          '\u20AC 1.847,50',
+          '\u20AC $balanceFormatted',
           style: GoogleFonts.inter(
             fontSize: 48,
             fontWeight: FontWeight.w700,
@@ -38,12 +58,25 @@ class _BalanceHeroState extends State<BalanceHero> {
           ),
         ),
         const SizedBox(height: 8),
-        _buildPendingCard(cs),
+        if (pendingTotal > 0) _buildPendingCard(pendingTotal, pendingByType),
       ],
     );
   }
 
-  Widget _buildPendingCard(ColorScheme cs) {
+  String _formatEuro(double amount) {
+    final parts = amount.toStringAsFixed(2).split('.');
+    final intPart = parts[0];
+    final decPart = parts[1];
+    // Add dots for thousands
+    final buffer = StringBuffer();
+    for (int i = 0; i < intPart.length; i++) {
+      if (i > 0 && (intPart.length - i) % 3 == 0) buffer.write('.');
+      buffer.write(intPart[i]);
+    }
+    return '$buffer,$decPart';
+  }
+
+  Widget _buildPendingCard(double pendingTotal, Map<EarningType, PendingInfo> pendingByType) {
     return GestureDetector(
       onTap: () => setState(() => _isPendingExpanded = !_isPendingExpanded),
       child: AnimatedContainer(
@@ -60,15 +93,11 @@ class _BalanceHeroState extends State<BalanceHero> {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.schedule,
-                  size: 16,
-                  color: AppColors.earningsGreen,
-                ),
+                const Icon(Icons.schedule, size: 16, color: AppColors.earningsGreen),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '+\u20AC 234,20 in arrivo',
+                    '+\u20AC ${pendingTotal.toStringAsFixed(2)} in arrivo',
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -83,18 +112,19 @@ class _BalanceHeroState extends State<BalanceHero> {
                 ),
               ],
             ),
-            if (_isPendingExpanded) ...[
+            if (_isPendingExpanded && pendingByType.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Container(
-                height: 1,
-                color: AppColors.earningsGreen.withValues(alpha: 0.2),
-              ),
+              Container(height: 1, color: AppColors.earningsGreen.withValues(alpha: 0.2)),
               const SizedBox(height: 12),
-              _buildPendingRow('Consegne', '€180,00', '3 in elaborazione', 'oggi', AppColors.turboOrange),
-              const SizedBox(height: 8),
-              _buildPendingRow('Network', '€34,20', '2 commissioni', 'domani', AppColors.earningsGreen),
-              const SizedBox(height: 8),
-              _buildPendingRow('Market', '€20,00', '1 ordine', 'lun 10', AppColors.bonusPurple),
+              ...pendingByType.entries.map((entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildPendingRow(
+                  _typeLabels[entry.key] ?? '',
+                  '\u20AC${entry.value.total.toStringAsFixed(2)}',
+                  '${entry.value.count} in elaborazione',
+                  _typeColors[entry.key] ?? AppColors.routeBlue,
+                ),
+              )),
             ],
           ],
         ),
@@ -102,60 +132,27 @@ class _BalanceHeroState extends State<BalanceHero> {
     );
   }
 
-  Widget _buildPendingRow(String label, String amount, String detail, String time, Color color) {
+  Widget _buildPendingRow(String label, String amount, String detail, Color color) {
     return Row(
       children: [
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              Text(
-                detail,
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  color: const Color(0xFF9E9E9E),
-                ),
-              ),
+              Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+              Text(detail, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF9E9E9E))),
             ],
           ),
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              amount,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
-            Text(
-              time,
-              style: GoogleFonts.inter(
-                fontSize: 9,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF9E9E9E),
-              ),
-            ),
-          ],
+        Text(
+          amount,
+          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: color),
         ),
       ],
     );

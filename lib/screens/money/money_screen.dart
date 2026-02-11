@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/tokens.dart';
+import '../../models/earning.dart';
 import '../../widgets/dloop_top_bar.dart';
 import '../../widgets/invite_sheet.dart';
 import '../../widgets/header_sheets.dart';
+import '../../providers/earnings_provider.dart';
+import '../../providers/transactions_provider.dart';
+import '../../providers/monthly_stats_provider.dart';
 import 'widgets/balance_hero.dart';
 import 'widgets/income_streams.dart';
 import 'widgets/recent_activity.dart';
 import 'widgets/history_bottom_sheet.dart';
 
-class MoneyScreen extends StatelessWidget {
+class MoneyScreen extends ConsumerWidget {
   const MoneyScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
 
     return SafeArea(
@@ -49,7 +54,7 @@ class MoneyScreen extends StatelessWidget {
                         icon: Icons.analytics_outlined,
                         label: 'Analytics',
                         color: AppColors.statsGold,
-                        onTap: () => _showAnalyticsSheet(context),
+                        onTap: () => _showAnalyticsSheet(context, ref),
                       ),
                       const SizedBox(width: 8),
                       _buildQuickAction(
@@ -57,7 +62,7 @@ class MoneyScreen extends StatelessWidget {
                         icon: Icons.receipt_long,
                         label: 'Transazioni',
                         color: AppColors.turboOrange,
-                        onTap: () => _showTransactionsSheet(context),
+                        onTap: () => _showTransactionsSheet(context, ref),
                       ),
                     ],
                   ),
@@ -117,8 +122,38 @@ class MoneyScreen extends StatelessWidget {
     );
   }
 
-  void _showAnalyticsSheet(BuildContext context) {
+  void _showAnalyticsSheet(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final earningsState = ref.read(earningsProvider);
+    final monthlyStats = ref.read(monthlyStatsProvider);
+
+    // Compute real averages
+    final hourlyRate = earningsState.hourlyRate;
+    final avgPerOrder = earningsState.avgPerOrder;
+
+    // Monthly stats for deliveries/day and avg distance
+    double deliveriesPerDay = 0;
+    double avgDistanceKm = 0;
+    monthlyStats.whenData((stats) {
+      if (stats.workDaysCount > 0) {
+        deliveriesPerDay = stats.totalOrders / stats.workDaysCount;
+      }
+      if (stats.totalOrders > 0) {
+        avgDistanceKm = stats.totalDistanceKm / stats.totalOrders;
+      }
+    });
+
+    // Avg delivery time from today orders
+    final deliveredOrders = earningsState.todayOrders.where((o) =>
+      o.status.name == 'delivered' && o.acceptedAt != null && o.deliveredAt != null
+    ).toList();
+    double avgMinutes = 0;
+    if (deliveredOrders.isNotEmpty) {
+      final totalMin = deliveredOrders.fold(0.0, (sum, o) =>
+        sum + o.deliveredAt!.difference(o.acceptedAt!).inMinutes);
+      avgMinutes = totalMin / deliveredOrders.length;
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
@@ -142,10 +177,11 @@ class MoneyScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              _buildAnalyticRow('Media oraria', '€14.80/h', AppColors.earningsGreen),
-              _buildAnalyticRow('Consegne/giorno', '8.2', AppColors.routeBlue),
-              _buildAnalyticRow('Distanza media', '3.4 km', AppColors.turboOrange),
-              _buildAnalyticRow('Tempo medio', '18 min', AppColors.bonusPurple),
+              _buildAnalyticRow('Media oraria', '\u20AC${hourlyRate.toStringAsFixed(2)}/h', AppColors.earningsGreen),
+              _buildAnalyticRow('Media per ordine', '\u20AC${avgPerOrder.toStringAsFixed(2)}', AppColors.earningsGreen),
+              _buildAnalyticRow('Consegne/giorno', deliveriesPerDay > 0 ? deliveriesPerDay.toStringAsFixed(1) : '-', AppColors.routeBlue),
+              _buildAnalyticRow('Distanza media', avgDistanceKm > 0 ? '${avgDistanceKm.toStringAsFixed(1)} km' : '-', AppColors.turboOrange),
+              _buildAnalyticRow('Tempo medio', avgMinutes > 0 ? '${avgMinutes.toStringAsFixed(0)} min' : '-', AppColors.bonusPurple),
               const SizedBox(height: 16),
               Text('Trend settimanale', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
               const SizedBox(height: 8),
@@ -174,8 +210,21 @@ class MoneyScreen extends StatelessWidget {
     );
   }
 
-  void _showTransactionsSheet(BuildContext context) {
+  void _showTransactionsSheet(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final todayTxs = ref.read(todayTransactionsProvider);
+
+    final typeIcons = {
+      EarningType.delivery: Icons.bolt,
+      EarningType.network: Icons.eco,
+      EarningType.market: Icons.shopping_cart,
+    };
+    final typeColors = {
+      EarningType.delivery: AppColors.turboOrange,
+      EarningType.network: AppColors.earningsGreen,
+      EarningType.market: AppColors.bonusPurple,
+    };
+
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
@@ -200,16 +249,24 @@ class MoneyScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(color: AppColors.earningsGreen.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                    child: Text('12 oggi', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.earningsGreen)),
+                    child: Text('${todayTxs.length} oggi', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.earningsGreen)),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              _buildTxItem(cs, 'Consegna Via Roma', '12:45', '+€4.80', AppColors.turboOrange),
-              _buildTxItem(cs, 'Comm. Dealer Marco', '11:30', '+€2.40', AppColors.earningsGreen),
-              _buildTxItem(cs, 'Vendita Box Premium', '10:15', '+€15.00', AppColors.bonusPurple),
-              _buildTxItem(cs, 'Consegna P.za Duomo', '09:22', '+€5.20', AppColors.turboOrange),
-              _buildTxItem(cs, 'Comm. Cliente Anna', '08:45', '+€1.80', AppColors.earningsGreen),
+              if (todayTxs.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text('Nessuna transazione oggi', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
+                  ),
+                )
+              else
+                ...todayTxs.take(10).map((tx) {
+                  final time = '${tx.dateTime.hour.toString().padLeft(2, '0')}:${tx.dateTime.minute.toString().padLeft(2, '0')}';
+                  final color = typeColors[tx.type] ?? AppColors.turboOrange;
+                  return _buildTxItem(cs, tx.description, time, '+\u20AC${tx.amount.toStringAsFixed(2)}', color, typeIcons[tx.type] ?? Icons.bolt);
+                }),
               const SizedBox(height: 8),
               Center(
                 child: TextButton(
@@ -224,7 +281,7 @@ class MoneyScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTxItem(ColorScheme cs, String desc, String time, String amount, Color color) {
+  Widget _buildTxItem(ColorScheme cs, String desc, String time, String amount, Color color, IconData icon) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -233,7 +290,7 @@ class MoneyScreen extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-            child: Icon(Icons.bolt, color: color, size: 16),
+            child: Icon(icon, color: color, size: 16),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -283,7 +340,7 @@ class MoneyScreen extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  'Guadagna di più',
+                  'Guadagna di piu',
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -316,7 +373,7 @@ class MoneyScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '€10 per ogni rider attivo',
+                        '\u20AC10 per ogni rider attivo',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: cs.onSurfaceVariant,
@@ -351,18 +408,25 @@ class MoneyScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'I tuoi invitati: 3 attivi',
+                'Prossimamente',
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: cs.onSurfaceVariant,
                 ),
               ),
-              Text(
-                '+€30 guadagnati',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.earningsGreen,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.turboOrange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'SOON',
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.turboOrange,
+                  ),
                 ),
               ),
             ],
