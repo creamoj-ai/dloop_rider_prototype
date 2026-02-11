@@ -59,4 +59,5 @@ class DefaultFirebaseOptions {
     projectId: 'loop-rider-prototype',
     storageBucket: 'loop-rider-prototype.firebasestorage.app',
   );
+
 }

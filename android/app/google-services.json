@@ -12,7 +12,20 @@
           "package_name": "com.dloop.rider.prototype"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "793691819503-psqjlbdm0fi1tpgrejib6knmn8leu2n3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dloop.rider.prototype",
+            "certificate_hash": "3cd14ceb53766ad1e41550041675234b3e92efe9"
+          }
+        },
+        {
+          "client_id": "793691819503-3k2shu09t4jrearijhd4eds9aotjmvd7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDSp5lXMuyE9zfeNEEyCumQEvA77UFFVGA"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "793691819503-3k2shu09t4jrearijhd4eds9aotjmvd7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

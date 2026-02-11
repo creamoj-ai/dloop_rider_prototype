@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/tokens.dart';
 import '../../providers/user_provider.dart';
@@ -18,6 +19,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
 
@@ -62,6 +64,66 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  bool _googleInitialized = false;
+
+  Future<void> _initGoogleSignIn() async {
+    if (_googleInitialized) return;
+    await GoogleSignIn.instance.initialize(
+      serverClientId: '793691819503-3k2shu09t4jrearijhd4eds9aotjmvd7.apps.googleusercontent.com',
+    );
+    _googleInitialized = true;
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await _initGoogleSignIn();
+
+      final googleUser = await GoogleSignIn.instance.authenticate();
+
+      final idToken = googleUser.authentication.idToken;
+      if (idToken == null) {
+        throw Exception('Impossibile ottenere il token Google');
+      }
+
+      await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+      );
+
+      if (mounted) {
+        await ref.read(currentUserProvider.notifier).refresh();
+        if (mounted) {
+          context.go('/today');
+        }
+      }
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        // User cancelled — do nothing
+      } else {
+        setState(() {
+          _errorMessage = 'Errore accesso Google. Riprova.';
+        });
+      }
+    } on AuthException catch (e) {
+      setState(() {
+        _errorMessage = _translateError(e.message);
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Errore accesso Google. Riprova.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleLoading = false);
       }
     }
   }
@@ -540,6 +602,43 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ),
                           Expanded(child: Divider(color: Colors.grey[800])),
                         ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Google Sign-In button
+                      SizedBox(
+                        height: 52,
+                        child: OutlinedButton.icon(
+                          onPressed: (_isLoading || _isGoogleLoading) ? null : _handleGoogleSignIn,
+                          icon: _isGoogleLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation(Colors.white70),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.g_mobiledata,
+                                  size: 28,
+                                  color: Colors.white,
+                                ),
+                          label: Text(
+                            'Accedi con Google',
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey[700]!),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 32),
 
