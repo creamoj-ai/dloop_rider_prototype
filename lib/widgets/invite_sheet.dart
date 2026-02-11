@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/tokens.dart';
+import '../providers/user_provider.dart';
+import '../providers/referral_provider.dart';
+import '../services/referral_service.dart';
 
-/// Bottom Sheet "Invita e guadagna" - Stile Revolut
-class InviteSheet extends StatelessWidget {
+/// Bottom Sheet "Invita e guadagna" - wired to Supabase referrals table
+class InviteSheet extends ConsumerWidget {
   const InviteSheet({super.key});
 
   static void show(BuildContext context) {
@@ -18,8 +22,25 @@ class InviteSheet extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final userAsync = ref.watch(currentUserProvider);
+    final referralsAsync = ref.watch(referralsStreamProvider);
+
+    // Generate referral code from user data
+    final referralCode = userAsync.when(
+      data: (user) => user != null
+          ? ReferralService.generateReferralCode(user.firstName, user.lastName, user.id)
+          : 'DLOOP0000',
+      loading: () => '...',
+      error: (_, __) => 'DLOOP0000',
+    );
+
+    final referrals = referralsAsync.when(
+      data: (list) => list,
+      loading: () => <Referral>[],
+      error: (_, __) => <Referral>[],
+    );
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -104,7 +125,7 @@ class InviteSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _buildCodeBox(context, cs),
+                _buildCodeBox(context, cs, referralCode),
                 const SizedBox(height: 32),
 
                 // Come funziona
@@ -128,7 +149,7 @@ class InviteSheet extends StatelessWidget {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: () => _shareInvite(context),
+                    onPressed: () => _shareInvite(context, referralCode),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.turboOrange,
                       foregroundColor: Colors.white,
@@ -157,16 +178,37 @@ class InviteSheet extends StatelessWidget {
                 const SizedBox(height: 32),
 
                 // I tuoi invitati
-                Text(
-                  'I tuoi invitati',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: cs.onSurfaceVariant,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'I tuoi invitati',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (referrals.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.earningsGreen.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${referrals.length}',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.earningsGreen,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 12),
-                _buildInvitedList(cs),
+                _buildInvitedList(cs, referrals),
                 const SizedBox(height: 20),
               ],
             ),
@@ -176,9 +218,7 @@ class InviteSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildCodeBox(BuildContext context, ColorScheme cs) {
-    const referralCode = 'MARIO2024';
-
+  Widget _buildCodeBox(BuildContext context, ColorScheme cs, String referralCode) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -204,7 +244,7 @@ class InviteSheet extends StatelessWidget {
           ),
           TextButton.icon(
             onPressed: () {
-              Clipboard.setData(const ClipboardData(text: referralCode));
+              Clipboard.setData(ClipboardData(text: referralCode));
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -286,14 +326,8 @@ class InviteSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildInvitedList(ColorScheme cs) {
-    final invitedUsers = [
-      {'name': 'Luca R.', 'status': 'active', 'earned': 10.0},
-      {'name': 'Anna M.', 'status': 'active', 'earned': 10.0},
-      {'name': 'Paolo G.', 'status': 'pending', 'earned': 0.0},
-    ];
-
-    if (invitedUsers.isEmpty) {
+  Widget _buildInvitedList(ColorScheme cs, List<Referral> referrals) {
+    if (referrals.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -318,11 +352,10 @@ class InviteSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        children: invitedUsers.asMap().entries.map((entry) {
+        children: referrals.asMap().entries.map((entry) {
           final index = entry.key;
-          final user = entry.value;
-          final isActive = user['status'] == 'active';
-          final isLast = index == invitedUsers.length - 1;
+          final referral = entry.value;
+          final isLast = index == referrals.length - 1;
 
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -342,7 +375,7 @@ class InviteSheet extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: isActive
+                    color: referral.isActive
                         ? AppColors.earningsGreen.withValues(alpha: 0.15)
                         : cs.onSurfaceVariant.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(18),
@@ -350,7 +383,7 @@ class InviteSheet extends StatelessWidget {
                   child: Icon(
                     Icons.person,
                     size: 20,
-                    color: isActive ? AppColors.earningsGreen : cs.onSurfaceVariant,
+                    color: referral.isActive ? AppColors.earningsGreen : cs.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -359,7 +392,7 @@ class InviteSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user['name'] as String,
+                        referral.referredName,
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -370,16 +403,16 @@ class InviteSheet extends StatelessWidget {
                       Row(
                         children: [
                           Icon(
-                            isActive ? Icons.check_circle : Icons.hourglass_empty,
+                            referral.isActive ? Icons.check_circle : Icons.hourglass_empty,
                             size: 12,
-                            color: isActive ? AppColors.earningsGreen : cs.onSurfaceVariant,
+                            color: referral.isActive ? AppColors.earningsGreen : cs.onSurfaceVariant,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            isActive ? 'Attivo' : 'In attesa',
+                            referral.isActive ? 'Attivo' : 'In attesa',
                             style: GoogleFonts.inter(
                               fontSize: 12,
-                              color: isActive ? AppColors.earningsGreen : cs.onSurfaceVariant,
+                              color: referral.isActive ? AppColors.earningsGreen : cs.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -387,9 +420,9 @@ class InviteSheet extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (isActive)
+                if (referral.isActive)
                   Text(
-                    '+€${(user['earned'] as double).toStringAsFixed(0)}',
+                    '+€${referral.bonusAmount.toStringAsFixed(0)}',
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -412,9 +445,8 @@ class InviteSheet extends StatelessWidget {
     );
   }
 
-  void _shareInvite(BuildContext context) {
-    const referralCode = 'MARIO2024';
-    const message = '''
+  void _shareInvite(BuildContext context, String referralCode) {
+    final message = '''
 Unisciti a dloop e guadagna consegnando!
 
 Usa il mio codice: $referralCode

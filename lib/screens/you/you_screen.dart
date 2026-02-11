@@ -7,6 +7,8 @@ import '../../widgets/dloop_top_bar.dart';
 import '../../widgets/invite_sheet.dart';
 import '../../widgets/header_sheets.dart';
 import '../../providers/notifications_provider.dart';
+import '../../providers/earnings_provider.dart';
+import '../../providers/referral_provider.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/today_stats_card.dart';
 import 'widgets/stats_only_card.dart';
@@ -20,12 +22,15 @@ class YouScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
+    final isOnline = ref.watch(earningsProvider).isOnline;
+    final activeReferrals = ref.watch(activeReferralsCountProvider);
+    final referralBonus = ref.watch(referralBonusProvider);
 
     return SafeArea(
       child: Column(
         children: [
           DloopTopBar(
-            isOnline: true,
+            isOnline: isOnline,
             notificationCount: unreadCount,
             searchHint: 'Cerca impostazioni...',
             onSearchTap: () => SearchSheet.show(context, hint: 'Cerca impostazioni...'),
@@ -44,7 +49,7 @@ class YouScreen extends ConsumerWidget {
                   const TodayStatsCard(),
                   const SizedBox(height: 24),
                   // 3. Invita Amici
-                  _buildInviteSection(context, cs),
+                  _buildInviteSection(context, cs, activeReferrals, referralBonus),
                   const SizedBox(height: 24),
                   // 4. Le Mie Tariffe
                   _buildPricingSection(context, cs),
@@ -138,7 +143,7 @@ class YouScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInviteSection(BuildContext context, ColorScheme cs) {
+  Widget _buildInviteSection(BuildContext context, ColorScheme cs, int activeReferrals, double referralBonus) {
     return InkWell(
       onTap: () => InviteSheet.show(context),
       borderRadius: BorderRadius.circular(16),
@@ -189,10 +194,12 @@ class YouScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Guadagna €10 per ogni rider',
+                    activeReferrals > 0
+                        ? '$activeReferrals attivi • +€${referralBonus.toStringAsFixed(0)} guadagnati'
+                        : 'Guadagna €10 per ogni rider',
                     style: GoogleFonts.inter(
                       fontSize: 13,
-                      color: cs.onSurfaceVariant,
+                      color: activeReferrals > 0 ? AppColors.earningsGreen : cs.onSurfaceVariant,
                     ),
                   ),
                 ],
