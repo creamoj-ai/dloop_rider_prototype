@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "793691819503-psqjlbdm0fi1tpgrejib6knmn8leu2n3.apps.googleusercontent.com",
+          "client_id": "793691819503-jq40h6f0ge5uojc5cvpncoqumihstfru.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.dloop.rider.prototype",
-            "certificate_hash": "3cd14ceb53766ad1e41550041675234b3e92efe9"
+            "certificate_hash": "5a37a66000fc965dbdbe305aa9d698c63a0a2881"
           }
         },
         {

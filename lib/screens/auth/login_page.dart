@@ -106,20 +106,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         }
       }
     } on GoogleSignInException catch (e) {
+      debugPrint('GoogleSignInException: code=${e.code}, details=$e');
       if (e.code == GoogleSignInExceptionCode.canceled) {
         // User cancelled — do nothing
       } else {
         setState(() {
-          _errorMessage = 'Errore accesso Google. Riprova.';
+          _errorMessage = 'Errore Google: ${e.code}';
         });
       }
     } on AuthException catch (e) {
+      debugPrint('AuthException on Google Sign-In: ${e.message}');
       setState(() {
         _errorMessage = _translateError(e.message);
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('Google Sign-In error: $e');
+      debugPrint('Stack: $st');
       setState(() {
-        _errorMessage = 'Errore accesso Google. Riprova.';
+        _errorMessage = 'Errore Google: $e';
       });
     } finally {
       if (mounted) {
@@ -608,36 +612,42 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       // Google Sign-In button
                       SizedBox(
                         height: 52,
-                        child: OutlinedButton.icon(
+                        child: OutlinedButton(
                           onPressed: (_isLoading || _isGoogleLoading) ? null : _handleGoogleSignIn,
-                          icon: _isGoogleLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation(Colors.white70),
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.g_mobiledata,
-                                  size: 28,
-                                  color: Colors.white,
-                                ),
-                          label: Text(
-                            'Accedi con Google',
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: Colors.grey[700]!),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
+                          child: _isGoogleLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation(Colors.white70),
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Image.asset(
+                                      'assets/images/google_logo.png',
+                                      height: 22,
+                                      width: 22,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Accedi con Google',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ),
                       const SizedBox(height: 32),
