@@ -226,7 +226,7 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
                         Icons.phone,
                         'Chiama',
                         AppColors.earningsGreen,
-                        () => _makeCall('+39 333 1234567'),
+                        () => _showContactUnavailable(order.dealerName),
                       ),
                     ),
                   ],
@@ -770,6 +770,16 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
+  }
+
+  void _showContactUnavailable(String dealerName) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Numero $dealerName non disponibile'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _makeCall(String phoneNumber) async {

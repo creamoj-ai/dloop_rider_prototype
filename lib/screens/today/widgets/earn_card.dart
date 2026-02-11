@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 import '../../../providers/earnings_provider.dart';
+import '../../../providers/active_orders_provider.dart';
 import '../../../models/order.dart';
 
 /// Card unificata per EARN - sostituisce ActiveModeCard
@@ -13,6 +14,10 @@ class EarnCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final earnings = ref.watch(earningsProvider);
+    final ordersState = ref.watch(activeOrdersProvider);
+    final firstAvailable = ordersState.availableOrders.isNotEmpty
+        ? ordersState.availableOrders.first
+        : null;
     final cs = Theme.of(context).colorScheme;
 
     // Se offline
@@ -35,16 +40,21 @@ class EarnCard extends ConsumerWidget {
     // Ordine disponibile
     return _NuovoOrdineCard(
       target: earnings.dailyTarget,
-      onAccept: () {
-        final order = Order.create(
-          id: 'order_${DateTime.now().millisecondsSinceEpoch}',
-          restaurantName: 'Pizzeria Da Mario',
-          customerAddress: 'Via Verdi 42',
-          distanceKm: 2.5,
-          bonusEarning: 1.0,
-        );
-        ref.read(earningsProvider.notifier).acceptOrder(order);
-      },
+      restaurantName: firstAvailable?.dealerName,
+      customerAddress: firstAvailable?.customerAddress,
+      distanceKm: firstAvailable?.distanceKm,
+      onAccept: firstAvailable != null
+          ? () {
+              final order = Order.create(
+                id: firstAvailable.id,
+                restaurantName: firstAvailable.dealerName,
+                customerAddress: firstAvailable.customerAddress,
+                distanceKm: firstAvailable.distanceKm,
+                bonusEarning: 0,
+              );
+              ref.read(earningsProvider.notifier).acceptOrder(order);
+            }
+          : null,
     );
   }
 }
@@ -190,11 +200,17 @@ class _OrdineAttivoCard extends StatelessWidget {
 /// Card nuovo ordine
 class _NuovoOrdineCard extends StatelessWidget {
   final dynamic target;
-  final VoidCallback onAccept;
+  final VoidCallback? onAccept;
+  final String? restaurantName;
+  final String? customerAddress;
+  final double? distanceKm;
 
   const _NuovoOrdineCard({
     required this.target,
     required this.onAccept,
+    this.restaurantName,
+    this.customerAddress,
+    this.distanceKm,
   });
 
   @override
@@ -236,30 +252,32 @@ class _NuovoOrdineCard extends StatelessWidget {
 
           // Dettagli
           Text(
-            'Pizzeria Da Mario',
+            restaurantName ?? 'In attesa di ordini...',
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: cs.onSurface,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            '→ Via Verdi 42',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: cs.onSurfaceVariant,
+          if (customerAddress != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              '→ $customerAddress',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: cs.onSurfaceVariant,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 12),
 
           // Info
-          Row(
+          if (distanceKm != null) Row(
             children: [
               Icon(Icons.straighten, size: 14, color: cs.onSurfaceVariant),
               const SizedBox(width: 6),
               Text(
-                '2.5 km',
+                '${distanceKm!.toStringAsFixed(1)} km',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   color: cs.onSurfaceVariant,
@@ -269,7 +287,7 @@ class _NuovoOrdineCard extends StatelessWidget {
               Icon(Icons.euro, size: 14, color: AppColors.earningsGreen),
               const SizedBox(width: 4),
               Text(
-                '€ 4.75',
+                '€ ${(distanceKm! * 1.50).toStringAsFixed(2)}',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,

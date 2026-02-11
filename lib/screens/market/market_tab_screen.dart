@@ -11,15 +11,6 @@ class MarketTabScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D0F),
-      floatingActionButton: FloatingActionButton.small(
-        backgroundColor: AppColors.earningsGreen,
-        child: const Icon(Icons.smart_toy, color: Colors.white, size: 16),
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Bot WhatsApp in arrivo')),
-          );
-        },
-      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -32,19 +23,83 @@ class MarketTabScreen extends StatelessWidget {
               onQuickActionTap: () => QuickActionsSheet.show(context),
             ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(12),
+              child: Stack(
                 children: [
-                  _buildKpiRow(),
-                  const SizedBox(height: 12),
-                  _label('Catalogo'),
-                  const SizedBox(height: 6),
-                  _buildProductsGrid(context),
-                  const SizedBox(height: 12),
-                  _label('Ordini'),
-                  const SizedBox(height: 6),
-                  _buildOrdersList(context),
-                  const SizedBox(height: 60),
+                  // Contenuto sfumato
+                  Opacity(
+                    opacity: 0.25,
+                    child: IgnorePointer(
+                      child: ListView(
+                        padding: const EdgeInsets.all(12),
+                        children: [
+                          _buildKpiRow(),
+                          const SizedBox(height: 12),
+                          _label('Catalogo'),
+                          const SizedBox(height: 6),
+                          _buildProductsGrid(context),
+                          const SizedBox(height: 12),
+                          _label('Ordini'),
+                          const SizedBox(height: 6),
+                          _buildOrdersList(context),
+                          const SizedBox(height: 60),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Coming Soon overlay
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: AppColors.bonusPurple.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.storefront,
+                            size: 48,
+                            color: AppColors.bonusPurple,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.turboOrange.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.turboOrange.withValues(alpha: 0.4)),
+                          ),
+                          child: Text(
+                            'COMING SOON',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.turboOrange,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Il marketplace dloop arriva presto!',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Vendi prodotti durante le consegne',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.white38,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -5,6 +5,7 @@ import '../../theme/tokens.dart';
 import '../../providers/earnings_provider.dart';
 import '../../models/order.dart';
 import '../../services/rush_hour_service.dart';
+import '../../providers/active_orders_provider.dart';
 
 /// Schermata EARN - Guadagna con le consegne
 class EarnDemoScreen extends ConsumerWidget {
@@ -13,6 +14,10 @@ class EarnDemoScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final earnings = ref.watch(earningsProvider);
+    final ordersState = ref.watch(activeOrdersProvider);
+    final firstAvailable = ordersState.availableOrders.isNotEmpty
+        ? ordersState.availableOrders.first
+        : null;
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -46,16 +51,21 @@ class EarnDemoScreen extends ConsumerWidget {
                       )
                     else if (earnings.isOnline)
                       _NuovoOrdineCard(
-                        onAccept: () {
-                          final order = Order.create(
-                            id: 'order_${DateTime.now().millisecondsSinceEpoch}',
-                            restaurantName: 'Pizzeria Da Mario',
-                            customerAddress: 'Via Verdi 42',
-                            distanceKm: 2.5,
-                            bonusEarning: 1.0,
-                          );
-                          ref.read(earningsProvider.notifier).acceptOrder(order);
-                        },
+                        restaurantName: firstAvailable?.dealerName,
+                        customerAddress: firstAvailable?.customerAddress,
+                        distanceKm: firstAvailable?.distanceKm,
+                        onAccept: firstAvailable != null
+                            ? () {
+                                final order = Order.create(
+                                  id: firstAvailable.id,
+                                  restaurantName: firstAvailable.dealerName,
+                                  customerAddress: firstAvailable.customerAddress,
+                                  distanceKm: firstAvailable.distanceKm,
+                                  bonusEarning: 0,
+                                );
+                                ref.read(earningsProvider.notifier).acceptOrder(order);
+                              }
+                            : null,
                       )
                     else
                       _OfflineCard(
@@ -504,9 +514,17 @@ class _OrdineAttivoCard extends StatelessWidget {
 
 /// Card nuovo ordine disponibile
 class _NuovoOrdineCard extends StatelessWidget {
-  final VoidCallback onAccept;
+  final VoidCallback? onAccept;
+  final String? restaurantName;
+  final String? customerAddress;
+  final double? distanceKm;
 
-  const _NuovoOrdineCard({required this.onAccept});
+  const _NuovoOrdineCard({
+    required this.onAccept,
+    this.restaurantName,
+    this.customerAddress,
+    this.distanceKm,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -515,9 +533,9 @@ class _NuovoOrdineCard extends StatelessWidget {
     final multiplier = RushHourService.getCurrentMultiplier();
 
     // Calcola guadagno stimato
-    const distanceKm = 2.5;
-    final baseEarning = distanceKm * Order.defaultRatePerKm;
-    final totalEarning = baseEarning * multiplier + 1.0; // +1 bonus
+    final dist = distanceKm ?? 0;
+    final baseEarning = dist * Order.defaultRatePerKm;
+    final totalEarning = baseEarning * multiplier;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -572,21 +590,23 @@ class _NuovoOrdineCard extends StatelessWidget {
           const SizedBox(height: 16),
 
           Text(
-            'Pizzeria Da Mario',
+            restaurantName ?? 'In attesa di ordini...',
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: cs.onSurface,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            '→ Via Verdi 42',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: cs.onSurfaceVariant,
+          if (customerAddress != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              '→ $customerAddress',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: cs.onSurfaceVariant,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 16),
 
           Row(
@@ -594,7 +614,7 @@ class _NuovoOrdineCard extends StatelessWidget {
               Icon(Icons.straighten, size: 14, color: cs.onSurfaceVariant),
               const SizedBox(width: 4),
               Text(
-                '${distanceKm.toStringAsFixed(1)} km',
+                '${dist.toStringAsFixed(1)} km',
                 style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant),
               ),
               const SizedBox(width: 16),
