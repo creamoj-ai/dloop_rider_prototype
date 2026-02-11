@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/tokens.dart';
+import '../../services/biometric_service.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -16,6 +17,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   late AnimationController _controller;
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
+  bool _biometricFailed = false;
 
   @override
   void initState() {
@@ -46,10 +48,43 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     final session = Supabase.instance.client.auth.currentSession;
 
     if (session != null) {
-      context.go('/today');
+      // User has active session — require biometric unlock
+      final biometricAvailable = await BiometricService.isAvailable();
+
+      if (biometricAvailable) {
+        final authenticated = await BiometricService.authenticate();
+        if (!mounted) return;
+
+        if (authenticated) {
+          context.go('/today');
+        } else {
+          // Auth failed — show retry or go to login
+          setState(() => _biometricFailed = true);
+        }
+      } else {
+        // No biometrics available — proceed directly
+        context.go('/today');
+      }
     } else {
       context.go('/login');
     }
+  }
+
+  void _retryBiometric() async {
+    setState(() => _biometricFailed = false);
+    final authenticated = await BiometricService.authenticate();
+    if (!mounted) return;
+
+    if (authenticated) {
+      context.go('/today');
+    } else {
+      setState(() => _biometricFailed = true);
+    }
+  }
+
+  void _goToLogin() {
+    Supabase.instance.client.auth.signOut();
+    context.go('/login');
   }
 
   @override
@@ -109,17 +144,60 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                       ),
                     ),
                     const SizedBox(height: 48),
-                    // Loading indicator
-                    SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(
-                          AppColors.turboOrange.withOpacity(0.6),
+                    // Loading indicator or biometric retry
+                    if (_biometricFailed) ...[
+                      const Icon(
+                        Icons.fingerprint,
+                        size: 48,
+                        color: AppColors.turboOrange,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Autenticazione fallita',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: Colors.white70,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: _retryBiometric,
+                        icon: const Icon(Icons.fingerprint, size: 20),
+                        label: Text(
+                          'Riprova',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.turboOrange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _goToLogin,
+                        child: Text(
+                          'Accedi con email',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: Colors.white38,
+                          ),
+                        ),
+                      ),
+                    ] else
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(
+                            AppColors.turboOrange.withOpacity(0.6),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
