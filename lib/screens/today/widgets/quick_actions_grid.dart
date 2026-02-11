@@ -169,7 +169,7 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
               context.push('/today/ai-chat');
             }),
             _botItem(Icons.shopping_bag, 'WhatsApp Market Bot', 'Gestisci ordini del tuo marketplace', AppColors.earningsGreen, cs, context),
-            _botItem(Icons.support_agent, 'Supporto Rider', 'Parla con il supporto dloop', AppColors.routeBlue, cs, context, notificationCount: unreadCount),
+            _botItem(Icons.support_agent, 'Supporto Rider', 'Parla con il supporto dloop', AppColors.routeBlue, cs, context, notificationCount: ref.read(unreadNotificationsCountProvider)),
             _botItem(Icons.group, 'Community Riders', 'Chat gruppo riders della tua zona', AppColors.bonusPurple, cs, context),
             const SizedBox(height: 8),
           ],

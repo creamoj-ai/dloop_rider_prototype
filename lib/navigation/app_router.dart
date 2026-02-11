@@ -6,7 +6,7 @@ import '../screens/auth/login_page.dart';
 import '../screens/auth/signup_page.dart';
 import '../screens/today/today_screen.dart';
 import '../screens/today/zone_map_screen.dart';
-import '../screens/today/route_screen.dart';
+import '../screens/today/sub/route_screen.dart';
 import '../screens/today/delivery_navigation_screen.dart';
 import '../screens/earn/earn_demo_screen.dart';
 import '../screens/money/money_screen.dart';

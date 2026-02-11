@@ -8,7 +8,6 @@ import '../services/rush_hour_service.dart';
 import '../services/orders_service.dart';
 import '../services/earnings_service.dart';
 import '../widgets/earning_notification.dart';
-import '../data/mock_data.dart';
 
 /// Stato globale per i guadagni del rider
 class EarningsState {
@@ -557,15 +556,11 @@ class NetworkEarningsNotifier extends StateNotifier<NetworkEarningsState> {
     );
   }
 
-  /// Fallback to mock data when Supabase is unavailable
+  /// Fallback when Supabase is unavailable — empty state (no mock data)
   void _loadFallbackData() {
-    final networkEarnings = MockData.transactions
-        .where((e) => e.type == EarningType.network && e.status == EarningStatus.completed)
-        .toList();
-
-    state = NetworkEarningsState(
-      networkEarnings: networkEarnings,
-      notifiedCount: networkEarnings.length,
+    state = const NetworkEarningsState(
+      networkEarnings: [],
+      notifiedCount: 0,
     );
   }
 
