@@ -86,7 +86,33 @@ class OrdersService {
     }
   }
 
+  /// Accept a broadcast order (claim it for current rider)
+  static Future<void> acceptBroadcastOrder(String orderId) async {
+    final riderId = _riderId;
+    if (riderId == null) return;
+
+    try {
+      await retry(() async {
+        await _client
+            .from('orders')
+            .update({
+              'rider_id': riderId,
+              'assigned_rider_id': riderId,
+              'status': OrderStatus.accepted.name,
+              'accepted_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', orderId)
+            .eq('status', 'pending');
+      }, onRetry: (attempt, e) {
+        print('⚡ OrdersService.acceptBroadcastOrder retry $attempt: $e');
+      });
+    } catch (e) {
+      print('❌ OrdersService.acceptBroadcastOrder failed: $e');
+    }
+  }
+
   /// Subscribe to real-time order updates (with auto-reconnect)
+  /// Includes rider's own orders + broadcast orders (via RLS policy)
   static Stream<List<Order>> subscribeToOrders() {
     final riderId = _riderId;
     if (riderId == null) {

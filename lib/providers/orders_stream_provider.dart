@@ -46,3 +46,13 @@ final todayStreamEarningsProvider = Provider<double>((ref) {
   final completed = ref.watch(todayCompletedOrdersProvider);
   return completed.fold(0.0, (sum, o) => sum + o.totalEarning);
 });
+
+/// Derived: broadcast orders (pending, no assigned rider, expired priority)
+final broadcastOrdersProvider = Provider<List<Order>>((ref) {
+  final ordersAsync = ref.watch(ordersStreamProvider);
+  return ordersAsync.when(
+    data: (orders) => orders.where((o) => o.isBroadcast).toList(),
+    loading: () => [],
+    error: (_, __) => [],
+  );
+});

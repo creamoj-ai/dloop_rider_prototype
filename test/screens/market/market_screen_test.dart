@@ -1,43 +1,108 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dloop_rider_prototype/models/market_product.dart';
+import 'package:dloop_rider_prototype/models/market_order.dart';
+import 'package:dloop_rider_prototype/providers/market_products_provider.dart';
+import 'package:dloop_rider_prototype/providers/market_orders_provider.dart';
 import 'package:dloop_rider_prototype/screens/market/market_tab_screen.dart';
 import '../../helpers/pump_helpers.dart';
 
 void main() {
   group('MarketTabScreen', () {
-    testWidgets('renders COMING SOON overlay', (tester) async {
-      await tester.pumpWidget(testScreen(const MarketTabScreen()));
+    final now = DateTime(2026, 2, 11);
+    final mockProducts = [
+      MarketProduct(
+        id: 'p1', name: 'Energy Drink', price: 15.0, costPrice: 8.0,
+        category: 'bevande', stock: 10, createdAt: now, updatedAt: now,
+      ),
+      MarketProduct(
+        id: 'p2', name: 'Snack Box', price: 12.0, costPrice: 5.0,
+        category: 'food', stock: 5, createdAt: now, updatedAt: now,
+      ),
+    ];
 
-      expect(find.text('COMING SOON'), findsOneWidget);
+    final mockOrders = [
+      MarketOrder(
+        id: 'o1', productName: 'Energy Drink', customerName: 'Anna V.',
+        unitPrice: 15.0, totalPrice: 15.0, status: MarketOrderStatus.pending,
+        createdAt: now,
+      ),
+    ];
+
+    List<Override> overrides() => [
+      marketProductsStreamProvider.overrideWith(
+        (ref) => Stream.value(mockProducts),
+      ),
+      marketOrdersStreamProvider.overrideWith(
+        (ref) => Stream.value(mockOrders),
+      ),
+    ];
+
+    testWidgets('renders KPI row with real data', (tester) async {
+      await tester.pumpWidget(testScreen(
+        const MarketTabScreen(),
+        overrides: overrides(),
+      ));
+      await tester.pumpAndSettle();
+
+      // Product count
+      expect(find.text('2'), findsOneWidget);
+      // Labels
+      expect(find.text('Prodotti'), findsOneWidget);
+      expect(find.text('Ordini'), findsOneWidget);
+      expect(find.text('Guadagni'), findsOneWidget);
     });
 
-    testWidgets('renders marketplace description', (tester) async {
-      await tester.pumpWidget(testScreen(const MarketTabScreen()));
+    testWidgets('renders product cards from providers', (tester) async {
+      await tester.pumpWidget(testScreen(
+        const MarketTabScreen(),
+        overrides: overrides(),
+      ));
+      await tester.pumpAndSettle();
 
-      expect(find.text('Il marketplace dloop arriva presto!'), findsOneWidget);
-      expect(find.text('Vendi prodotti durante le consegne'), findsOneWidget);
+      expect(find.text('Energy Drink'), findsOneWidget);
+      expect(find.text('Snack Box'), findsOneWidget);
     });
 
-    testWidgets('renders storefront icon', (tester) async {
-      await tester.pumpWidget(testScreen(const MarketTabScreen()));
+    testWidgets('renders active orders', (tester) async {
+      await tester.pumpWidget(testScreen(
+        const MarketTabScreen(),
+        overrides: overrides(),
+      ));
+      await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.storefront), findsOneWidget);
+      expect(find.text('Anna V.'), findsOneWidget);
+      expect(find.text('Nuovo'), findsOneWidget);
     });
 
-    testWidgets('content is faded with opacity 0.25', (tester) async {
-      await tester.pumpWidget(testScreen(const MarketTabScreen()));
+    testWidgets('shows FAB for adding products', (tester) async {
+      await tester.pumpWidget(testScreen(
+        const MarketTabScreen(),
+        overrides: overrides(),
+      ));
+      await tester.pumpAndSettle();
 
-      final opacity = tester.widget<Opacity>(find.byType(Opacity));
-      expect(opacity.opacity, 0.25);
+      expect(find.byType(FloatingActionButton), findsOneWidget);
+      expect(find.byIcon(Icons.add), findsOneWidget);
     });
 
-    testWidgets('content is non-interactive via IgnorePointer', (tester) async {
-      await tester.pumpWidget(testScreen(const MarketTabScreen()));
+    testWidgets('shows empty state when no products', (tester) async {
+      await tester.pumpWidget(testScreen(
+        const MarketTabScreen(),
+        overrides: [
+          marketProductsStreamProvider.overrideWith(
+            (ref) => Stream.value(<MarketProduct>[]),
+          ),
+          marketOrdersStreamProvider.overrideWith(
+            (ref) => Stream.value(<MarketOrder>[]),
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
 
-      // The IgnorePointer wrapping the faded content is a descendant of Opacity
-      final opacityFinder = find.byType(Opacity);
-      final opacity = tester.widget<Opacity>(opacityFinder);
-      expect(opacity.child, isA<IgnorePointer>());
+      expect(find.text('Nessun prodotto'), findsOneWidget);
+      expect(find.text('Nessun ordine attivo'), findsOneWidget);
     });
   });
 }

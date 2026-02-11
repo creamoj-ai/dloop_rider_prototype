@@ -35,6 +35,14 @@ class Order {
   final DateTime? pickedUpAt;
   final DateTime? deliveredAt;
 
+  // Hybrid dispatch fields
+  final String? assignedRiderId;
+  final String? zoneId;
+  final String source;
+  final DateTime? priorityExpiresAt;
+  final String? dealerContactId;
+  final String? dealerPlatformId;
+
   // Rate per km default (usato quando non c'è RiderPricing)
   static const double defaultRatePerKm = 1.50;
 
@@ -57,6 +65,12 @@ class Order {
     this.acceptedAt,
     this.pickedUpAt,
     this.deliveredAt,
+    this.assignedRiderId,
+    this.zoneId,
+    this.source = 'manual',
+    this.priorityExpiresAt,
+    this.dealerContactId,
+    this.dealerPlatformId,
   });
 
   /// Calcola guadagno totale (con minimo garantito)
@@ -151,6 +165,12 @@ class Order {
       acceptedAt: newStatus == OrderStatus.accepted ? DateTime.now() : acceptedAt,
       pickedUpAt: newStatus == OrderStatus.pickedUp ? DateTime.now() : pickedUpAt,
       deliveredAt: newStatus == OrderStatus.delivered ? DateTime.now() : deliveredAt,
+      assignedRiderId: assignedRiderId,
+      zoneId: zoneId,
+      source: source,
+      priorityExpiresAt: priorityExpiresAt,
+      dealerContactId: dealerContactId,
+      dealerPlatformId: dealerPlatformId,
     );
   }
 
@@ -175,6 +195,12 @@ class Order {
       acceptedAt: acceptedAt,
       pickedUpAt: pickedUpAt,
       deliveredAt: deliveredAt,
+      assignedRiderId: assignedRiderId,
+      zoneId: zoneId,
+      source: source,
+      priorityExpiresAt: priorityExpiresAt,
+      dealerContactId: dealerContactId,
+      dealerPlatformId: dealerPlatformId,
     );
   }
 
@@ -199,6 +225,12 @@ class Order {
       acceptedAt: acceptedAt,
       pickedUpAt: pickedUpAt,
       deliveredAt: deliveredAt,
+      assignedRiderId: assignedRiderId,
+      zoneId: zoneId,
+      source: source,
+      priorityExpiresAt: priorityExpiresAt,
+      dealerContactId: dealerContactId,
+      dealerPlatformId: dealerPlatformId,
     );
   }
 
@@ -228,6 +260,12 @@ class Order {
       'accepted_at': acceptedAt?.toIso8601String(),
       'picked_up_at': pickedUpAt?.toIso8601String(),
       'delivered_at': deliveredAt?.toIso8601String(),
+      'assigned_rider_id': assignedRiderId,
+      'zone_id': zoneId,
+      'source': source,
+      'priority_expires_at': priorityExpiresAt?.toIso8601String(),
+      'dealer_contact_id': dealerContactId,
+      'dealer_platform_id': dealerPlatformId,
     };
   }
 
@@ -281,6 +319,20 @@ class Order {
       deliveredAt: json['delivered_at'] != null
           ? DateTime.tryParse(json['delivered_at'] as String)
           : null,
+      assignedRiderId: json['assigned_rider_id']?.toString(),
+      zoneId: json['zone_id']?.toString(),
+      source: json['source'] as String? ?? 'manual',
+      priorityExpiresAt: json['priority_expires_at'] != null
+          ? DateTime.tryParse(json['priority_expires_at'].toString())
+          : null,
+      dealerContactId: json['dealer_contact_id']?.toString(),
+      dealerPlatformId: json['dealer_platform_id']?.toString(),
     );
   }
+
+  /// Is this a broadcast order (no assigned rider, expired priority)?
+  bool get isBroadcast =>
+      assignedRiderId == null &&
+      priorityExpiresAt != null &&
+      priorityExpiresAt!.isBefore(DateTime.now());
 }
