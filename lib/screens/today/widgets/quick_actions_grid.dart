@@ -5,6 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 import '../../../providers/rider_stats_provider.dart';
 import '../../../providers/earnings_provider.dart';
+import '../../../providers/referral_provider.dart';
+import '../../../providers/notifications_provider.dart';
+import '../../../services/referral_service.dart';
 import 'tools/earnings_calculator_sheet.dart';
 import 'tools/shift_timer_sheet.dart';
 import 'tools/checklist_sheet.dart';
@@ -19,26 +22,13 @@ class QuickActionsGrid extends ConsumerStatefulWidget {
 }
 
 class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
-  // Notification state
-  int _whatsappNotifications = 3;
-  int _supportNotifications = 1;
-  int _communityNotifications = 12;
-
-  // Network stats (mock active riders — no referral table yet)
-  final int _networkActiveRiders = 12;
-
-  int get _totalNotifications =>
-      _whatsappNotifications + _supportNotifications + _communityNotifications;
-
-  void _markWhatsappRead() => setState(() => _whatsappNotifications = 0);
-  void _markSupportRead() => setState(() => _supportNotifications = 0);
-  void _markCommunityRead() => setState(() => _communityNotifications = 0);
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final statsAsync = ref.watch(riderStatsProvider);
     final networkState = ref.watch(networkEarningsProvider);
+    final unreadCount = ref.watch(unreadNotificationsCountProvider);
+    final activeReferrals = ref.watch(activeReferralsCountProvider);
 
     // Compute network monthly earnings from real data
     final now = DateTime.now();
@@ -65,10 +55,10 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
                 child: _ActionTile(
                   icon: Icons.smart_toy,
                   label: 'Assistente',
-                  subtitle: '$_totalNotifications messaggi',
+                  subtitle: '$unreadCount messaggi',
                   color: AppColors.earningsGreen,
                   onTap: () => _showBotOptions(context),
-                  badgeCount: _totalNotifications,
+                  badgeCount: unreadCount,
                 ),
               ),
               const SizedBox(width: 12),
@@ -94,10 +84,10 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
                 child: _ActionTile(
                   icon: Icons.people,
                   label: 'Network',
-                  subtitle: '$_networkActiveRiders attivi',
+                  subtitle: '$activeReferrals attivi',
                   subtitleExtra: '+\u20AC${networkMonthlyEarnings.toStringAsFixed(0)}/mese',
                   color: AppColors.routeBlue,
-                  onTap: () => _showNetworkSheet(context, networkMonthlyEarnings),
+                  onTap: () => _showNetworkSheet(context, networkMonthlyEarnings, activeReferrals),
                 ),
               ),
               const SizedBox(width: 12),
@@ -118,8 +108,11 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
     );
   }
 
-  void _showNetworkSheet(BuildContext context, double monthlyEarnings) {
+  void _showNetworkSheet(BuildContext context, double monthlyEarnings, int activeReferrals) {
     final cs = Theme.of(context).colorScheme;
+    final referralsAsync = ref.read(referralsStreamProvider);
+    final referrals = referralsAsync.valueOrNull ?? [];
+
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
@@ -134,7 +127,8 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
         expand: false,
         builder: (context, scrollController) => _NetworkSheet(
           scrollController: scrollController,
-          activeRiders: _networkActiveRiders,
+          referrals: referrals,
+          activeRiders: activeReferrals,
           monthlyEarnings: monthlyEarnings,
         ),
       ),
@@ -174,9 +168,9 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
               Navigator.pop(context);
               context.push('/today/ai-chat');
             }),
-            _botItem(Icons.shopping_bag, 'WhatsApp Market Bot', 'Gestisci ordini del tuo marketplace', AppColors.earningsGreen, cs, context, notificationCount: _whatsappNotifications, onRead: _markWhatsappRead),
-            _botItem(Icons.support_agent, 'Supporto Rider', 'Parla con il supporto dloop', AppColors.routeBlue, cs, context, notificationCount: _supportNotifications, onRead: _markSupportRead),
-            _botItem(Icons.group, 'Community Riders', 'Chat gruppo riders della tua zona', AppColors.bonusPurple, cs, context, notificationCount: _communityNotifications, onRead: _markCommunityRead),
+            _botItem(Icons.shopping_bag, 'WhatsApp Market Bot', 'Gestisci ordini del tuo marketplace', AppColors.earningsGreen, cs, context),
+            _botItem(Icons.support_agent, 'Supporto Rider', 'Parla con il supporto dloop', AppColors.routeBlue, cs, context, notificationCount: unreadCount),
+            _botItem(Icons.group, 'Community Riders', 'Chat gruppo riders della tua zona', AppColors.bonusPurple, cs, context),
             const SizedBox(height: 8),
           ],
         ),
@@ -448,14 +442,16 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
-/// Bottom Sheet Network completo
+/// Bottom Sheet Network completo — wired to referrals from Supabase
 class _NetworkSheet extends StatefulWidget {
   final ScrollController scrollController;
+  final List<Referral> referrals;
   final int activeRiders;
   final double monthlyEarnings;
 
   const _NetworkSheet({
     required this.scrollController,
+    required this.referrals,
     required this.activeRiders,
     required this.monthlyEarnings,
   });
@@ -467,27 +463,17 @@ class _NetworkSheet extends StatefulWidget {
 class _NetworkSheetState extends State<_NetworkSheet> {
   String _filter = 'tutti';
 
-  // Mock data
-  final List<Map<String, dynamic>> _members = [
-    {'name': 'Luca Rossi', 'status': 'active', 'orders': 142, 'earned': 8.50, 'days': 45, 'rank': 1},
-    {'name': 'Anna Martini', 'status': 'active', 'orders': 98, 'earned': 5.90, 'days': 32, 'rank': 2},
-    {'name': 'Marco Polo', 'status': 'active', 'orders': 76, 'earned': 4.55, 'days': 28, 'rank': 3},
-    {'name': 'Sara Verdi', 'status': 'active', 'orders': 54, 'earned': 3.20, 'days': 21, 'rank': 4},
-    {'name': 'Paolo Bianchi', 'status': 'pending', 'orders': 2, 'earned': 0.0, 'days': 5, 'rank': 0},
-    {'name': 'Giulia Neri', 'status': 'pending', 'orders': 0, 'earned': 0.0, 'days': 2, 'rank': 0},
-  ];
-
-  List<Map<String, dynamic>> get _filteredMembers {
-    if (_filter == 'attivi') return _members.where((m) => m['status'] == 'active').toList();
-    if (_filter == 'in_attesa') return _members.where((m) => m['status'] == 'pending').toList();
-    return _members;
+  List<Referral> get _filteredMembers {
+    if (_filter == 'attivi') return widget.referrals.where((r) => r.isActive).toList();
+    if (_filter == 'in_attesa') return widget.referrals.where((r) => r.isPending).toList();
+    return widget.referrals;
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final activeCount = _members.where((m) => m['status'] == 'active').length;
-    final pendingCount = _members.where((m) => m['status'] == 'pending').length;
+    final activeCount = widget.referrals.where((r) => r.isActive).length;
+    final pendingCount = widget.referrals.where((r) => r.isPending).length;
 
     return SingleChildScrollView(
       controller: widget.scrollController,
@@ -542,7 +528,7 @@ class _NetworkSheetState extends State<_NetworkSheet> {
             child: Column(
               children: [
                 Text(
-                  '€ ${widget.monthlyEarnings.toStringAsFixed(2)}',
+                  '\u20AC ${widget.monthlyEarnings.toStringAsFixed(2)}',
                   style: GoogleFonts.inter(fontSize: 32, fontWeight: FontWeight.w700, color: AppColors.earningsGreen),
                 ),
                 const SizedBox(height: 4),
@@ -551,7 +537,7 @@ class _NetworkSheetState extends State<_NetworkSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _statPill(cs, '${_members.length}', 'Totali', AppColors.routeBlue),
+                    _statPill(cs, '${widget.referrals.length}', 'Totali', AppColors.routeBlue),
                     _statPill(cs, '$activeCount', 'Attivi', AppColors.earningsGreen),
                     _statPill(cs, '$pendingCount', 'In attesa', AppColors.turboOrange),
                   ],
@@ -580,7 +566,15 @@ class _NetworkSheetState extends State<_NetworkSheet> {
           const SizedBox(height: 16),
 
           // Lista membri
-          ..._filteredMembers.map((m) => _memberTile(cs, m)),
+          if (_filteredMembers.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text('Nessun membro', style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
+              ),
+            )
+          else
+            ..._filteredMembers.asMap().entries.map((e) => _memberTile(cs, e.value, e.key + 1)),
           const SizedBox(height: 20),
         ],
       ),
@@ -616,9 +610,9 @@ class _NetworkSheetState extends State<_NetworkSheet> {
             ],
           ),
           const SizedBox(height: 12),
-          _howStep('1', '€10 bonus per ogni rider attivato'),
+          _howStep('1', '\u20AC10 bonus per ogni rider attivato'),
           _howStep('2', '6% sui guadagni (primi 3 mesi)'),
-          _howStep('3', '3% sui guadagni (dal 4° mese)'),
+          _howStep('3', '3% sui guadagni (dal 4\u00B0 mese)'),
         ],
       ),
     );
@@ -658,14 +652,14 @@ class _NetworkSheetState extends State<_NetworkSheet> {
     );
   }
 
-  Widget _memberTile(ColorScheme cs, Map<String, dynamic> member) {
-    final isActive = member['status'] == 'active';
-    final rank = member['rank'] as int;
+  Widget _memberTile(ColorScheme cs, Referral referral, int rank) {
+    final isActive = referral.isActive;
+    final daysSinceJoin = DateTime.now().difference(referral.createdAt).inDays;
 
     String rankEmoji = '';
-    if (rank == 1) rankEmoji = '🥇 ';
-    if (rank == 2) rankEmoji = '🥈 ';
-    if (rank == 3) rankEmoji = '🥉 ';
+    if (isActive && rank == 1) rankEmoji = '\uD83E\uDD47 ';
+    if (isActive && rank == 2) rankEmoji = '\uD83E\uDD48 ';
+    if (isActive && rank == 3) rankEmoji = '\uD83E\uDD49 ';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -686,27 +680,23 @@ class _NetworkSheetState extends State<_NetworkSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('$rankEmoji${member['name']}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                Text('$rankEmoji${referral.referredName}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
                 const SizedBox(height: 4),
                 Row(
                   children: [
                     Icon(isActive ? Icons.check_circle : Icons.hourglass_empty, size: 12, color: isActive ? AppColors.earningsGreen : AppColors.turboOrange),
                     const SizedBox(width: 4),
                     Text(
-                      isActive ? 'Attivo da ${member['days']} giorni' : 'In attesa (${member['orders']}/5 ordini)',
+                      isActive ? 'Attivo da $daysSinceJoin giorni' : 'In attesa di attivazione',
                       style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant),
                     ),
                   ],
                 ),
-                if (isActive) ...[
-                  const SizedBox(height: 2),
-                  Text('${member['orders']} ordini completati', style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant)),
-                ],
               ],
             ),
           ),
           if (isActive)
-            Text('+€${(member['earned'] as double).toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.earningsGreen))
+            Text('+\u20AC${referral.bonusAmount.toStringAsFixed(2)}', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.earningsGreen))
           else
             Text('-', style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
         ],
