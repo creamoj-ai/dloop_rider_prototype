@@ -5,50 +5,20 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 import '../../../models/zone_data.dart';
-import '../../../services/zones_service.dart';
+import '../../../providers/zones_provider.dart';
 import '../../../providers/rest_mode_provider.dart';
 
-class HotZones extends ConsumerStatefulWidget {
+class HotZones extends ConsumerWidget {
   const HotZones({super.key});
 
   @override
-  ConsumerState<HotZones> createState() => _HotZonesState();
-}
-
-class _HotZonesState extends ConsumerState<HotZones> {
-  List<ZoneData> _zones = [];
-  bool _isLoading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadZones();
-  }
-
-  Future<void> _loadZones() async {
-    try {
-      final zones = await ZonesService.getHotZones();
-      if (mounted) {
-        setState(() {
-          _zones = zones;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final restMode = ref.watch(restModeProvider);
     final isResting = restMode.isResting;
+    final zonesAsync = ref.watch(zonesStreamProvider);
+    final zones = zonesAsync.valueOrNull ?? [];
+    final isLoading = zonesAsync.isLoading;
+    final hasError = zonesAsync.hasError;
 
     return Stack(
       children: [
@@ -110,11 +80,8 @@ class _HotZonesState extends ConsumerState<HotZones> {
                 // Refresh button (hidden during rest)
                 if (!isResting)
                   IconButton(
-                    onPressed: _isLoading ? null : () {
-                      setState(() => _isLoading = true);
-                      _loadZones();
-                    },
-                    icon: _isLoading
+                    onPressed: isLoading ? null : () => ref.invalidate(zonesStreamProvider),
+                    icon: isLoading
                         ? const SizedBox(
                             width: 16,
                             height: 16,
@@ -131,10 +98,10 @@ class _HotZonesState extends ConsumerState<HotZones> {
             SizedBox(
               height: 120,
               child: isResting
-                  ? _buildRestModeContent()
-                  : _isLoading
+                  ? _buildRestModeContent(ref)
+                  : isLoading
                       ? const Center(child: CircularProgressIndicator(color: AppColors.turboOrange))
-                      : _error != null
+                      : hasError
                           ? Center(
                               child: Text(
                                 'Errore caricamento zone',
@@ -143,9 +110,9 @@ class _HotZonesState extends ConsumerState<HotZones> {
                             )
                           : ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              itemCount: _zones.length,
+                              itemCount: zones.length,
                               separatorBuilder: (_, __) => const SizedBox(width: 12),
-                              itemBuilder: (context, i) => _ZoneCard(zone: _zones[i]),
+                              itemBuilder: (context, i) => _ZoneCard(zone: zones[i]),
                             ),
             ),
             const SizedBox(height: 12),
@@ -173,7 +140,7 @@ class _HotZonesState extends ConsumerState<HotZones> {
     );
   }
 
-  Widget _buildRestModeContent() {
+  Widget _buildRestModeContent(WidgetRef ref) {
     final restMode = ref.watch(restModeProvider);
     final minutes = restMode.remainingSeconds ~/ 60;
     final seconds = restMode.remainingSeconds % 60;
@@ -219,7 +186,7 @@ class _HotZonesState extends ConsumerState<HotZones> {
     );
   }
 
-  void _showExploreOptions(BuildContext context) {
+  static void _showExploreOptions(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,

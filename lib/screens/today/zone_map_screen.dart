@@ -1,28 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../models/zone_data.dart';
+import '../../providers/location_provider.dart';
+import '../../providers/zones_provider.dart';
+import '../../services/location_service.dart';
 import '../../theme/tokens.dart';
 
-class ZoneMapScreen extends StatefulWidget {
+class ZoneMapScreen extends ConsumerStatefulWidget {
   const ZoneMapScreen({super.key});
 
   @override
-  State<ZoneMapScreen> createState() => _ZoneMapScreenState();
+  ConsumerState<ZoneMapScreen> createState() => _ZoneMapScreenState();
 }
 
-class _ZoneMapScreenState extends State<ZoneMapScreen> {
+class _ZoneMapScreenState extends ConsumerState<ZoneMapScreen> {
   final _mapController = MapController();
   int _selectedZone = 0;
+  bool _permissionRequested = false;
 
-  // Milano center
-  static const _milanCenter = LatLng(45.4642, 9.1900);
+  @override
+  void initState() {
+    super.initState();
+    _requestLocationPermission();
+  }
+
+  Future<void> _requestLocationPermission() async {
+    if (_permissionRequested) return;
+    _permissionRequested = true;
+    final granted = await LocationService.ensurePermission();
+    if (granted && mounted) {
+      // Force re-read of position stream after permission granted
+      ref.invalidate(positionStreamProvider);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final zone = _zones[_selectedZone];
+    final zonesAsync = ref.watch(zonesStreamProvider);
+    final posAsync = ref.watch(positionStreamProvider);
+    final riderPos = posAsync.valueOrNull;
 
     return Scaffold(
       appBar: AppBar(
@@ -31,301 +52,312 @@ class _ZoneMapScreenState extends State<ZoneMapScreen> {
           IconButton(
             icon: const Icon(Icons.my_location, size: 20),
             onPressed: () {
-              _mapController.move(_milanCenter, 13.0);
+              if (riderPos != null) {
+                _mapController.move(LatLng(riderPos.latitude, riderPos.longitude), 15.0);
+              } else {
+                final zones = zonesAsync.valueOrNull;
+                if (zones != null && zones.isNotEmpty) {
+                  _mapController.move(LatLng(zones.first.latitude, zones.first.longitude), 13.0);
+                }
+              }
             },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Real map
-          Expanded(
-            flex: 5,
-            child: Stack(
-              children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _milanCenter,
-                    initialZoom: 13.0,
-                    onTap: (_, __) {},
-                  ),
+      body: zonesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.turboOrange)),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off, color: Colors.white38, size: 48),
+              const SizedBox(height: 12),
+              Text('Errore caricamento zone', style: GoogleFonts.inter(color: Colors.white54)),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => ref.invalidate(zonesStreamProvider),
+                child: const Text('Riprova'),
+              ),
+            ],
+          ),
+        ),
+        data: (zones) {
+          if (zones.isEmpty) {
+            return Center(
+              child: Text('Nessuna zona disponibile', style: GoogleFonts.inter(color: Colors.white54)),
+            );
+          }
+          final safeIndex = _selectedZone.clamp(0, zones.length - 1);
+          if (safeIndex != _selectedZone) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              setState(() => _selectedZone = safeIndex);
+            });
+          }
+          final zone = zones[safeIndex];
+          final mapCenter = riderPos != null
+              ? LatLng(riderPos.latitude, riderPos.longitude)
+              : LatLng(zones.first.latitude, zones.first.longitude);
+
+          return Column(
+            children: [
+              // Map
+              Expanded(
+                flex: 5,
+                child: Stack(
                   children: [
-                    // OpenStreetMap tiles (dark style)
-                    TileLayer(
-                      urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                      subdomains: const ['a', 'b', 'c', 'd'],
-                      userAgentPackageName: 'com.dloop.rider.prototype',
-                    ),
-                    // Heat zone circles
-                    CircleLayer(
-                      circles: _zones.asMap().entries.map((e) {
-                        final z = e.value;
-                        final selected = e.key == _selectedZone;
-                        return CircleMarker(
-                          point: z.center,
-                          radius: z.radiusMeters,
-                          useRadiusInMeter: true,
-                          color: z.color.withOpacity(selected ? 0.30 : 0.15),
-                          borderColor: selected ? z.color : z.color.withOpacity(0.3),
-                          borderStrokeWidth: selected ? 2.5 : 1,
-                        );
-                      }).toList(),
-                    ),
-                    // Nearby order markers
-                    MarkerLayer(
-                      markers: _nearbyOrders.map((o) => Marker(
-                        point: o.position,
-                        width: 52,
-                        height: 26,
-                        child: GestureDetector(
-                          onTap: () => _showOrderDetail(context, o),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.turboOrange,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 6)],
-                            ),
-                            child: Text(
-                              o.price,
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-                            ),
-                          ),
+                    FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: mapCenter,
+                        initialZoom: 13.0,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                          subdomains: const ['a', 'b', 'c', 'd'],
+                          userAgentPackageName: 'com.dloop.rider.prototype',
                         ),
-                      )).toList(),
-                    ),
-                    // Zone label markers
-                    MarkerLayer(
-                      markers: _zones.asMap().entries.map((e) {
-                        final z = e.value;
-                        final selected = e.key == _selectedZone;
-                        return Marker(
-                          point: z.center,
-                          width: 80,
-                          height: 28,
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() => _selectedZone = e.key);
-                              _mapController.move(z.center, 14.0);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: selected ? z.color.withOpacity(0.9) : cs.surface.withOpacity(0.85),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: z.color, width: selected ? 1.5 : 0.5),
-                              ),
-                              child: Text(
-                                z.shortName,
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  color: selected ? Colors.white : z.color,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
+                        // Zone circles
+                        CircleLayer(
+                          circles: zones.asMap().entries.map((e) {
+                            final z = e.value;
+                            final selected = e.key == safeIndex;
+                            return CircleMarker(
+                              point: LatLng(z.latitude, z.longitude),
+                              radius: z.radiusMeters,
+                              useRadiusInMeter: true,
+                              color: z.demandColor.withOpacity(selected ? 0.30 : 0.15),
+                              borderColor: selected ? z.demandColor : z.demandColor.withOpacity(0.3),
+                              borderStrokeWidth: selected ? 2.5 : 1,
+                            );
+                          }).toList(),
+                        ),
+                        // Zone labels
+                        MarkerLayer(
+                          markers: zones.asMap().entries.map((e) {
+                            final z = e.value;
+                            final selected = e.key == safeIndex;
+                            return Marker(
+                              point: LatLng(z.latitude, z.longitude),
+                              width: 80,
+                              height: 28,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() => _selectedZone = e.key);
+                                  _mapController.move(LatLng(z.latitude, z.longitude), 14.0);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: selected ? z.demandColor.withOpacity(0.9) : cs.surface.withOpacity(0.85),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: z.demandColor, width: selected ? 1.5 : 0.5),
+                                  ),
+                                  child: Text(
+                                    z.shortName,
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.inter(
+                                      color: selected ? Colors.white : z.demandColor,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    // Rider position marker
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: _milanCenter,
-                          width: 36,
-                          height: 36,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.routeBlue,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2.5),
-                              boxShadow: [BoxShadow(color: AppColors.routeBlue.withOpacity(0.5), blurRadius: 12)],
-                            ),
-                            child: const Icon(Icons.delivery_dining, size: 18, color: Colors.white),
-                          ),
+                            );
+                          }).toList(),
                         ),
+                        // Rider real position
+                        if (riderPos != null)
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: LatLng(riderPos.latitude, riderPos.longitude),
+                                width: 36,
+                                height: 36,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.routeBlue,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2.5),
+                                    boxShadow: [BoxShadow(color: AppColors.routeBlue.withOpacity(0.5), blurRadius: 12)],
+                                  ),
+                                  child: const Icon(Icons.delivery_dining, size: 18, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
+                    ),
+                    // Legend
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: cs.surface.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _legendDot(AppColors.earningsGreen, 'Alta domanda'),
+                            const SizedBox(height: 4),
+                            _legendDot(AppColors.statsGold, 'Media'),
+                            const SizedBox(height: 4),
+                            _legendDot(Colors.grey, 'Bassa'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Live badge
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.urgentRed,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                            const SizedBox(width: 6),
+                            Text('LIVE', style: GoogleFonts.inter(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                // Legend
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: cs.surface.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _legendDot(AppColors.earningsGreen, 'Alta domanda'),
-                        const SizedBox(height: 4),
-                        _legendDot(AppColors.statsGold, 'Media'),
-                        const SizedBox(height: 4),
-                        _legendDot(Colors.grey, 'Bassa'),
-                        const SizedBox(height: 4),
-                        _legendDot(AppColors.turboOrange, 'Ordini'),
-                      ],
-                    ),
-                  ),
-                ),
-                // Live badge
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.urgentRed,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Text('LIVE', style: GoogleFonts.inter(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Zone selector strip
-          Container(
-            height: 50,
-            color: cs.surface,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              itemCount: _zones.length,
-              itemBuilder: (_, i) {
-                final z = _zones[i];
-                final selected = i == _selectedZone;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() => _selectedZone = i);
-                      _mapController.move(z.center, 14.0);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: selected ? z.color.withOpacity(0.2) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: selected ? z.color : Colors.white24),
-                      ),
-                      child: Text(
-                        z.name,
-                        style: GoogleFonts.inter(
-                          color: selected ? z.color : Colors.white54,
-                          fontSize: 12,
-                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          // Zone detail panel
-          Expanded(
-            flex: 4,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Zone header
-                  Row(
-                    children: [
-                      Container(width: 4, height: 24, decoration: BoxDecoration(color: zone.color, borderRadius: BorderRadius.circular(2))),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(zone.name, style: GoogleFonts.inter(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: zone.color.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
-                        child: Text(zone.demandLabel, style: GoogleFonts.inter(color: zone.color, fontSize: 11, fontWeight: FontWeight.w700)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // KPI row
-                  Row(
-                    children: [
-                      _kpiPill(Icons.shopping_bag, zone.ordersHour, 'ordini/h', cs),
-                      const SizedBox(width: 10),
-                      _kpiPill(Icons.euro, zone.earning, 'stima/h', cs),
-                      const SizedBox(width: 10),
-                      _kpiPill(Icons.near_me, zone.distance, 'da te', cs),
-                      const SizedBox(width: 10),
-                      _kpiPill(Icons.people, zone.riders, 'rider', cs),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Trend
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12)),
-                    child: Row(
-                      children: [
-                        Icon(
-                          zone.trending == 'up' ? Icons.trending_up : zone.trending == 'down' ? Icons.trending_down : Icons.trending_flat,
-                          color: zone.trending == 'up' ? AppColors.earningsGreen : zone.trending == 'down' ? AppColors.urgentRed : AppColors.statsGold,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(zone.trendText, style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Nearby orders
-                  Text('Ordini disponibili', style: GoogleFonts.inter(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  ...zone.orders.map((o) => _orderTile(o, cs)),
-                  const SizedBox(height: 16),
-                  // CTA
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _openGoogleMaps(zone.name),
-                      icon: const Icon(Icons.navigation, size: 18),
-                      label: Text('VAI IN QUESTA ZONA', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: zone.color,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
               ),
-            ),
-          ),
-        ],
+              // Zone selector strip
+              Container(
+                height: 50,
+                color: cs.surface,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  itemCount: zones.length,
+                  itemBuilder: (_, i) {
+                    final z = zones[i];
+                    final selected = i == safeIndex;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => _selectedZone = i);
+                          _mapController.move(LatLng(z.latitude, z.longitude), 14.0);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: selected ? z.demandColor.withOpacity(0.2) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: selected ? z.demandColor : Colors.white24),
+                          ),
+                          child: Text(
+                            z.name,
+                            style: GoogleFonts.inter(
+                              color: selected ? z.demandColor : Colors.white54,
+                              fontSize: 12,
+                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              // Zone detail panel
+              Expanded(
+                flex: 4,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Zone header
+                      Row(
+                        children: [
+                          Container(width: 4, height: 24, decoration: BoxDecoration(color: zone.demandColor, borderRadius: BorderRadius.circular(2))),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(zone.name, style: GoogleFonts.inter(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: zone.demandColor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                            child: Text(zone.demandLabel, style: GoogleFonts.inter(color: zone.demandColor, fontSize: 11, fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // KPI row
+                      Row(
+                        children: [
+                          _kpiPill(Icons.shopping_bag, '${zone.ordersPerHour}', 'ordini/h', cs),
+                          const SizedBox(width: 10),
+                          _kpiPill(Icons.euro, '€${zone.earningMax.toInt()}', 'stima/h', cs),
+                          const SizedBox(width: 10),
+                          _kpiPill(Icons.near_me, '${zone.distanceKm.toStringAsFixed(1)}km', 'da te', cs),
+                          const SizedBox(width: 10),
+                          _kpiPill(Icons.people, zone.ridersEstimate, 'rider', cs),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Trend
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12)),
+                        child: Row(
+                          children: [
+                            Icon(
+                              zone.trending == 'up' ? Icons.trending_up : zone.trending == 'down' ? Icons.trending_down : Icons.trending_flat,
+                              color: zone.trending == 'up' ? AppColors.earningsGreen : zone.trending == 'down' ? AppColors.urgentRed : AppColors.statsGold,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(zone.trendText, style: GoogleFonts.inter(color: Colors.white70, fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // CTA
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _openGoogleMaps(zone.name),
+                          icon: const Icon(Icons.navigation, size: 18),
+                          label: Text('VAI IN QUESTA ZONA', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: zone.demandColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   Future<void> _openGoogleMaps(String zoneName) async {
-    final encodedAddress = Uri.encodeComponent('$zoneName, Milano, Italia');
+    final encodedAddress = Uri.encodeComponent('$zoneName, Italia');
     final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedAddress');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -359,237 +391,4 @@ class _ZoneMapScreenState extends State<ZoneMapScreen> {
       ),
     );
   }
-
-  Widget _orderTile(_ZoneOrder order, ColorScheme cs) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.turboOrange.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.fastfood, size: 18, color: AppColors.turboOrange),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(order.restaurant, style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                Text('${order.distance} • ${order.time}', style: GoogleFonts.inter(color: Colors.white38, fontSize: 11)),
-              ],
-            ),
-          ),
-          Text(order.price, style: GoogleFonts.inter(color: AppColors.earningsGreen, fontSize: 14, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-
-  void _showOrderDetail(BuildContext context, _NearbyOrder order) {
-    final cs = Theme.of(context).colorScheme;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.fastfood, color: AppColors.turboOrange),
-                const SizedBox(width: 10),
-                Text(order.restaurant, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _detailRow(Icons.euro, 'Compenso: ${order.price}'),
-            _detailRow(Icons.near_me, 'Distanza: ${order.dist}'),
-            _detailRow(Icons.location_on, 'Consegna: ${order.destination}'),
-            _detailRow(Icons.timer, 'Tempo stimato: ${order.eta}'),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Ordine da ${order.restaurant} accettato!')),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.earningsGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text('ACCETTA ORDINE', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _detailRow(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: Colors.white54),
-          const SizedBox(width: 10),
-          Text(text, style: GoogleFonts.inter(color: Colors.white70, fontSize: 14)),
-        ],
-      ),
-    );
-  }
 }
-
-// --- Data models ---
-
-class _ZoneOrder {
-  final String restaurant;
-  final String distance;
-  final String time;
-  final String price;
-  const _ZoneOrder(this.restaurant, this.distance, this.time, this.price);
-}
-
-class _NearbyOrder {
-  final LatLng position;
-  final String price;
-  final String restaurant;
-  final String dist;
-  final String destination;
-  final String eta;
-  const _NearbyOrder({required this.position, required this.price, required this.restaurant, required this.dist, required this.destination, required this.eta});
-}
-
-class _MapZone {
-  final String name;
-  final String shortName;
-  final String demandLabel;
-  final Color color;
-  final LatLng center;
-  final double radiusMeters;
-  final String ordersHour;
-  final String earning;
-  final String distance;
-  final String riders;
-  final String trending;
-  final String trendText;
-  final List<_ZoneOrder> orders;
-
-  const _MapZone({
-    required this.name,
-    required this.shortName,
-    required this.demandLabel,
-    required this.color,
-    required this.center,
-    required this.radiusMeters,
-    required this.ordersHour,
-    required this.earning,
-    required this.distance,
-    required this.riders,
-    required this.trending,
-    required this.trendText,
-    required this.orders,
-  });
-}
-
-// --- Zone data (Milano) ---
-
-const _zones = [
-  _MapZone(
-    name: 'Milano Centro',
-    shortName: 'Centro',
-    demandLabel: 'ALTA',
-    color: AppColors.earningsGreen,
-    center: LatLng(45.4642, 9.1900),
-    radiusMeters: 800,
-    ordersHour: '12', earning: '€18', distance: '0.5km', riders: '8',
-    trending: 'up',
-    trendText: 'Domanda in crescita +25% rispetto a ieri',
-    orders: [
-      _ZoneOrder('Pizzeria Da Mario', '0.3 km', '~8 min', '€4.50'),
-      _ZoneOrder('Sushi Zen', '0.5 km', '~12 min', '€5.80'),
-      _ZoneOrder("McDonald's Duomo", '0.2 km', '~6 min', '€3.90'),
-    ],
-  ),
-  _MapZone(
-    name: 'Navigli',
-    shortName: 'Navigli',
-    demandLabel: 'ALTA',
-    color: AppColors.earningsGreen,
-    center: LatLng(45.4500, 9.1750),
-    radiusMeters: 650,
-    ordersHour: '10', earning: '€16', distance: '1.2km', riders: '6',
-    trending: 'up',
-    trendText: 'Zona aperitivo — picco dalle 18:00 alle 22:00',
-    orders: [
-      _ZoneOrder('Trattoria Milanese', '1.0 km', '~15 min', '€5.20'),
-      _ZoneOrder('Burger King Navigli', '1.3 km', '~10 min', '€4.10'),
-    ],
-  ),
-  _MapZone(
-    name: 'Porta Romana',
-    shortName: 'P.Romana',
-    demandLabel: 'MEDIA',
-    color: AppColors.statsGold,
-    center: LatLng(45.4500, 9.2050),
-    radiusMeters: 550,
-    ordersHour: '8', earning: '€13', distance: '2.0km', riders: '4',
-    trending: 'flat',
-    trendText: 'Domanda stabile — buona per consegne regolari',
-    orders: [
-      _ZoneOrder('Poke House', '1.8 km', '~18 min', '€4.80'),
-      _ZoneOrder('Rossopomodoro', '2.1 km', '~20 min', '€5.50'),
-    ],
-  ),
-  _MapZone(
-    name: 'Isola',
-    shortName: 'Isola',
-    demandLabel: 'MEDIA',
-    color: AppColors.statsGold,
-    center: LatLng(45.4850, 9.1880),
-    radiusMeters: 500,
-    ordersHour: '6', earning: '€11', distance: '3.1km', riders: '3',
-    trending: 'down',
-    trendText: 'Domanda in calo — pochi ristoranti aperti ora',
-    orders: [
-      _ZoneOrder('Kebab House', '3.0 km', '~22 min', '€4.00'),
-    ],
-  ),
-  _MapZone(
-    name: 'Città Studi',
-    shortName: 'C.Studi',
-    demandLabel: 'BASSA',
-    color: Colors.grey,
-    center: LatLng(45.4780, 9.2250),
-    radiusMeters: 450,
-    ordersHour: '4', earning: '€9', distance: '4.5km', riders: '2',
-    trending: 'down',
-    trendText: 'Zona universitaria — picco solo a pranzo',
-    orders: [
-      _ZoneOrder('Panino Giusto', '4.3 km', '~25 min', '€3.50'),
-    ],
-  ),
-];
-
-const _nearbyOrders = [
-  _NearbyOrder(position: LatLng(45.4660, 9.1850), price: '€4.50', restaurant: 'Pizzeria Da Mario', dist: '0.3 km', destination: 'Via Torino 45', eta: '8 min'),
-  _NearbyOrder(position: LatLng(45.4620, 9.1950), price: '€5.80', restaurant: 'Sushi Zen', dist: '0.5 km', destination: 'Corso Buenos Aires 12', eta: '12 min'),
-  _NearbyOrder(position: LatLng(45.4520, 9.1720), price: '€5.20', restaurant: 'Trattoria Milanese', dist: '1.0 km', destination: 'Ripa di Porta Ticinese 7', eta: '15 min'),
-  _NearbyOrder(position: LatLng(45.4480, 9.2080), price: '€4.80', restaurant: 'Poke House', dist: '1.8 km', destination: 'Via Ripamonti 20', eta: '18 min'),
-  _NearbyOrder(position: LatLng(45.4800, 9.2200), price: '€3.50', restaurant: 'Panino Giusto', dist: '4.3 km', destination: 'Piazza Leonardo 1', eta: '25 min'),
-];
