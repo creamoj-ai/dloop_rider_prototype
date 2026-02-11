@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "793691819503",
+    "project_id": "loop-rider-prototype",
+    "storage_bucket": "loop-rider-prototype.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:793691819503:android:c96b89e9b727a2ed87ba1a",
+        "android_client_info": {
+          "package_name": "com.dloop.rider.prototype"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSp5lXMuyE9zfeNEEyCumQEvA77UFFVGA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
