@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
 import '../theme/tokens.dart';
 
 /// Bottom sheet per la ricerca
@@ -16,13 +15,13 @@ class SearchSheet {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => Padding(
+      builder: (ctx) => Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
         ),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
+            maxHeight: MediaQuery.of(ctx).size.height * 0.7,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -119,9 +118,9 @@ class NotificationsSheet {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => ConstrainedBox(
+      builder: (ctx) => ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
+          maxHeight: MediaQuery.of(ctx).size.height * 0.7,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -242,7 +241,7 @@ class QuickActionsSheet {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => Column(
+      builder: (ctx) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Handle
