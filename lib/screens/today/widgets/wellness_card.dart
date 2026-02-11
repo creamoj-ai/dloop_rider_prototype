@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 import '../../../providers/rest_mode_provider.dart';
+import '../../../providers/session_provider.dart';
 
 class WellnessCard extends ConsumerStatefulWidget {
   const WellnessCard({super.key});
@@ -18,25 +19,54 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
   int? _selectedMinutes;
   int _remainingSeconds = 0;
   Timer? _timer;
+  int _breakReduction = 0; // cumulative break stress reduction
 
-  double _stressIndex = 0.62;
-  static const String _activeTime = '3h 12m';
+  double _computeStressIndex(ActiveSessionState session) {
+    if (!session.hasActiveSession || session.startTime == null) {
+      return 0.1; // No session, fully rested
+    }
+    final activeHours = DateTime.now().difference(session.startTime!).inMinutes / 60.0;
+    double base;
+    if (activeHours < 2) {
+      base = 0.15;
+    } else if (activeHours < 4) {
+      base = 0.35;
+    } else if (activeHours < 6) {
+      base = 0.55;
+    } else if (activeHours < 8) {
+      base = 0.75;
+    } else {
+      base = 0.95;
+    }
+    // Reduce by completed breaks (each reduces by 0.15)
+    return (base - _breakReduction * 0.15).clamp(0.05, 1.0);
+  }
 
-  Color get _stressColor {
+  String _computeActiveTime(ActiveSessionState session) {
+    if (!session.hasActiveSession || session.startTime == null) {
+      return '0h 0m';
+    }
+    final elapsed = DateTime.now().difference(session.startTime!);
+    final hours = elapsed.inHours;
+    final minutes = elapsed.inMinutes % 60;
+    return '${hours}h ${minutes}m';
+  }
+
+  Color _stressColor(double stressIndex) {
     if (_isResting) return AppColors.routeBlue;
-    if (_stressIndex < 0.4) return AppColors.earningsGreen;
-    if (_stressIndex < 0.7) return AppColors.statsGold;
+    if (stressIndex < 0.4) return AppColors.earningsGreen;
+    if (stressIndex < 0.7) return AppColors.statsGold;
     return AppColors.urgentRed;
   }
 
-  String get _stressLabel {
+  String _stressLabel(double stressIndex) {
     if (_isResting) return 'RIPOSO';
-    if (_stressIndex < 0.4) return 'OTTIMO';
-    if (_stressIndex < 0.7) return 'BUONO';
+    if (stressIndex < 0.4) return 'OTTIMO';
+    if (stressIndex < 0.7) return 'BUONO';
     return 'RIPOSA';
   }
 
-  int get _energyPercent => (100 - _stressIndex * 100).toInt();
+  int _energyPercent(double stressIndex) => (100 - stressIndex * 100).toInt();
 
   String get _remainingTimeFormatted {
     final minutes = _remainingSeconds ~/ 60;
@@ -93,7 +123,7 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
       _isResting = false;
       _selectedMinutes = null;
       _remainingSeconds = 0;
-      if (completed) _stressIndex = (_stressIndex - 0.2).clamp(0.1, 1.0);
+      if (completed) _breakReduction++;
     });
 
     // End global rest mode
@@ -120,6 +150,12 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final session = ref.watch(activeSessionProvider);
+    final stressIndex = _computeStressIndex(session);
+    final activeTime = _computeActiveTime(session);
+    final color = _stressColor(stressIndex);
+    final label = _stressLabel(stressIndex);
+    final energy = _energyPercent(stressIndex);
 
     return GestureDetector(
       onTap: () => setState(() => _isExpanded = !_isExpanded),
@@ -130,17 +166,17 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
           color: _isResting ? AppColors.routeBlue.withValues(alpha: 0.1) : cs.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: _stressColor.withValues(alpha: _isResting ? 0.5 : 0.2),
+            color: color.withValues(alpha: _isResting ? 0.5 : 0.2),
             width: _isResting ? 2 : 1,
           ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildHeader(cs),
+            _buildHeader(cs, stressIndex, color, label, energy),
             if (_isExpanded) ...[
               const SizedBox(height: 14),
-              _isResting ? _buildRestingContent(cs) : _buildActiveContent(cs),
+              _isResting ? _buildRestingContent(cs) : _buildActiveContent(cs, stressIndex, activeTime, color, energy),
             ],
           ],
         ),
@@ -148,14 +184,14 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
     );
   }
 
-  Widget _buildHeader(ColorScheme cs) {
+  Widget _buildHeader(ColorScheme cs, double stressIndex, Color color, String label, int energy) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return Row(
           children: [
             Icon(
               _isResting ? Icons.bedtime : Icons.self_improvement,
-              color: _stressColor,
+              color: color,
               size: 18,
             ),
             const SizedBox(width: 6),
@@ -164,7 +200,7 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
               style: GoogleFonts.inter(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: _stressColor,
+                color: color,
                 letterSpacing: 0.8,
               ),
             ),
@@ -183,9 +219,9 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(3),
                         child: LinearProgressIndicator(
-                          value: 1 - _stressIndex,
+                          value: 1 - stressIndex,
                           backgroundColor: cs.surfaceContainerHighest,
-                          valueColor: AlwaysStoppedAnimation(_stressColor),
+                          valueColor: AlwaysStoppedAnimation(color),
                           minHeight: 5,
                         ),
                       ),
@@ -193,11 +229,11 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
               if (!_isResting) ...[
                 const SizedBox(width: 6),
                 Text(
-                  '$_energyPercent%',
+                  '$energy%',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: _stressColor,
+                    color: color,
                   ),
                 ),
               ],
@@ -209,15 +245,15 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
-                  color: _stressColor.withValues(alpha: 0.15),
+                  color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  _stressLabel,
+                  label,
                   style: GoogleFonts.inter(
                     fontSize: 8,
                     fontWeight: FontWeight.w600,
-                    color: _stressColor,
+                    color: color,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -302,7 +338,7 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
     );
   }
 
-  Widget _buildActiveContent(ColorScheme cs) {
+  Widget _buildActiveContent(ColorScheme cs, double stressIndex, String activeTime, Color color, int energy) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -316,16 +352,16 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Energia', style: GoogleFonts.inter(fontSize: 11, color: cs.onSurfaceVariant)),
-                      Text('$_energyPercent%', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: _stressColor)),
+                      Text('$energy%', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
                     ],
                   ),
                   const SizedBox(height: 4),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(3),
                     child: LinearProgressIndicator(
-                      value: 1 - _stressIndex,
+                      value: 1 - stressIndex,
                       backgroundColor: cs.surfaceContainerHighest,
-                      valueColor: AlwaysStoppedAnimation(_stressColor),
+                      valueColor: AlwaysStoppedAnimation(color),
                       minHeight: 6,
                     ),
                   ),
@@ -337,7 +373,7 @@ class _WellnessCardState extends ConsumerState<WellnessCard> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('Attivo', style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant)),
-                Text(_activeTime, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                Text(activeTime, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface)),
               ],
             ),
           ],

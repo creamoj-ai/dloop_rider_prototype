@@ -1,142 +1,24 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 import '../../../providers/earnings_provider.dart';
+import '../../../providers/active_orders_provider.dart';
 import '../../../services/rush_hour_service.dart';
 
-/// Dati ordine disponibile
-class AvailableOrder {
-  final String id;
-  final String restaurantName;
-  final String restaurantAddress;
-  final String customerAddress;
-  final double distanceKm;
-  final String? orderNotes;
-  final bool isUrgent; // Ordine prioritario (🔥)
-
-  const AvailableOrder({
-    required this.id,
-    required this.restaurantName,
-    required this.restaurantAddress,
-    required this.customerAddress,
-    required this.distanceKm,
-    this.orderNotes,
-    this.isUrgent = false,
-  });
-
-  /// Guadagno base (€1.50/km)
-  double get baseEarning => distanceKm * 1.50;
-
-  /// Guadagno con rush hour
-  double get totalEarning => baseEarning * RushHourService.getCurrentMultiplier();
-
-  /// Genera lista di ordini random
-  static List<AvailableOrder> generateList(int count) {
-    final random = Random();
-    final orders = <AvailableOrder>[];
-
-    const restaurants = [
-      ('Pizzeria Da Mario', 'Via Torino 25'),
-      ('Sushi Zen', 'Corso Italia 12'),
-      ('Trattoria Nonna', 'Via Dante 8'),
-      ('Burger King', 'Piazza Duomo 3'),
-      ("McDonald's", 'Via Montenapoleone 15'),
-      ('Poke House', 'Corso Buenos Aires 88'),
-      ('Rossopomodoro', 'Via Brera 22'),
-      ('La Piadineria', 'Via Paolo Sarpi 44'),
-      ('KFC', 'Viale Papiniano 10'),
-      ('Spontini', 'Corso Sempione 5'),
-    ];
-
-    const customerAddresses = [
-      'Via Roma 15',
-      'Corso Italia 88',
-      'Via Torino 12',
-      'Via Dante 23',
-      'Corso Buenos Aires 45',
-      'Via Montenapoleone 8',
-      'Piazza Duomo 1',
-      'Via Brera 30',
-      'Corso Sempione 76',
-      'Via Paolo Sarpi 55',
-      'Viale Papiniano 42',
-      'Via Padova 118',
-    ];
-
-    const notes = [
-      null,
-      'Citofono rotto, chiamare',
-      'Consegnare al portiere',
-      'Piano 3, scala B',
-      'Suonare 2 volte',
-      null,
-      'Lasciare fuori dalla porta',
-      null,
-    ];
-
-    // Usati per evitare duplicati
-    final usedRestaurants = <int>{};
-
-    for (int i = 0; i < count; i++) {
-      int restaurantIdx;
-      do {
-        restaurantIdx = random.nextInt(restaurants.length);
-      } while (usedRestaurants.contains(restaurantIdx) && usedRestaurants.length < restaurants.length);
-      usedRestaurants.add(restaurantIdx);
-
-      final restaurant = restaurants[restaurantIdx];
-      final distance = 0.8 + random.nextDouble() * 3.5; // 0.8 - 4.3 km
-
-      orders.add(AvailableOrder(
-        id: 'order_${DateTime.now().millisecondsSinceEpoch}_$i',
-        restaurantName: restaurant.$1,
-        restaurantAddress: restaurant.$2,
-        customerAddress: customerAddresses[random.nextInt(customerAddresses.length)],
-        distanceKm: double.parse(distance.toStringAsFixed(1)),
-        orderNotes: notes[random.nextInt(notes.length)],
-        isUrgent: i == 0 && random.nextBool(), // Il primo potrebbe essere urgente
-      ));
-    }
-
-    // Ordina per distanza (più vicini prima)
-    orders.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-
-    return orders;
-  }
-}
-
-class ActiveModeCard extends ConsumerStatefulWidget {
+class ActiveModeCard extends ConsumerWidget {
   const ActiveModeCard({super.key});
 
   @override
-  ConsumerState<ActiveModeCard> createState() => _ActiveModeCardState();
-}
-
-class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
-  // Lista ordini disponibili
-  late List<AvailableOrder> _availableOrders;
-
-  @override
-  void initState() {
-    super.initState();
-    _availableOrders = AvailableOrder.generateList(4); // 4 ordini iniziali
-  }
-
-  void _refreshOrders() {
-    setState(() {
-      _availableOrders = AvailableOrder.generateList(3 + Random().nextInt(3)); // 3-5 ordini
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final ordersState = ref.watch(activeOrdersProvider);
     final earnings = ref.watch(earningsProvider);
     final target = earnings.dailyTarget;
     final isRushHour = RushHourService.isRushHourNow();
+    final availableOrders = ordersState.availableOrders;
+    final activeOrders = ordersState.orders.where((o) => o.phase != OrderPhase.completed).toList();
 
     return Container(
       width: double.infinity,
@@ -151,16 +33,18 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header con titolo e refresh
-          _buildHeader(cs, isRushHour),
+          // Active orders banner (if any)
+          if (activeOrders.isNotEmpty)
+            _buildActiveOrderBanner(context, cs, activeOrders),
 
-          // Divider
+          // Header
+          _buildHeader(context, ref, cs, isRushHour, availableOrders.length),
+
           Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.3)),
 
-          // Lista ordini
-          _buildOrdersList(cs, isRushHour),
+          // Orders list
+          _buildOrdersList(context, ref, cs, isRushHour, availableOrders),
 
-          // Divider
           Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.3)),
 
           // Daily target
@@ -173,13 +57,44 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
     );
   }
 
+  /// Banner ordini attivi in corso
+  Widget _buildActiveOrderBanner(BuildContext context, ColorScheme cs, List<ActiveOrder> activeOrders) {
+    return GestureDetector(
+      onTap: () => context.push('/today/delivery'),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.routeBlue.withValues(alpha: 0.15),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(Radii.lg - 1)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.delivery_dining, size: 18, color: AppColors.routeBlue),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                '${activeOrders.length} ${activeOrders.length == 1 ? 'ordine in corso' : 'ordini in corso'}',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.routeBlue,
+                ),
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.routeBlue),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Header con conteggio ordini e refresh
-  Widget _buildHeader(ColorScheme cs, bool isRushHour) {
+  Widget _buildHeader(BuildContext context, WidgetRef ref, ColorScheme cs, bool isRushHour, int orderCount) {
     return Padding(
       padding: const EdgeInsets.all(Spacing.lg),
       child: Row(
         children: [
-          // Icona ordini
           Container(
             padding: const EdgeInsets.all(Spacing.sm),
             decoration: BoxDecoration(
@@ -193,8 +108,6 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
             ),
           ),
           const SizedBox(width: Spacing.md),
-
-          // Titolo e conteggio
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,7 +123,7 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_availableOrders.length} disponibili',
+                  '$orderCount disponibili',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -220,8 +133,6 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
               ],
             ),
           ),
-
-          // Rush hour badge
           if (isRushHour) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -232,11 +143,7 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.local_fire_department,
-                    size: 14,
-                    color: AppColors.earningsGreen,
-                  ),
+                  const Icon(Icons.local_fire_department, size: 14, color: AppColors.earningsGreen),
                   const SizedBox(width: 4),
                   Text(
                     '2X',
@@ -251,15 +158,9 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
             ),
             const SizedBox(width: Spacing.sm),
           ],
-
-          // Refresh button
           IconButton(
-            onPressed: _refreshOrders,
-            icon: Icon(
-              Icons.refresh,
-              color: cs.onSurfaceVariant,
-              size: 22,
-            ),
+            onPressed: () => ref.read(activeOrdersProvider.notifier).refreshAvailableOrders(),
+            icon: Icon(Icons.refresh, color: cs.onSurfaceVariant, size: 22),
             tooltip: 'Aggiorna ordini',
             visualDensity: VisualDensity.compact,
           ),
@@ -269,11 +170,11 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
   }
 
   /// Lista ordini scrollabile
-  Widget _buildOrdersList(ColorScheme cs, bool isRushHour) {
+  Widget _buildOrdersList(BuildContext context, WidgetRef ref, ColorScheme cs, bool isRushHour, List<ActiveOrder> orders) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _availableOrders.length,
+      itemCount: orders.length,
       separatorBuilder: (_, __) => Divider(
         height: 1,
         color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -281,14 +182,14 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
         endIndent: Spacing.lg,
       ),
       itemBuilder: (context, index) {
-        final order = _availableOrders[index];
-        return _buildOrderRow(cs, order, isRushHour, index == 0);
+        final order = orders[index];
+        return _buildOrderRow(context, ref, cs, order, isRushHour, index == 0);
       },
     );
   }
 
   /// Singola riga ordine
-  Widget _buildOrderRow(ColorScheme cs, AvailableOrder order, bool isRushHour, bool isFirst) {
+  Widget _buildOrderRow(BuildContext context, WidgetRef ref, ColorScheme cs, ActiveOrder order, bool isRushHour, bool isFirst) {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: Spacing.lg,
@@ -297,52 +198,30 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Indicatore urgente o normale
           Container(
             width: 4,
             height: 48,
             margin: const EdgeInsets.only(right: Spacing.md),
             decoration: BoxDecoration(
-              color: order.isUrgent
-                  ? AppColors.turboOrange
-                  : (isFirst ? AppColors.earningsGreen : cs.outlineVariant),
+              color: isFirst ? AppColors.earningsGreen : cs.outlineVariant,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-
-          // Info ordine
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Nome ristorante con badge urgente
-                Row(
-                  children: [
-                    if (order.isUrgent) ...[
-                      const Icon(
-                        Icons.local_fire_department,
-                        size: 16,
-                        color: AppColors.turboOrange,
-                      ),
-                      const SizedBox(width: 4),
-                    ],
-                    Expanded(
-                      child: Text(
-                        order.restaurantName,
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurface,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                Text(
+                  order.dealerName,
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-
-                // Indirizzo e distanza
                 Text(
                   '${order.customerAddress} • ${order.distanceKm} km',
                   style: GoogleFonts.inter(
@@ -355,14 +234,10 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
               ],
             ),
           ),
-
           const SizedBox(width: Spacing.md),
-
-          // Guadagno e pulsante
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Guadagno
               if (isRushHour) ...[
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -396,18 +271,16 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
                   ),
                 ),
               ],
-
               const SizedBox(height: Spacing.sm),
-
-              // Pulsante ACCETTA
               SizedBox(
                 height: 32,
                 child: ElevatedButton(
-                  onPressed: () => _acceptOrder(order),
+                  onPressed: () {
+                    ref.read(activeOrdersProvider.notifier).acceptOrder(order);
+                    context.push('/today/delivery', extra: order.id);
+                  },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: order.isUrgent
-                        ? AppColors.turboOrange
-                        : AppColors.earningsGreen,
+                    backgroundColor: AppColors.earningsGreen,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
                     shape: RoundedRectangleBorder(
@@ -439,26 +312,6 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
     );
   }
 
-  /// Accetta ordine e naviga
-  void _acceptOrder(AvailableOrder order) {
-    context.push('/today/delivery', extra: {
-      'restaurantName': order.restaurantName,
-      'restaurantAddress': order.restaurantAddress,
-      'customerAddress': order.customerAddress,
-      'distanceKm': order.distanceKm,
-      'orderNotes': order.orderNotes,
-    });
-
-    // Rimuovi l'ordine accettato e rigenera la lista
-    setState(() {
-      _availableOrders.removeWhere((o) => o.id == order.id);
-      // Se restano pochi ordini, aggiungine di nuovi
-      if (_availableOrders.length < 2) {
-        _availableOrders = AvailableOrder.generateList(3 + Random().nextInt(3));
-      }
-    });
-  }
-
   /// Barra obiettivo giornaliero
   Widget _buildDailyTarget(ColorScheme cs, dynamic target) {
     return Column(
@@ -468,11 +321,7 @@ class _ActiveModeCardState extends ConsumerState<ActiveModeCard> {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.flag_outlined,
-                  size: 16,
-                  color: cs.onSurfaceVariant,
-                ),
+                Icon(Icons.flag_outlined, size: 16, color: cs.onSurfaceVariant),
                 const SizedBox(width: Spacing.sm),
                 Text(
                   'Obiettivo: € ${target.currentAmount.toStringAsFixed(0)} / € ${target.targetAmount.toStringAsFixed(0)}',

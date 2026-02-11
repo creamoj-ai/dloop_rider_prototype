@@ -1,24 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
+import '../../../providers/rider_stats_provider.dart';
+import '../../../providers/earnings_provider.dart';
+import 'tools/earnings_calculator_sheet.dart';
+import 'tools/shift_timer_sheet.dart';
+import 'tools/checklist_sheet.dart';
+import 'tools/vehicle_settings_sheet.dart';
+import 'tools/monthly_stats_sheet.dart';
 
-class QuickActionsGrid extends StatefulWidget {
+class QuickActionsGrid extends ConsumerStatefulWidget {
   const QuickActionsGrid({super.key});
 
   @override
-  State<QuickActionsGrid> createState() => _QuickActionsGridState();
+  ConsumerState<QuickActionsGrid> createState() => _QuickActionsGridState();
 }
 
-class _QuickActionsGridState extends State<QuickActionsGrid> {
+class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
   // Notification state
   int _whatsappNotifications = 3;
   int _supportNotifications = 1;
   int _communityNotifications = 12;
 
-  // Network stats (mock)
+  // Network stats (mock active riders — no referral table yet)
   final int _networkActiveRiders = 12;
-  final double _networkMonthlyEarnings = 47.50;
 
   int get _totalNotifications =>
       _whatsappNotifications + _supportNotifications + _communityNotifications;
@@ -30,6 +36,22 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final statsAsync = ref.watch(riderStatsProvider);
+    final networkState = ref.watch(networkEarningsProvider);
+
+    // Compute network monthly earnings from real data
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    final networkMonthlyEarnings = networkState.networkEarnings
+        .where((e) => e.dateTime.isAfter(monthStart))
+        .fold(0.0, (sum, e) => sum + e.amount);
+
+    // Get stats (fallback to defaults if loading)
+    final stats = statsAsync.when(
+      data: (s) => s,
+      loading: () => const RiderStats(),
+      error: (_, __) => const RiderStats(),
+    );
 
     return Column(
       children: [
@@ -72,9 +94,9 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
                   icon: Icons.people,
                   label: 'Network',
                   subtitle: '$_networkActiveRiders attivi',
-                  subtitleExtra: '+€${_networkMonthlyEarnings.toStringAsFixed(0)}/mese',
+                  subtitleExtra: '+\u20AC${networkMonthlyEarnings.toStringAsFixed(0)}/mese',
                   color: AppColors.routeBlue,
-                  onTap: () => _showNetworkSheet(context),
+                  onTap: () => _showNetworkSheet(context, networkMonthlyEarnings),
                 ),
               ),
               const SizedBox(width: 12),
@@ -82,10 +104,10 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
                 child: _ActionTile(
                   icon: Icons.emoji_events,
                   label: 'Obiettivi',
-                  subtitle: '12 giorni streak',
-                  subtitleExtra: 'Top 5% zona',
+                  subtitle: '${stats.currentDailyStreak} giorni streak',
+                  subtitleExtra: 'Rating ${stats.avgRating.toStringAsFixed(1)}/5.0',
                   color: AppColors.bonusPurple,
-                  onTap: () => _showMotivation(context),
+                  onTap: () => _showMotivation(context, stats),
                 ),
               ),
             ],
@@ -95,7 +117,7 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
     );
   }
 
-  void _showNetworkSheet(BuildContext context) {
+  void _showNetworkSheet(BuildContext context, double monthlyEarnings) {
     final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
@@ -112,7 +134,7 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
         builder: (context, scrollController) => _NetworkSheet(
           scrollController: scrollController,
           activeRiders: _networkActiveRiders,
-          monthlyEarnings: _networkMonthlyEarnings,
+          monthlyEarnings: monthlyEarnings,
         ),
       ),
     );
@@ -206,7 +228,8 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
       context: context,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
+      isScrollControlled: true,
+      builder: (_) => SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -214,10 +237,11 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
           children: [
             Text('Strumenti', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
             const SizedBox(height: 16),
-            _sheetItem(Icons.calculate, 'Calcolatore guadagni', cs),
-            _sheetItem(Icons.timer, 'Timer turno', cs),
-            _sheetItem(Icons.checklist, 'Checklist pre-turno', cs),
-            _sheetItem(Icons.settings, 'Impostazioni veicolo', cs),
+            _toolItem(Icons.calculate, 'Calcolatore guadagni', 'Stima i tuoi guadagni', AppColors.earningsGreen, cs, context, () => _openToolSheet(context, const EarningsCalculatorSheet())),
+            _toolItem(Icons.timer, 'Timer turno', 'Cronometra il tuo turno', AppColors.routeBlue, cs, context, () => _openToolSheet(context, const ShiftTimerSheet())),
+            _toolItem(Icons.checklist, 'Checklist pre-turno', 'Controlla tutto prima di partire', AppColors.turboOrange, cs, context, () => _openToolSheet(context, const ChecklistSheet())),
+            _toolItem(Icons.settings, 'Impostazioni veicolo', 'Veicolo e distanza massima', AppColors.bonusPurple, cs, context, () => _openToolSheet(context, const VehicleSettingsSheet())),
+            _toolItem(Icons.calendar_month, 'Stats mese', 'Riepilogo mensile guadagni', AppColors.routeBlue, cs, context, () => _openToolSheet(context, const MonthlyStatsSheet())),
             const SizedBox(height: 8),
           ],
         ),
@@ -225,8 +249,55 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
     );
   }
 
-  void _showMotivation(BuildContext context) {
+  void _openToolSheet(BuildContext context, Widget sheet) {
+    Navigator.pop(context); // Close toolkit sheet first
     final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => sheet,
+    );
+  }
+
+  Widget _toolItem(IconData icon, String title, String subtitle, Color color, ColorScheme cs, BuildContext context, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                  Text(subtitle, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: cs.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMotivation(BuildContext context, RiderStats stats) {
+    final cs = Theme.of(context).colorScheme;
+
+    // Compute next streak milestone
+    final streak = stats.currentDailyStreak;
+    final milestones = [7, 14, 30, 60, 90, 180, 365];
+    final nextMilestone = milestones.firstWhere((m) => m > streak, orElse: () => streak + 30);
+
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
@@ -239,10 +310,10 @@ class _QuickActionsGridState extends State<QuickActionsGrid> {
           children: [
             Text('Obiettivi', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
             const SizedBox(height: 16),
-            _sheetItem(Icons.local_fire_department, 'Streak: 12 giorni consecutivi', cs),
-            _sheetItem(Icons.star, 'Valutazione: 4.9 / 5.0', cs),
-            _sheetItem(Icons.trending_up, 'Top 5% rider nella tua zona', cs),
-            _sheetItem(Icons.emoji_events, 'Prossimo badge: 15 giorni streak', cs),
+            _sheetItem(Icons.local_fire_department, 'Streak: ${stats.currentDailyStreak} giorni consecutivi', cs),
+            _sheetItem(Icons.star, 'Valutazione: ${stats.avgRating.toStringAsFixed(1)} / 5.0', cs),
+            _sheetItem(Icons.trending_up, 'Livello ${stats.currentLevel} \u2022 ${stats.currentXp}/${stats.xpToNextLevel} XP', cs),
+            _sheetItem(Icons.emoji_events, 'Prossimo traguardo: $nextMilestone giorni streak', cs),
             const SizedBox(height: 8),
           ],
         ),

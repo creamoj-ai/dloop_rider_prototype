@@ -68,14 +68,8 @@ final appRouter = GoRouter(
             GoRoute(
               path: 'delivery',
               builder: (context, state) {
-                final extra = state.extra as Map<String, dynamic>? ?? {};
-                return DeliveryNavigationScreen(
-                  restaurantName: extra['restaurantName'] ?? 'Ristorante',
-                  restaurantAddress: extra['restaurantAddress'] ?? 'Via Roma 1',
-                  customerAddress: extra['customerAddress'] ?? 'Via Cliente 1',
-                  distanceKm: extra['distanceKm'] ?? 2.0,
-                  orderNotes: extra['orderNotes'],
-                );
+                final orderId = state.extra as String?;
+                return DeliveryNavigationScreen(orderId: orderId);
               },
             ),
           ],

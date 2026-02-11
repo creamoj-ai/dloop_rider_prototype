@@ -10,52 +10,15 @@ import '../../services/rush_hour_service.dart';
 
 /// Schermata gestione ordini multitasking (EARN-03 v2)
 class DeliveryNavigationScreen extends ConsumerStatefulWidget {
-  final String restaurantName;
-  final String restaurantAddress;
-  final String customerAddress;
-  final double distanceKm;
-  final String? orderNotes;
+  final String? orderId;
 
-  const DeliveryNavigationScreen({
-    super.key,
-    required this.restaurantName,
-    required this.restaurantAddress,
-    required this.customerAddress,
-    required this.distanceKm,
-    this.orderNotes,
-  });
+  const DeliveryNavigationScreen({super.key, this.orderId});
 
   @override
   ConsumerState<DeliveryNavigationScreen> createState() => _DeliveryNavigationScreenState();
 }
 
 class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Aggiungi l'ordine iniziale se non già presente
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final state = ref.read(activeOrdersProvider);
-      final alreadyExists = state.orders.any((o) =>
-        o.dealerName == widget.restaurantName &&
-        o.customerAddress == widget.customerAddress
-      );
-      if (!alreadyExists) {
-        ref.read(activeOrdersProvider.notifier).acceptOrder(
-          ActiveOrder(
-            id: 'order_${DateTime.now().millisecondsSinceEpoch}',
-            dealerName: widget.restaurantName,
-            dealerAddress: widget.restaurantAddress,
-            customerAddress: widget.customerAddress,
-            distanceKm: widget.distanceKm,
-            orderNotes: widget.orderNotes,
-            acceptedAt: DateTime.now(),
-          ),
-        );
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
