@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/tokens.dart';
 import '../../services/biometric_service.dart';
+import '../../services/preferences_service.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -48,21 +49,34 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     final session = Supabase.instance.client.auth.currentSession;
 
     if (session != null) {
-      // User has active session — require biometric unlock
-      final biometricAvailable = await BiometricService.isAvailable();
+      // Check if biometric lock is enabled in rider preferences
+      bool biometricEnabled = true; // safe default
+      try {
+        final settings = await PreferencesService.getSettings();
+        biometricEnabled = settings.biometricLock;
+      } catch (_) {
+        // If fetch fails, default to requiring biometric (safe fallback)
+      }
 
-      if (biometricAvailable) {
-        final authenticated = await BiometricService.authenticate();
-        if (!mounted) return;
+      if (biometricEnabled) {
+        final biometricAvailable = await BiometricService.isAvailable();
 
-        if (authenticated) {
-          context.go('/today');
+        if (biometricAvailable) {
+          final authenticated = await BiometricService.authenticate();
+          if (!mounted) return;
+
+          if (authenticated) {
+            context.go('/today');
+          } else {
+            setState(() => _biometricFailed = true);
+          }
         } else {
-          // Auth failed — show retry or go to login
-          setState(() => _biometricFailed = true);
+          if (!mounted) return;
+          context.go('/today');
         }
       } else {
-        // No biometrics available — proceed directly
+        // Biometric lock disabled in settings — skip
+        if (!mounted) return;
         context.go('/today');
       }
     } else {

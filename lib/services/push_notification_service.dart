@@ -93,10 +93,10 @@ class PushNotificationService {
     }
 
     // Get and save FCM token
-    await _saveFcmToken();
+    await saveFcmToken();
 
     // Listen for token refresh
-    _messaging.onTokenRefresh.listen((token) => _saveFcmToken(token: token));
+    _messaging.onTokenRefresh.listen((token) => saveFcmToken(token: token));
   }
 
   /// Handle foreground FCM messages — show local notification
@@ -170,7 +170,7 @@ class PushNotificationService {
   }
 
   /// Save FCM token to Supabase for server-side push
-  static Future<void> _saveFcmToken({String? token}) async {
+  static Future<void> saveFcmToken({String? token}) async {
     final riderId = _riderId;
     if (riderId == null) return;
 

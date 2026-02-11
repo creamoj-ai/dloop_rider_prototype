@@ -66,9 +66,67 @@ class PreferencesService {
     });
   }
 
+  /// Fetch settings (push_notifications, order_sounds, biometric_lock, distance_unit)
+  static Future<RiderSettings> getSettings() async {
+    if (_userId == null) return RiderSettings.defaults();
+
+    return retry(() async {
+      final res = await _client
+          .from('rider_preferences')
+          .select('push_notifications, order_sounds, biometric_lock, distance_unit')
+          .eq('rider_id', _userId!)
+          .maybeSingle();
+
+      if (res != null) return RiderSettings.fromJson(res);
+      return RiderSettings.defaults();
+    });
+  }
+
+  /// Update a single setting by key
+  static Future<void> updateSetting(String key, dynamic value) async {
+    if (_userId == null) return;
+
+    await retry(() async {
+      await _client
+          .from('rider_preferences')
+          .upsert({
+            'rider_id': _userId!,
+            key: value,
+          }, onConflict: 'rider_id');
+    });
+  }
+
   static Map<String, dynamic> get _defaults => {
     'vehicle_type': 'scooter',
     'max_distance_km': 5.0,
     'checklist': <dynamic>[],
   };
+}
+
+class RiderSettings {
+  final bool pushNotifications;
+  final bool orderSounds;
+  final bool biometricLock;
+  final String distanceUnit;
+
+  RiderSettings({
+    required this.pushNotifications,
+    required this.orderSounds,
+    required this.biometricLock,
+    required this.distanceUnit,
+  });
+
+  factory RiderSettings.defaults() => RiderSettings(
+    pushNotifications: true,
+    orderSounds: true,
+    biometricLock: true,
+    distanceUnit: 'km',
+  );
+
+  factory RiderSettings.fromJson(Map<String, dynamic> json) => RiderSettings(
+    pushNotifications: json['push_notifications'] as bool? ?? true,
+    orderSounds: json['order_sounds'] as bool? ?? true,
+    biometricLock: json['biometric_lock'] as bool? ?? true,
+    distanceUnit: json['distance_unit'] as String? ?? 'km',
+  );
 }

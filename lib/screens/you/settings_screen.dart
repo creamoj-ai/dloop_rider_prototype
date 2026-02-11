@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/tokens.dart';
 import '../../services/biometric_service.dart';
+import '../../services/preferences_service.dart';
+import '../../services/push_notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,6 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _biometricAvailable = false;
   String _distanceUnit = 'km';
   String? _userEmail;
+  bool _loading = true;
 
   @override
   void initState() {
@@ -28,12 +31,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     final user = Supabase.instance.client.auth.currentUser;
     final bioAvailable = await BiometricService.isAvailable();
+
+    // Load real settings from Supabase
+    RiderSettings settings;
+    try {
+      settings = await PreferencesService.getSettings();
+    } catch (_) {
+      settings = RiderSettings.defaults();
+    }
+
     if (mounted) {
       setState(() {
         _userEmail = user?.email;
         _biometricAvailable = bioAvailable;
+        _pushNotifications = settings.pushNotifications;
+        _orderSounds = settings.orderSounds;
+        _biometricLock = settings.biometricLock;
+        _distanceUnit = settings.distanceUnit;
+        _loading = false;
       });
     }
+  }
+
+  Future<void> _updateSetting(String key, dynamic value) async {
+    try {
+      await PreferencesService.updateSetting(key, value);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore salvataggio: $e', style: GoogleFonts.inter()),
+            backgroundColor: Colors.red[700],
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _togglePushNotifications(bool value) async {
+    setState(() => _pushNotifications = value);
+    await _updateSetting('push_notifications', value);
+
+    // Enable/disable FCM token
+    try {
+      if (value) {
+        await PushNotificationService.saveFcmToken();
+      } else {
+        await PushNotificationService.removeToken();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleOrderSounds(bool value) async {
+    setState(() => _orderSounds = value);
+    await _updateSetting('order_sounds', value);
+  }
+
+  Future<void> _toggleBiometricLock(bool value) async {
+    setState(() => _biometricLock = value);
+    await _updateSetting('biometric_lock', value);
+  }
+
+  Future<void> _changeDistanceUnit(String value) async {
+    setState(() => _distanceUnit = value);
+    await _updateSetting('distance_unit', value);
   }
 
   @override
@@ -44,67 +105,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         title: Text('Impostazioni', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Account section
-          _sectionHeader('Account'),
-          _infoTile(cs, Icons.email_outlined, 'Email', _userEmail ?? '...'),
-          _actionTile(cs, Icons.lock_outline, 'Cambia password', () => _showChangePassword(context)),
-          const SizedBox(height: 24),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.turboOrange))
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Account section
+                _sectionHeader('Account'),
+                _infoTile(cs, Icons.email_outlined, 'Email', _userEmail ?? '...'),
+                _actionTile(cs, Icons.lock_outline, 'Cambia password', () => _showChangePassword(context)),
+                const SizedBox(height: 24),
 
-          // Notifications section
-          _sectionHeader('Notifiche'),
-          _switchTile(cs, Icons.notifications_outlined, 'Notifiche push', 'Ordini, guadagni, traguardi', _pushNotifications, (v) {
-            setState(() => _pushNotifications = v);
-          }),
-          _switchTile(cs, Icons.volume_up_outlined, 'Suoni ordini', 'Suono per nuovi ordini', _orderSounds, (v) {
-            setState(() => _orderSounds = v);
-          }),
-          const SizedBox(height: 24),
+                // Notifications section
+                _sectionHeader('Notifiche'),
+                _switchTile(cs, Icons.notifications_outlined, 'Notifiche push', 'Ordini, guadagni, traguardi', _pushNotifications, _togglePushNotifications),
+                _switchTile(cs, Icons.volume_up_outlined, 'Suoni ordini', 'Suono per nuovi ordini', _orderSounds, _toggleOrderSounds),
+                const SizedBox(height: 24),
 
-          // Security section
-          _sectionHeader('Sicurezza'),
-          if (_biometricAvailable)
-            _switchTile(cs, Icons.fingerprint, 'Blocco biometrico', 'Richiedi impronta all\'apertura', _biometricLock, (v) {
-              setState(() => _biometricLock = v);
-            }),
-          if (!_biometricAvailable)
-            _infoTile(cs, Icons.fingerprint, 'Biometria', 'Non disponibile su questo dispositivo'),
-          const SizedBox(height: 24),
+                // Security section
+                _sectionHeader('Sicurezza'),
+                if (_biometricAvailable)
+                  _switchTile(cs, Icons.fingerprint, 'Blocco biometrico', 'Richiedi impronta all\'apertura', _biometricLock, _toggleBiometricLock),
+                if (!_biometricAvailable)
+                  _infoTile(cs, Icons.fingerprint, 'Biometria', 'Non disponibile su questo dispositivo'),
+                const SizedBox(height: 24),
 
-          // Preferences section
-          _sectionHeader('Preferenze'),
-          _choiceTile(cs, Icons.straighten, 'Unità distanza', _distanceUnit == 'km' ? 'Chilometri' : 'Miglia', () {
-            _showDistanceUnitPicker(context);
-          }),
-          _infoTile(cs, Icons.language, 'Lingua', 'Italiano'),
-          _infoTile(cs, Icons.dark_mode, 'Tema', 'Scuro'),
-          const SizedBox(height: 24),
+                // Preferences section
+                _sectionHeader('Preferenze'),
+                _choiceTile(cs, Icons.straighten, 'Unità distanza', _distanceUnit == 'km' ? 'Chilometri' : 'Miglia', () {
+                  _showDistanceUnitPicker(context);
+                }),
+                _infoTile(cs, Icons.language, 'Lingua', 'Italiano'),
+                _infoTile(cs, Icons.dark_mode, 'Tema', 'Scuro'),
+                const SizedBox(height: 24),
 
-          // Info section
-          _sectionHeader('Informazioni'),
-          _actionTile(cs, Icons.description_outlined, 'Termini di servizio', () {
-            _showInfoSheet(context, 'Termini di Servizio', 'I termini di servizio completi saranno disponibili a breve.');
-          }),
-          _actionTile(cs, Icons.privacy_tip_outlined, 'Privacy Policy', () {
-            _showInfoSheet(context, 'Privacy Policy', 'La privacy policy completa sarà disponibile a breve.');
-          }),
-          _actionTile(cs, Icons.info_outline, 'Info app', () {
-            _showAppInfo(context);
-          }),
-          const SizedBox(height: 32),
+                // Info section
+                _sectionHeader('Informazioni'),
+                _actionTile(cs, Icons.description_outlined, 'Termini di servizio', () {
+                  _showInfoSheet(context, 'Termini di Servizio', 'I termini di servizio completi saranno disponibili a breve.');
+                }),
+                _actionTile(cs, Icons.privacy_tip_outlined, 'Privacy Policy', () {
+                  _showInfoSheet(context, 'Privacy Policy', 'La privacy policy completa sarà disponibile a breve.');
+                }),
+                _actionTile(cs, Icons.info_outline, 'Info app', () {
+                  _showAppInfo(context);
+                }),
+                const SizedBox(height: 32),
 
-          // Version
-          Center(
-            child: Text(
-              'dloop rider v1.0.0',
-              style: GoogleFonts.inter(fontSize: 12, color: Colors.white24),
+                // Version
+                Center(
+                  child: Text(
+                    'dloop rider v1.0.0',
+                    style: GoogleFonts.inter(fontSize: 12, color: Colors.white24),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
     );
   }
 
@@ -366,7 +423,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       title: Text(label, style: GoogleFonts.inter(fontSize: 15, color: Colors.white)),
       onTap: () {
-        setState(() => _distanceUnit = value);
+        _changeDistanceUnit(value);
         Navigator.pop(context);
       },
     );
