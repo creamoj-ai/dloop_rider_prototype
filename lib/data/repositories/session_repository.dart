@@ -10,7 +10,7 @@ class SessionRepository {
     if (_userId == null) return null;
     final res = await _client
         .from('sessions')
-        .select('*, zones!start_zone_id(name, city)')
+        .select()
         .eq('rider_id', _userId!)
         .eq('is_active', true)
         .maybeSingle();
@@ -88,13 +88,4 @@ class SessionRepository {
         .eq('rider_id', _userId!);
   }
 
-  /// Fetch zone metrics live for Napoli
-  Future<List<Map<String, dynamic>>> getZoneMetrics() async {
-    final res = await _client
-        .from('zone_metrics_live')
-        .select('*, zones(name, city, center_lat, center_lng, demand_score)')
-        .order('heatmap_score', ascending: false)
-        .limit(10);
-    return List<Map<String, dynamic>>.from(res);
-  }
 }

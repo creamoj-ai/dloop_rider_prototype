@@ -77,14 +77,12 @@ class ActiveSessionNotifier extends StateNotifier<ActiveSessionState> {
         return;
       }
 
-      final zone = session['zones'] as Map<String, dynamic>?;
-
       state = ActiveSessionState(
         isLoading: false,
         hasActiveSession: true,
         mode: session['mode'] ?? 'earn',
-        zoneName: zone?['name'] ?? '',
-        zoneCity: zone?['city'] ?? '',
+        zoneName: '',
+        zoneCity: '',
         sessionEarnings: (session['session_earnings'] as num?)?.toDouble() ?? 0,
         ordersCompleted: (session['orders_completed'] as num?)?.toInt() ?? 0,
         distanceKm: (session['distance_km'] as num?)?.toDouble() ?? 0,
