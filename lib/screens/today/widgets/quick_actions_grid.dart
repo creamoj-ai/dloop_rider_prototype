@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/tokens.dart';
 import '../../../providers/rider_stats_provider.dart';
@@ -148,7 +149,7 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => Padding(
+      builder: (_) => SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -169,6 +170,10 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
               ],
             ),
             const SizedBox(height: 20),
+            _botItem(Icons.smart_toy, 'Assistente AI dloop', 'Consigli, FAQ, obiettivi e motivazione', AppColors.earningsGreen, cs, context, onTapOverride: () {
+              Navigator.pop(context);
+              context.push('/today/ai-chat');
+            }),
             _botItem(Icons.shopping_bag, 'WhatsApp Market Bot', 'Gestisci ordini del tuo marketplace', AppColors.earningsGreen, cs, context, notificationCount: _whatsappNotifications, onRead: _markWhatsappRead),
             _botItem(Icons.support_agent, 'Supporto Rider', 'Parla con il supporto dloop', AppColors.routeBlue, cs, context, notificationCount: _supportNotifications, onRead: _markSupportRead),
             _botItem(Icons.group, 'Community Riders', 'Chat gruppo riders della tua zona', AppColors.bonusPurple, cs, context, notificationCount: _communityNotifications, onRead: _markCommunityRead),
@@ -179,9 +184,9 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
     );
   }
 
-  Widget _botItem(IconData icon, String title, String subtitle, Color color, ColorScheme cs, BuildContext context, {int notificationCount = 0, VoidCallback? onRead}) {
+  Widget _botItem(IconData icon, String title, String subtitle, Color color, ColorScheme cs, BuildContext context, {int notificationCount = 0, VoidCallback? onRead, VoidCallback? onTapOverride}) {
     return InkWell(
-      onTap: () {
+      onTap: onTapOverride ?? () {
         Navigator.pop(context);
         onRead?.call();
         ScaffoldMessenger.of(context).showSnackBar(

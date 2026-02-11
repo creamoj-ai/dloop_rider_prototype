@@ -81,7 +81,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     // Rileva nuovi guadagni dal Network e mostra popup celebration
     if (networkState.networkEarnings.length > _lastNetworkEarningsCount && _lastNetworkEarningsCount > 0) {
       // Nuovo guadagno dal Network! Mostra popup
-      final latestEarning = networkState.networkEarnings.last;
+      // Stream ordina per processed_at DESC, quindi il più recente è il primo
+      final latestEarning = networkState.networkEarnings.first;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notificationController.show(
           amount: latestEarning.amount,

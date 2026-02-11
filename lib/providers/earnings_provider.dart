@@ -7,7 +7,6 @@ import '../models/earning.dart';
 import '../services/rush_hour_service.dart';
 import '../services/orders_service.dart';
 import '../services/earnings_service.dart';
-import '../utils/retry.dart';
 import '../widgets/earning_notification.dart';
 import '../data/mock_data.dart';
 
@@ -516,28 +515,50 @@ class NetworkEarningsState {
 
 /// Notifier per i guadagni Network
 class NetworkEarningsNotifier extends StateNotifier<NetworkEarningsState> {
+  StreamSubscription<List<Earning>>? _earningsSub;
+
   NetworkEarningsNotifier() : super(const NetworkEarningsState()) {
-    _loadInitialData();
+    _subscribeToNetworkEarnings();
   }
 
-  Future<void> _loadInitialData() async {
-    // Try Supabase first
+  /// Subscribe to real-time earnings stream, filtering for network types
+  void _subscribeToNetworkEarnings() {
     try {
-      final earnings = await EarningsService.getEarnings();
-      final networkEarnings = earnings
-          .where((e) => e.type == EarningType.network && e.status == EarningStatus.completed)
-          .toList();
+      _earningsSub = EarningsService.subscribeToEarnings().listen(
+        (allEarnings) {
+          final networkEarnings = allEarnings
+              .where((e) => e.type == EarningType.network && e.status == EarningStatus.completed)
+              .toList();
 
-      if (networkEarnings.isNotEmpty) {
-        state = NetworkEarningsState(
-          networkEarnings: networkEarnings,
-          notifiedCount: networkEarnings.length,
-        );
-        return;
-      }
-    } catch (_) {}
+          if (networkEarnings.isNotEmpty) {
+            _applyNetworkEarnings(networkEarnings);
+          } else if (state.networkEarnings.isEmpty) {
+            _loadFallbackData();
+          }
+        },
+        onError: (e) {
+          print('⚡ NetworkEarningsNotifier stream error: $e');
+          if (state.networkEarnings.isEmpty) _loadFallbackData();
+        },
+      );
+    } catch (_) {
+      _loadFallbackData();
+    }
+  }
 
-    // Fallback to mock data
+  /// Apply incoming network earnings, preserving notifiedCount on first load
+  void _applyNetworkEarnings(List<Earning> networkEarnings) {
+    final isFirstLoad = state.networkEarnings.isEmpty && state.notifiedCount == 0;
+    state = NetworkEarningsState(
+      networkEarnings: networkEarnings,
+      // First load: mark all as notified (no popup spam on app start)
+      // Subsequent updates: keep existing notifiedCount so new ones trigger popup
+      notifiedCount: isFirstLoad ? networkEarnings.length : state.notifiedCount,
+    );
+  }
+
+  /// Fallback to mock data when Supabase is unavailable
+  void _loadFallbackData() {
     final networkEarnings = MockData.transactions
         .where((e) => e.type == EarningType.network && e.status == EarningStatus.completed)
         .toList();
@@ -546,6 +567,12 @@ class NetworkEarningsNotifier extends StateNotifier<NetworkEarningsState> {
       networkEarnings: networkEarnings,
       notifiedCount: networkEarnings.length,
     );
+  }
+
+  @override
+  void dispose() {
+    _earningsSub?.cancel();
+    super.dispose();
   }
 
   /// Simula arrivo di un nuovo guadagno Network (per demo/test)

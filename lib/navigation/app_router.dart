@@ -20,6 +20,7 @@ import '../screens/you/pricing_settings_screen.dart';
 import '../screens/you/settings_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
 import '../screens/support/support_chat_screen.dart';
+import '../screens/chatbot/chatbot_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -72,6 +73,7 @@ final appRouter = GoRouter(
                 return DeliveryNavigationScreen(orderId: orderId);
               },
             ),
+            GoRoute(path: 'ai-chat', builder: (context, state) => const ChatBotScreen()),
           ],
         ),
         GoRoute(
