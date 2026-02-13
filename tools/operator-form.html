@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dloop WoZ — Crea Ordine</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; padding: 20px; max-width: 480px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; color: #00e676; }
+    .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 24px; }
+    label { display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 4px; margin-top: 14px; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid #333; border-radius: 8px; background: #1a1a1a; color: #fff; font-size: 0.95rem; }
+    input:focus { outline: none; border-color: #00e676; }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    .earning-preview { margin-top: 20px; padding: 16px; background: #1a2e1a; border: 1px solid #00e676; border-radius: 12px; text-align: center; }
+    .earning-preview .amount { font-size: 2rem; font-weight: 700; color: #00e676; }
+    .earning-preview .label { font-size: 0.75rem; color: #888; }
+    button[type="submit"] { width: 100%; margin-top: 24px; padding: 14px; background: #00e676; color: #000; font-size: 1rem; font-weight: 700; border: none; border-radius: 12px; cursor: pointer; }
+    button[type="submit"]:hover { background: #00c853; }
+    button[type="submit"]:disabled { background: #333; color: #666; cursor: not-allowed; }
+    .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; z-index: 100; display: none; }
+    .toast.success { background: #00e676; color: #000; }
+    .toast.error { background: #f44336; color: #fff; }
+    .config-section { margin-bottom: 20px; padding: 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; }
+    .config-section summary { font-size: 0.8rem; color: #888; cursor: pointer; }
+    .config-section input { margin-top: 8px; font-family: monospace; font-size: 0.8rem; }
+    .order-log { margin-top: 24px; }
+    .order-log h3 { font-size: 0.85rem; color: #888; margin-bottom: 8px; }
+    .log-entry { padding: 8px 12px; background: #1a1a1a; border-radius: 6px; margin-bottom: 6px; font-size: 0.8rem; }
+    .log-entry .time { color: #888; }
+    .log-entry .id { color: #00e676; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>dloop Wizard of Oz</h1>
+  <p class="subtitle">Crea ordini manualmente per il rider</p>
+
+  <details class="config-section">
+    <summary>Configurazione</summary>
+    <label>Supabase URL</label>
+    <input type="text" id="cfgUrl" value="https://aqpwfurradxbnqvycvkm.supabase.co">
+    <label>Admin Key (WOZ_ADMIN_KEY)</label>
+    <input type="password" id="cfgKey" value="">
+    <label>Rider UUID</label>
+    <input type="text" id="cfgRider" value="" placeholder="UUID da Supabase Auth > Users">
+  </details>
+
+  <form id="orderForm">
+    <label>Nome Dealer *</label>
+    <input type="text" id="restaurantName" required placeholder="es. Pizzeria Da Mario">
+
+    <label>Indirizzo Dealer *</label>
+    <input type="text" id="restaurantAddress" required placeholder="es. Via Torino 25, Napoli">
+
+    <label>Nome Cliente *</label>
+    <input type="text" id="customerName" required placeholder="es. Marco Rossi">
+
+    <label>Indirizzo Cliente *</label>
+    <input type="text" id="customerAddress" required placeholder="es. Via Roma 15, Napoli">
+
+    <div class="row">
+      <div>
+        <label>Distanza (km) *</label>
+        <input type="number" id="distanceKm" step="0.1" min="0.5" required value="2.0">
+      </div>
+      <div>
+        <label>Mancia (EUR)</label>
+        <input type="number" id="tipAmount" step="0.50" min="0" value="0">
+      </div>
+    </div>
+
+    <div class="earning-preview">
+      <div class="label">Guadagno base stimato</div>
+      <div class="amount" id="earningPreview">€ 3.00</div>
+    </div>
+
+    <button type="submit" id="submitBtn">CREA ORDINE</button>
+  </form>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="order-log">
+    <h3>Ordini creati in questa sessione</h3>
+    <div id="logEntries"></div>
+  </div>
+
+  <script>
+    const RATE_PER_KM = 1.50;
+    const MIN_GUARANTEE = 3.00;
+
+    // Update earning preview
+    const distanceInput = document.getElementById('distanceKm');
+    const earningPreview = document.getElementById('earningPreview');
+
+    function updatePreview() {
+      const km = parseFloat(distanceInput.value) || 0;
+      const earning = Math.max(km * RATE_PER_KM, MIN_GUARANTEE);
+      earningPreview.textContent = `\u20AC ${earning.toFixed(2)}`;
+    }
+
+    distanceInput.addEventListener('input', updatePreview);
+    updatePreview();
+
+    // Toast
+    function showToast(message, type) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = `toast ${type}`;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 4000);
+    }
+
+    // Add log entry
+    function addLogEntry(orderId, dealerName, earning) {
+      const now = new Date().toLocaleTimeString('it-IT');
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      div.innerHTML = `<span class="time">${now}</span> — ${dealerName} — <span class="id">${orderId.slice(0, 8)}...</span> — \u20AC${earning.toFixed(2)}`;
+      document.getElementById('logEntries').prepend(div);
+    }
+
+    // Submit
+    document.getElementById('orderForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const supabaseUrl = document.getElementById('cfgUrl').value.replace(/\/$/, '');
+      const adminKey = document.getElementById('cfgKey').value;
+      const riderId = document.getElementById('cfgRider').value;
+
+      if (!adminKey || !riderId) {
+        showToast('Configura Admin Key e Rider UUID', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Invio...';
+
+      const body = {
+        rider_id: riderId,
+        restaurant_name: document.getElementById('restaurantName').value,
+        restaurant_address: document.getElementById('restaurantAddress').value,
+        customer_name: document.getElementById('customerName').value,
+        customer_address: document.getElementById('customerAddress').value,
+        distance_km: parseFloat(document.getElementById('distanceKm').value),
+        tip_amount: parseFloat(document.getElementById('tipAmount').value) || 0,
+      };
+
+      try {
+        const res = await fetch(`${supabaseUrl}/functions/v1/create-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Key': adminKey,
+          },
+          body: JSON.stringify(body),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          showToast(`Ordine creato! ${data.order_id.slice(0, 8)}...`, 'success');
+          addLogEntry(data.order_id, body.restaurant_name, data.base_earning);
+          // Reset form (keep config)
+          document.getElementById('restaurantName').value = '';
+          document.getElementById('restaurantAddress').value = '';
+          document.getElementById('customerName').value = '';
+          document.getElementById('customerAddress').value = '';
+          document.getElementById('distanceKm').value = '2.0';
+          document.getElementById('tipAmount').value = '0';
+          updatePreview();
+        } else {
+          showToast(`Errore: ${data.error}`, 'error');
+        }
+      } catch (err) {
+        showToast(`Network error: ${err.message}`, 'error');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'CREA ORDINE';
+    });
+
+    // Persist config in localStorage
+    ['cfgUrl', 'cfgKey', 'cfgRider'].forEach(id => {
+      const el = document.getElementById(id);
+      const saved = localStorage.getItem(`dloop_woz_${id}`);
+      if (saved) el.value = saved;
+      el.addEventListener('input', () => {
+        localStorage.setItem(`dloop_woz_${id}`, el.value);
+      });
+    });
+  </script>
+</body>
+</html>
