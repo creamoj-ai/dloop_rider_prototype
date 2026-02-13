@@ -13,11 +13,13 @@ class PartnerBenefitsService {
           .eq('is_active', true)
           .order('sort_order', ascending: true);
 
-      return (response as List)
+      final offers = (response as List)
           .map((json) => PartnerOffer.fromJson(json))
           .toList();
+      dlog('\u2705 PartnerBenefits: ${offers.length} offers loaded from Supabase');
+      return offers;
     } catch (e) {
-      dlog('\u274c PartnerBenefits getActiveOffers error: $e');
+      dlog('\u274c PartnerBenefits FALLBACK DEMO: $e');
       return _getDemoOffers();
     }
   }

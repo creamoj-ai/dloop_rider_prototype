@@ -1,7 +1,10 @@
 // Edge Function: whatsapp-webhook — WhatsApp Cloud API webhook handler
+// Routes messages to customer or dealer pipeline based on phone lookup.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
+import { normalizePhone } from "../_shared/phone_utils.ts";
 import { processInboundMessage } from "./processor.ts";
+import { processDealerMessage } from "./dealer_processor.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN") ?? "dloop_wa_verify_2026";
 
@@ -119,16 +122,49 @@ async function handleIncomingMessage(
   }
 
   try {
-    await processInboundMessage(db, inbound as {
-      phone: string;
-      text?: string;
-      name?: string;
-      audioMediaId?: string;
-      imageMediaId?: string;
-      imageCaption?: string;
-      latitude?: number;
-      longitude?: number;
-    });
+    // Route: check if sender is a dealer by matching phone in rider_contacts
+    const normalized = normalizePhone(phone);
+    const { data: dealerContacts } = await db
+      .from("rider_contacts")
+      .select("id, rider_id, name, phone")
+      .eq("contact_type", "dealer");
+
+    const matchedDealer = (dealerContacts ?? []).find(
+      (d: Record<string, unknown>) =>
+        normalizePhone(d.phone as string) === normalized
+    );
+
+    if (matchedDealer) {
+      // DEALER pipeline
+      console.log(`Routing to DEALER pipeline: ${matchedDealer.name}`);
+      await processDealerMessage(db, inbound as {
+        phone: string;
+        text?: string;
+        name?: string;
+        audioMediaId?: string;
+        imageMediaId?: string;
+        imageCaption?: string;
+        latitude?: number;
+        longitude?: number;
+      }, {
+        id: matchedDealer.id as string,
+        rider_id: matchedDealer.rider_id as string,
+        name: matchedDealer.name as string,
+      });
+    } else {
+      // CUSTOMER pipeline (existing)
+      console.log(`Routing to CUSTOMER pipeline: ${phone}`);
+      await processInboundMessage(db, inbound as {
+        phone: string;
+        text?: string;
+        name?: string;
+        audioMediaId?: string;
+        imageMediaId?: string;
+        imageCaption?: string;
+        latitude?: number;
+        longitude?: number;
+      });
+    }
   } catch (error) {
     console.error(`Failed to process message from ${phone}:`, error);
   }

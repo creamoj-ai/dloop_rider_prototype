@@ -101,10 +101,12 @@ class _AnimatedBottomNav extends StatelessWidget {
                     badge: _badges[2],
                     onTap: () => onTap(2),
                     accentColor: _proColor,
+                    alwaysAccent: true,
+                    showNewBadge: true,
                   ),
                   _NavItem(
-                    icon: Icons.shopping_cart,
-                    label: 'Market',
+                    icon: Icons.storefront,
+                    label: 'MyNegozio',
                     isSelected: currentIndex == 3,
                     badge: _badges[3],
                     onTap: () => onTap(3),
@@ -148,6 +150,8 @@ class _NavItem extends StatelessWidget {
   final int badge;
   final VoidCallback onTap;
   final Color? accentColor;
+  final bool alwaysAccent;
+  final bool showNewBadge;
 
   const _NavItem({
     required this.icon,
@@ -156,12 +160,19 @@ class _NavItem extends StatelessWidget {
     required this.badge,
     required this.onTap,
     this.accentColor,
+    this.alwaysAccent = false,
+    this.showNewBadge = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final activeColor = accentColor ?? const Color(0xFFFF6B00);
-    final color = isSelected ? activeColor : Colors.grey;
+    // alwaysAccent: icona e label sempre nel colore accent (anche quando non selezionato)
+    final color = isSelected
+        ? activeColor
+        : alwaysAccent
+            ? activeColor.withValues(alpha: 0.6)
+            : Colors.grey;
 
     return Expanded(
       child: GestureDetector(
@@ -185,7 +196,7 @@ class _NavItem extends StatelessWidget {
                       size: 24,
                     ),
                   ),
-                  // Badge dot
+                  // Badge dot (numeric)
                   if (badge > 0)
                     Positioned(
                       right: -4,
@@ -199,6 +210,27 @@ class _NavItem extends StatelessWidget {
                         ),
                       ),
                     ),
+                  // NEW badge
+                  if (showNewBadge && !isSelected)
+                    Positioned(
+                      right: -14,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: (accentColor ?? const Color(0xFFAA00FF)),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'NEW',
+                          style: GoogleFonts.inter(
+                            fontSize: 7,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -207,7 +239,11 @@ class _NavItem extends StatelessWidget {
                 duration: const Duration(milliseconds: 200),
                 style: GoogleFonts.inter(
                   fontSize: isSelected ? 11 : 10,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  fontWeight: isSelected
+                      ? FontWeight.w600
+                      : alwaysAccent
+                          ? FontWeight.w600
+                          : FontWeight.w500,
                   color: color,
                 ),
                 child: Text(label),

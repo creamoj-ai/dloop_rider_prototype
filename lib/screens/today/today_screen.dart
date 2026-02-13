@@ -30,7 +30,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   final _bannerController = InAppNotificationController();
   int _lastNotificationsCount = 0;
 
-  static const _kChatbotIntroPref = 'has_seen_chatbot_intro';
+  static const _kChatbotIntroPref = 'has_seen_chatbot_intro_v2';
 
   @override
   void initState() {
@@ -129,41 +129,77 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       child: EarningNotificationOverlay(
         controller: notificationController,
         child: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Top Bar stile Revolut
-            DloopTopBar(
-              isOnline: _isOnline,
-              notificationCount: unreadCount,
-              onSearchTap: () => SearchSheet.show(context, hint: 'Cerca zone, ordini...'),
-              onNotificationTap: () => NotificationsSheet.show(context),
-              onQuickActionTap: () => QuickActionsSheet.show(context),
-              searchHint: 'Cerca zone, ordini...',
-            ),
-            // Contenuto scrollabile
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const KpiStrip(),
-                        const SizedBox(height: 24),
-                        const ActiveModeCard(),
-                        const SizedBox(height: 12),
-                        const ActivityTab(),
-                        const SizedBox(height: 24),
-                        const HotZones(),
-                        const SizedBox(height: 24),
-                        const QuickActionsGrid(),
-                        const SizedBox(height: 24),
-                        const WellnessCard(),
-                        const SizedBox(height: 24),
-                      ],
+            Column(
+              children: [
+                // Top Bar stile Revolut
+                DloopTopBar(
+                  isOnline: _isOnline,
+                  notificationCount: unreadCount,
+                  onSearchTap: () => SearchSheet.show(context, hint: 'Cerca zone, ordini...'),
+                  onNotificationTap: () => NotificationsSheet.show(context),
+                  onQuickActionTap: () => QuickActionsSheet.show(context),
+                  searchHint: 'Cerca zone, ordini...',
+                ),
+                // Contenuto scrollabile
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const KpiStrip(),
+                            const SizedBox(height: 24),
+                            const ActiveModeCard(),
+                            const SizedBox(height: 12),
+                            const ActivityTab(),
+                            const SizedBox(height: 24),
+                            const HotZones(),
+                            const SizedBox(height: 24),
+                            const QuickActionsGrid(),
+                            const SizedBox(height: 24),
+                            const WellnessCard(),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
                     ),
+                  ),
+                ),
+              ],
+            ),
+            // FAB Assistente AI — posizionato in basso a destra
+            Positioned(
+              right: 16,
+              bottom: 12,
+              child: GestureDetector(
+                onTap: () => context.push('/today/ai-chat'),
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00C853), Color(0xFF00E676)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00C853).withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.assistant,
+                    color: Colors.white,
+                    size: 28,
                   ),
                 ),
               ),
