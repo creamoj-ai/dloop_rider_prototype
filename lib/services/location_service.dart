@@ -40,4 +40,18 @@ class LocationService {
       ),
     );
   }
+
+  /// Battery-efficient stream for background tracking.
+  /// Uses balanced accuracy and coarser distance filter.
+  static Stream<Position> getPositionStreamBalanced() async* {
+    final ok = await ensurePermission();
+    if (!ok) return;
+
+    yield* Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.low,
+        distanceFilter: 20,
+      ),
+    );
+  }
 }

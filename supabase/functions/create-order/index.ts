@@ -135,6 +135,27 @@ serve(async (req: Request) => {
       }
     }
 
+    // Auto-dispatch: trigger Smart Dispatch (fire-and-forget)
+    let dispatchResult: Record<string, unknown> | null = null;
+    try {
+      const dispatchRes = await fetch(
+        `${Deno.env.get("SUPABASE_URL")}/functions/v1/dispatch-order`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Key": WOZ_ADMIN_KEY,
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY") ?? ""}`,
+          },
+          body: JSON.stringify({ order_id: orderId }),
+        }
+      );
+      dispatchResult = await dispatchRes.json();
+      console.log("Auto-dispatch result:", dispatchResult);
+    } catch (dispatchErr) {
+      console.error("Auto-dispatch failed (non-blocking):", dispatchErr);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -142,6 +163,7 @@ serve(async (req: Request) => {
         base_earning: baseEarning,
         rider_id: rider_id,
         relay_id: relayId,
+        dispatch: dispatchResult,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

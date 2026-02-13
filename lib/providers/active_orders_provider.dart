@@ -27,6 +27,9 @@ class ActiveOrder {
   final String? orderNotes;
   final DateTime acceptedAt;
   final bool isDemo;
+  final bool isPriorityAssigned;
+  final DateTime? priorityExpiresAt;
+  final int dispatchAttempt;
   OrderPhase phase;
 
   ActiveOrder({
@@ -38,6 +41,9 @@ class ActiveOrder {
     this.orderNotes,
     required this.acceptedAt,
     this.isDemo = false,
+    this.isPriorityAssigned = false,
+    this.priorityExpiresAt,
+    this.dispatchAttempt = 0,
     this.phase = OrderPhase.toPickup,
   });
 
@@ -58,6 +64,12 @@ class ActiveOrder {
         phase = OrderPhase.completed;
     }
 
+    // Check if this order is priority-assigned to the current rider
+    final hasPriority = order.assignedRiderId != null &&
+        order.priorityExpiresAt != null &&
+        order.priorityExpiresAt!.isAfter(DateTime.now()) &&
+        order.status == OrderStatus.pending;
+
     return ActiveOrder(
       id: order.id,
       dealerName: order.restaurantName,
@@ -66,6 +78,9 @@ class ActiveOrder {
       distanceKm: order.distanceKm,
       orderNotes: null,
       acceptedAt: order.acceptedAt ?? order.createdAt,
+      isPriorityAssigned: hasPriority,
+      priorityExpiresAt: order.priorityExpiresAt,
+      dispatchAttempt: order.dispatchAttempts,
       phase: phase,
     );
   }
@@ -109,7 +124,10 @@ class ActiveOrder {
   }
 
   /// Copia con nuovo stato
-  ActiveOrder copyWith({OrderPhase? phase}) {
+  ActiveOrder copyWith({
+    OrderPhase? phase,
+    bool? isPriorityAssigned,
+  }) {
     return ActiveOrder(
       id: id,
       dealerName: dealerName,
@@ -119,6 +137,9 @@ class ActiveOrder {
       orderNotes: orderNotes,
       acceptedAt: acceptedAt,
       isDemo: isDemo,
+      isPriorityAssigned: isPriorityAssigned ?? this.isPriorityAssigned,
+      priorityExpiresAt: priorityExpiresAt,
+      dispatchAttempt: dispatchAttempt,
       phase: phase ?? this.phase,
     );
   }
@@ -266,6 +287,14 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
   void reload() {
     _ordersSub?.cancel();
     _subscribeToOrders();
+  }
+
+  /// Rifiuta un ordine assegnato via Smart Dispatch
+  void rejectAssignedOrder(String orderId) {
+    state = state.copyWith(
+      availableOrders: state.availableOrders.where((o) => o.id != orderId).toList(),
+    );
+    OrdersService.rejectAssignedOrder(orderId);
   }
 
   /// Accetta un ordine disponibile

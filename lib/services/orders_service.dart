@@ -112,6 +112,55 @@ class OrdersService {
     }
   }
 
+  /// Accept a priority-assigned order (Smart Dispatch)
+  static Future<void> acceptAssignedOrder(String orderId) async {
+    final riderId = _riderId;
+    if (riderId == null) return;
+
+    try {
+      await retry(() async {
+        await _client
+            .from('orders')
+            .update({
+              'rider_id': riderId,
+              'status': OrderStatus.accepted.name,
+              'accepted_at': DateTime.now().toIso8601String(),
+              'dispatch_status': 'assigned',
+            })
+            .eq('id', orderId)
+            .eq('assigned_rider_id', riderId);
+      }, onRetry: (attempt, e) {
+        dlog('⚡ OrdersService.acceptAssignedOrder retry $attempt: $e');
+      });
+    } catch (e) {
+      dlog('❌ OrdersService.acceptAssignedOrder failed: $e');
+    }
+  }
+
+  /// Reject a priority-assigned order (Smart Dispatch)
+  static Future<void> rejectAssignedOrder(String orderId) async {
+    final riderId = _riderId;
+    if (riderId == null) return;
+
+    try {
+      await retry(() async {
+        await _client
+            .from('orders')
+            .update({
+              'assigned_rider_id': null,
+              'priority_expires_at': null,
+              'dispatch_status': 'pending',
+            })
+            .eq('id', orderId)
+            .eq('assigned_rider_id', riderId);
+      }, onRetry: (attempt, e) {
+        dlog('⚡ OrdersService.rejectAssignedOrder retry $attempt: $e');
+      });
+    } catch (e) {
+      dlog('❌ OrdersService.rejectAssignedOrder failed: $e');
+    }
+  }
+
   /// Subscribe to real-time order updates (with auto-reconnect)
   /// Includes rider's own orders + broadcast orders (via RLS policy)
   static Stream<List<Order>> subscribeToOrders() {

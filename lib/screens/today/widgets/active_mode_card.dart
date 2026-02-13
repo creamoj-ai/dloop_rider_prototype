@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../../../theme/tokens.dart';
 import '../../../providers/earnings_provider.dart';
 import '../../../providers/active_orders_provider.dart';
 import '../../../services/rush_hour_service.dart';
+import 'countdown_timer.dart';
 
 class ActiveModeCard extends ConsumerWidget {
   const ActiveModeCard({super.key});
@@ -17,7 +19,9 @@ class ActiveModeCard extends ConsumerWidget {
     final earnings = ref.watch(earningsProvider);
     final target = earnings.dailyTarget;
     final isRushHour = RushHourService.isRushHourNow();
-    final availableOrders = ordersState.availableOrders;
+    final allAvailable = ordersState.availableOrders;
+    final priorityOrders = allAvailable.where((o) => o.isPriorityAssigned).toList();
+    final availableOrders = allAvailable.where((o) => !o.isPriorityAssigned).toList();
     final activeOrders = ordersState.orders.where((o) => o.phase != OrderPhase.completed).toList();
 
     return Container(
@@ -36,6 +40,11 @@ class ActiveModeCard extends ConsumerWidget {
           // Active orders banner (if any)
           if (activeOrders.isNotEmpty)
             _buildActiveOrderBanner(context, cs, activeOrders),
+
+          // Priority-assigned orders (Smart Dispatch)
+          if (priorityOrders.isNotEmpty)
+            ...priorityOrders.map((order) =>
+              _buildPriorityOrderCard(context, ref, cs, order, isRushHour)),
 
           // Header
           _buildHeader(context, ref, cs, isRushHour, availableOrders.length),
@@ -85,6 +94,151 @@ class ActiveModeCard extends ConsumerWidget {
             Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.routeBlue),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Card ordine assegnato via Smart Dispatch (priority)
+  Widget _buildPriorityOrderCard(BuildContext context, WidgetRef ref, ColorScheme cs, ActiveOrder order, bool isRushHour) {
+    const orangeAccent = Color(0xFFFF9800);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(Spacing.md, Spacing.md, Spacing.md, 0),
+      padding: const EdgeInsets.all(Spacing.md),
+      decoration: BoxDecoration(
+        color: orangeAccent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(Radii.md),
+        border: Border.all(color: orangeAccent.withValues(alpha: 0.5), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: "ASSEGNATO A TE" + countdown
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: orangeAccent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt, size: 14, color: orangeAccent),
+                    const SizedBox(width: 4),
+                    Text(
+                      'ASSEGNATO A TE',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: orangeAccent,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              if (order.priorityExpiresAt != null)
+                CountdownTimer(
+                  expiresAt: order.priorityExpiresAt!,
+                  onExpired: () => ref.read(activeOrdersProvider.notifier).rejectAssignedOrder(order.id),
+                ),
+            ],
+          ),
+          const SizedBox(height: Spacing.md),
+          // Dealer info + earning
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.dealerName,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${order.customerAddress} • ${order.distanceKm} km',
+                      style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: Spacing.md),
+              Text(
+                '€${(isRushHour ? order.totalEarning : order.baseEarning).toStringAsFixed(2)}',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.earningsGreen,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Spacing.md),
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => ref.read(activeOrdersProvider.notifier).rejectAssignedOrder(order.id),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    side: const BorderSide(color: Color(0xFFEF4444)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.sm)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  child: Text('RIFIUTA', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700)),
+                ),
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: () {
+                    ref.read(activeOrdersProvider.notifier).acceptOrder(order);
+                    context.push('/today/delivery', extra: order.id);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.earningsGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.sm)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('ACCETTA', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // Debug: dispatch attempt info
+          if (kDebugMode && order.dispatchAttempt > 0) ...[
+            const SizedBox(height: Spacing.sm),
+            Text(
+              'Tentativo #${order.dispatchAttempt}',
+              style: GoogleFonts.inter(fontSize: 10, color: cs.onSurfaceVariant),
+            ),
+          ],
+        ],
       ),
     );
   }

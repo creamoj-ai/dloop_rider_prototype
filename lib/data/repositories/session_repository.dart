@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/location_tracking_service.dart';
 
 class SessionRepository {
   final _client = Supabase.instance.client;
@@ -43,6 +44,9 @@ class SessionRepository {
         .select('id')
         .single();
 
+    // Start GPS tracking for Smart Dispatch
+    await LocationTrackingService.startTracking();
+
     return res['id'] as String?;
   }
 
@@ -62,6 +66,9 @@ class SessionRepository {
         .update(updates)
         .eq('id', sessionId)
         .eq('rider_id', _userId!);
+
+    // Stop GPS tracking
+    LocationTrackingService.stopTracking();
   }
 
   /// Update session metrics (orders, earnings, distance)
