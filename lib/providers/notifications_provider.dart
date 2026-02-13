@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/notification.dart';
 import '../services/notification_service.dart';
+import '../utils/logger.dart';
 
 class NotificationsState {
   final List<AppNotification> notifications;
@@ -43,7 +44,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         );
       },
       onError: (e) {
-        print('❌ NotificationsNotifier stream error: $e');
+        dlog('❌ NotificationsNotifier stream error: $e');
         // Keep current state but stop loading
         state = state.copyWith(isLoading: false);
       },

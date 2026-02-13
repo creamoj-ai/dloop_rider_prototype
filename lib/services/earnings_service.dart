@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/earning.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 
 class EarningsService {
@@ -29,10 +30,10 @@ class EarningsService {
             .map((json) => Earning.fromJson(json))
             .toList();
       }, onRetry: (attempt, e) {
-        print('⚡ EarningsService.getEarnings retry $attempt: $e');
+        dlog('⚡ EarningsService.getEarnings retry $attempt: $e');
       });
     } catch (e) {
-      print('❌ EarningsService.getEarnings failed after retries: $e');
+      dlog('❌ EarningsService.getEarnings failed after retries: $e');
       return [];
     }
   }
@@ -49,10 +50,10 @@ class EarningsService {
           ...earning.toJson(),
         });
       }, onRetry: (attempt, e) {
-        print('⚡ EarningsService.createEarning retry $attempt: $e');
+        dlog('⚡ EarningsService.createEarning retry $attempt: $e');
       });
     } catch (e) {
-      print('❌ EarningsService.createEarning failed after retries: $e');
+      dlog('❌ EarningsService.createEarning failed after retries: $e');
     }
   }
 
@@ -71,7 +72,7 @@ class EarningsService {
           .order('processed_at', ascending: false)
           .map((data) => data.map((json) => Earning.fromJson(json)).toList()),
       onReconnect: (attempt, e) {
-        print('⚡ EarningsService.subscribeToEarnings reconnect $attempt: $e');
+        dlog('⚡ EarningsService.subscribeToEarnings reconnect $attempt: $e');
       },
     );
   }

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/dealer_platform.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 
 class DealerPlatformService {
@@ -23,7 +24,7 @@ class DealerPlatformService {
           .map((data) =>
               data.map((json) => DealerPlatform.fromJson(json)).toList()),
       onReconnect: (attempt, e) {
-        print('⚡ DealerPlatformService.subscribeToPlatforms reconnect $attempt: $e');
+        dlog('⚡ DealerPlatformService.subscribeToPlatforms reconnect $attempt: $e');
       },
     );
   }
@@ -53,7 +54,7 @@ class DealerPlatformService {
         'is_active': true,
       });
     }, onRetry: (attempt, e) {
-      print('⚡ DealerPlatformService.addPlatform retry $attempt: $e');
+      dlog('⚡ DealerPlatformService.addPlatform retry $attempt: $e');
     });
   }
 
@@ -83,7 +84,7 @@ class DealerPlatformService {
           .eq('id', platformId)
           .eq('rider_id', riderId);
     }, onRetry: (attempt, e) {
-      print('⚡ DealerPlatformService.updatePlatform retry $attempt: $e');
+      dlog('⚡ DealerPlatformService.updatePlatform retry $attempt: $e');
     });
   }
 

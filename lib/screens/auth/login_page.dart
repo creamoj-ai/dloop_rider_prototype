@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:email_validator/email_validator.dart';
 import '../../theme/tokens.dart';
 import '../../providers/user_provider.dart';
+import '../../utils/logger.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -73,7 +77,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<void> _initGoogleSignIn() async {
     if (_googleInitialized) return;
     await GoogleSignIn.instance.initialize(
-      serverClientId: '793691819503-3k2shu09t4jrearijhd4eds9aotjmvd7.apps.googleusercontent.com',
+      serverClientId: dotenv.env['GOOGLE_CLIENT_ID'] ?? '',
     );
     _googleInitialized = true;
   }
@@ -106,7 +110,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         }
       }
     } on GoogleSignInException catch (e) {
-      debugPrint('GoogleSignInException: code=${e.code}, details=$e');
+      dlog('GoogleSignInException: code=${e.code}, details=$e');
       if (e.code == GoogleSignInExceptionCode.canceled) {
         // User cancelled — do nothing
       } else {
@@ -115,13 +119,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         });
       }
     } on AuthException catch (e) {
-      debugPrint('AuthException on Google Sign-In: ${e.message}');
+      dlog('AuthException on Google Sign-In: ${e.message}');
       setState(() {
         _errorMessage = _translateError(e.message);
       });
     } catch (e, st) {
-      debugPrint('Google Sign-In error: $e');
-      debugPrint('Stack: $st');
+      dlog('Google Sign-In error: $e');
+      dlog('Stack: $st');
       setState(() {
         _errorMessage = 'Errore Google: $e';
       });
@@ -142,18 +146,45 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return 'Errore: $error';
   }
 
+  DateTime? _lastResetRequestTime;
+
   void _showForgotPasswordDialog() {
     final resetEmailController = TextEditingController(text: _emailController.text);
     bool isResetting = false;
     String? resetError;
     bool emailSent = false;
+    int cooldownSeconds = 0;
+    Timer? cooldownTimer;
+
+    // Check if we're still in cooldown from a previous request
+    if (_lastResetRequestTime != null) {
+      final elapsed = DateTime.now().difference(_lastResetRequestTime!).inSeconds;
+      if (elapsed < 60) {
+        cooldownSeconds = 60 - elapsed;
+      }
+    }
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
+        builder: (context, setModalState) {
+          void startCooldown() {
+            cooldownSeconds = 60;
+            _lastResetRequestTime = DateTime.now();
+            cooldownTimer?.cancel();
+            cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+              if (cooldownSeconds <= 0) {
+                timer.cancel();
+                setModalState(() => cooldownSeconds = 0);
+              } else {
+                setModalState(() => cooldownSeconds--);
+              }
+            });
+          }
+
+          return Container(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
@@ -215,8 +246,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 // Description
                 Text(
                   emailSent
-                      ? 'Se l\'email è associata a un account, riceverai un link entro pochi minuti. Non ricevi nulla? L\'email potrebbe non essere registrata.'
-                      : 'Inserisci l\'email del tuo account. Se non è registrata, non riceverai alcun link.',
+                      ? 'Se l\'account esiste, riceverai un\'email con il link per reimpostare la password.'
+                      : 'Inserisci l\'email del tuo account.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 14,
@@ -298,11 +329,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: isResetting
+                      onPressed: (isResetting || cooldownSeconds > 0)
                           ? null
                           : () async {
                               final email = resetEmailController.text.trim();
-                              if (email.isEmpty || !email.contains('@')) {
+                              if (email.isEmpty || !EmailValidator.validate(email)) {
                                 setModalState(() {
                                   resetError = 'Inserisci un\'email valida';
                                 });
@@ -316,18 +347,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
                               try {
                                 await Supabase.instance.client.auth.resetPasswordForEmail(email);
+                                startCooldown();
                                 setModalState(() {
                                   emailSent = true;
                                   isResetting = false;
                                 });
-                              } on AuthException catch (e) {
+                              } catch (_) {
+                                // Anti-enumeration: always show success message
+                                startCooldown();
                                 setModalState(() {
-                                  resetError = e.message;
-                                  isResetting = false;
-                                });
-                              } catch (e) {
-                                setModalState(() {
-                                  resetError = 'Errore di connessione. Riprova.';
+                                  emailSent = true;
                                   isResetting = false;
                                 });
                               }
@@ -351,7 +380,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               ),
                             )
                           : Text(
-                              'INVIA LINK',
+                              cooldownSeconds > 0
+                                  ? 'Riprova tra ${cooldownSeconds}s'
+                                  : 'INVIA LINK',
                               style: GoogleFonts.inter(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -389,7 +420,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ],
             ),
           ),
-        ),
+        );
+        },
       ),
     );
   }
@@ -506,7 +538,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           if (value == null || value.isEmpty) {
                             return 'Inserisci la tua email';
                           }
-                          if (!value.contains('@')) {
+                          if (!EmailValidator.validate(value)) {
                             return 'Email non valida';
                           }
                           return null;

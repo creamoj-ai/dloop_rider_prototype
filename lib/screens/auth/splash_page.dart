@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme/tokens.dart';
 import '../../services/biometric_service.dart';
 import '../../services/preferences_service.dart';
+import '../../utils/logger.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -19,6 +20,8 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
   bool _biometricFailed = false;
+  int _biometricAttempts = 0;
+  static const int _maxBiometricAttempts = 5;
 
   @override
   void initState() {
@@ -92,13 +95,10 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     if (authenticated) {
       context.go('/today');
     } else {
+      _biometricAttempts++;
+      dlog('Biometric attempt $_biometricAttempts/$_maxBiometricAttempts failed');
       setState(() => _biometricFailed = true);
     }
-  }
-
-  void _goToLogin() {
-    Supabase.instance.client.auth.signOut();
-    context.go('/login');
   }
 
   @override
@@ -160,47 +160,72 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                     const SizedBox(height: 48),
                     // Loading indicator or biometric retry
                     if (_biometricFailed) ...[
-                      const Icon(
-                        Icons.fingerprint,
+                      Icon(
+                        _biometricAttempts >= _maxBiometricAttempts
+                            ? Icons.lock
+                            : Icons.fingerprint,
                         size: 48,
-                        color: AppColors.turboOrange,
+                        color: _biometricAttempts >= _maxBiometricAttempts
+                            ? AppColors.urgentRed
+                            : AppColors.turboOrange,
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Autenticazione fallita',
+                        _biometricAttempts >= _maxBiometricAttempts
+                            ? 'Accesso bloccato'
+                            : 'Autenticazione fallita',
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           color: Colors.white70,
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _biometricAttempts >= _maxBiometricAttempts
+                            ? 'Troppi tentativi falliti'
+                            : '${_maxBiometricAttempts - _biometricAttempts} tentativi rimasti',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
+                      ),
                       const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        onPressed: _retryBiometric,
-                        icon: const Icon(Icons.fingerprint, size: 20),
-                        label: Text(
-                          'Riprova',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.turboOrange,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      if (_biometricAttempts >= _maxBiometricAttempts)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            // Could open email/phone support in future
+                          },
+                          icon: const Icon(Icons.support_agent, size: 20),
+                          label: Text(
+                            'Contatta supporto',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[700],
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        )
+                      else
+                        ElevatedButton.icon(
+                          onPressed: _retryBiometric,
+                          icon: const Icon(Icons.fingerprint, size: 20),
+                          label: Text(
+                            'Riprova',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.turboOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: _goToLogin,
-                        child: Text(
-                          'Accedi con email',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: Colors.white38,
-                          ),
-                        ),
-                      ),
                     ] else
                       SizedBox(
                         width: 24,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/chat_message.dart';
 import '../services/support_chat_service.dart';
+import '../utils/logger.dart';
 
 class SupportChatState {
   final SupportConversation? activeConversation;
@@ -52,7 +53,7 @@ class SupportChatNotifier extends StateNotifier<SupportChatState> {
       _subscribeToMessages(conversation.id);
       await SupportChatService.markMessagesAsRead(conversation.id);
     } catch (e) {
-      print('❌ SupportChatNotifier.openOrCreateConversation failed: $e');
+      dlog('❌ SupportChatNotifier.openOrCreateConversation failed: $e');
       state = state.copyWith(isLoading: false);
     }
   }
@@ -64,7 +65,7 @@ class SupportChatNotifier extends StateNotifier<SupportChatState> {
         state = state.copyWith(messages: messages);
       },
       onError: (e) {
-        print('❌ SupportChatNotifier messages stream error: $e');
+        dlog('❌ SupportChatNotifier messages stream error: $e');
       },
     );
   }
@@ -80,7 +81,7 @@ class SupportChatNotifier extends StateNotifier<SupportChatState> {
       await SupportChatService.sendMessage(conversation.id, body.trim());
       state = state.copyWith(isSending: false);
     } catch (e) {
-      print('❌ SupportChatNotifier.sendMessage failed: $e');
+      dlog('❌ SupportChatNotifier.sendMessage failed: $e');
       state = state.copyWith(isSending: false);
     }
   }

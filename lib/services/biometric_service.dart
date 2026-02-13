@@ -1,4 +1,5 @@
 import 'package:local_auth/local_auth.dart';
+import '../utils/logger.dart';
 
 class BiometricService {
   static final _auth = LocalAuthentication();
@@ -36,7 +37,7 @@ class BiometricService {
         ),
       );
     } catch (e) {
-      print('❌ BiometricService.authenticate failed: $e');
+      dlog('❌ BiometricService.authenticate failed: $e');
       return false;
     }
   }

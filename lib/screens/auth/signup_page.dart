@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:email_validator/email_validator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -76,7 +77,7 @@ class _SignupPageState extends State<SignupPage> {
       return 'Questa email è già registrata';
     }
     if (error.contains('Password should be')) {
-      return 'La password deve avere almeno 6 caratteri';
+      return 'Minimo 8 caratteri, 1 maiuscola, 1 numero';
     }
     if (error.contains('Invalid email')) {
       return 'Email non valida';
@@ -294,7 +295,7 @@ class _SignupPageState extends State<SignupPage> {
                           if (value == null || value.isEmpty) {
                             return 'Inserisci la tua email';
                           }
-                          if (!value.contains('@') || !value.contains('.')) {
+                          if (!EmailValidator.validate(value)) {
                             return 'Email non valida';
                           }
                           return null;
@@ -306,7 +307,7 @@ class _SignupPageState extends State<SignupPage> {
                       _buildTextField(
                         controller: _passwordController,
                         label: 'Password',
-                        hint: 'Minimo 6 caratteri',
+                        hint: 'Minimo 8 caratteri, 1 maiuscola, 1 numero',
                         icon: Icons.lock_outline,
                         obscureText: _obscurePassword,
                         suffixIcon: IconButton(
@@ -321,8 +322,14 @@ class _SignupPageState extends State<SignupPage> {
                           if (value == null || value.isEmpty) {
                             return 'Inserisci una password';
                           }
-                          if (value.length < 6) {
-                            return 'Minimo 6 caratteri';
+                          if (value.length < 8) {
+                            return 'Minimo 8 caratteri';
+                          }
+                          if (!value.contains(RegExp(r'[A-Z]'))) {
+                            return 'Almeno 1 lettera maiuscola';
+                          }
+                          if (!value.contains(RegExp(r'[0-9]'))) {
+                            return 'Almeno 1 numero';
                           }
                           return null;
                         },

@@ -80,12 +80,12 @@ void main() {
         'test@test.com',
       );
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Minimo 6 caratteri'),
-        'password123',
+        find.widgetWithText(TextFormField, 'Minimo 8 caratteri, 1 maiuscola, 1 numero'),
+        'Password123',
       );
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Ripeti la password'),
-        'differentpassword',
+        'DifferentPass1',
       );
 
       // Scroll down to make REGISTRATI visible

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 
 /// Rider stats from the rider_stats table (lifetime + gamification)
@@ -83,10 +84,10 @@ final riderStatsProvider = FutureProvider<RiderStats>((ref) async {
 
       return RiderStats.fromJson(response);
     }, onRetry: (attempt, e) {
-      print('⚡ riderStatsProvider retry $attempt: $e');
+      dlog('⚡ riderStatsProvider retry $attempt: $e');
     });
   } catch (e) {
-    print('❌ riderStatsProvider failed: $e');
+    dlog('❌ riderStatsProvider failed: $e');
     return const RiderStats();
   }
 });

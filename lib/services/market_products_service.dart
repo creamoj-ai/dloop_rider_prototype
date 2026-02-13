@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/market_product.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 
 class MarketProductsService {
@@ -21,7 +22,7 @@ class MarketProductsService {
           .map((data) =>
               data.map((json) => MarketProduct.fromJson(json)).toList()),
       onReconnect: (attempt, e) {
-        print('⚡ MarketProductsService.subscribeToProducts reconnect $attempt: $e');
+        dlog('⚡ MarketProductsService.subscribeToProducts reconnect $attempt: $e');
       },
     );
   }
@@ -42,7 +43,7 @@ class MarketProductsService {
           .map((json) => MarketProduct.fromJson(json))
           .toList();
     }, onRetry: (attempt, e) {
-      print('⚡ MarketProductsService.getProducts retry $attempt: $e');
+      dlog('⚡ MarketProductsService.getProducts retry $attempt: $e');
     });
   }
 
@@ -71,7 +72,7 @@ class MarketProductsService {
         'image_url': imageUrl,
       });
     }, onRetry: (attempt, e) {
-      print('⚡ MarketProductsService.addProduct retry $attempt: $e');
+      dlog('⚡ MarketProductsService.addProduct retry $attempt: $e');
     });
   }
 
@@ -107,7 +108,7 @@ class MarketProductsService {
           .eq('id', productId)
           .eq('rider_id', riderId);
     }, onRetry: (attempt, e) {
-      print('⚡ MarketProductsService.updateProduct retry $attempt: $e');
+      dlog('⚡ MarketProductsService.updateProduct retry $attempt: $e');
     });
   }
 
@@ -152,10 +153,10 @@ class MarketProductsService {
             .eq('id', productId)
             .eq('rider_id', riderId);
       }, onRetry: (attempt, e) {
-        print('⚡ MarketProductsService.incrementSoldCount retry $attempt: $e');
+        dlog('⚡ MarketProductsService.incrementSoldCount retry $attempt: $e');
       });
     } catch (e) {
-      print('❌ MarketProductsService.incrementSoldCount failed: $e');
+      dlog('❌ MarketProductsService.incrementSoldCount failed: $e');
     }
   }
 }

@@ -5,12 +5,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../navigation/app_router.dart';
+import '../utils/logger.dart';
 
 /// Top-level handler for background FCM messages
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print('📩 Background FCM: ${message.notification?.title}');
+  dlog('📩 Background FCM: ${message.notification?.title}');
 }
 
 /// Service for Firebase Cloud Messaging push notifications
@@ -58,7 +59,7 @@ class PushNotificationService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      print('⚠️ Push notifications permission denied');
+      dlog('⚠️ Push notifications permission denied');
       return;
     }
 
@@ -143,11 +144,25 @@ class PushNotificationService {
     } catch (_) {}
   }
 
+  /// Allowed notification types for deep link navigation
+  static const _allowedTypes = <String>{
+    'new_order',
+    'order_update',
+    'order_accepted',
+    'order_cancelled',
+    'order_delivered',
+    'support_message',
+    'earnings',
+    'achievement',
+    'system',
+  };
+
   /// Navigate to the right screen based on notification type
   static void _navigateByType(Map<String, dynamic> data) {
     final type = data['type'] as String?;
-    if (type == null) {
-      appRouter.go('/today/notifications');
+    if (type == null || !_allowedTypes.contains(type)) {
+      // Unknown or missing type — navigate to safe default
+      appRouter.go('/today');
       return;
     }
 
@@ -185,9 +200,9 @@ class PushNotificationService {
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'rider_id,token');
 
-      print('✅ FCM token saved');
+      dlog('✅ FCM token saved');
     } catch (e) {
-      print('❌ Failed to save FCM token: $e');
+      dlog('❌ Failed to save FCM token: $e');
     }
   }
 
@@ -206,7 +221,7 @@ class PushNotificationService {
           .eq('rider_id', riderId)
           .eq('token', fcmToken);
     } catch (e) {
-      print('❌ Failed to remove FCM token: $e');
+      dlog('❌ Failed to remove FCM token: $e');
     }
   }
 }

@@ -7,6 +7,7 @@ import '../models/earning.dart';
 import '../services/rush_hour_service.dart';
 import '../services/orders_service.dart';
 import '../services/earnings_service.dart';
+import '../utils/logger.dart';
 import '../widgets/earning_notification.dart';
 
 /// Stato globale per i guadagni del rider
@@ -130,7 +131,7 @@ class EarningsNotifier extends StateNotifier<EarningsState> {
           }
         },
         onError: (e) {
-          print('⚡ EarningsNotifier stream error: $e');
+          dlog('⚡ EarningsNotifier stream error: $e');
           if (state.todayOrders.isEmpty) _loadDemoData();
         },
       );
@@ -536,7 +537,7 @@ class NetworkEarningsNotifier extends StateNotifier<NetworkEarningsState> {
           }
         },
         onError: (e) {
-          print('⚡ NetworkEarningsNotifier stream error: $e');
+          dlog('⚡ NetworkEarningsNotifier stream error: $e');
           if (state.networkEarnings.isEmpty) _loadFallbackData();
         },
       );

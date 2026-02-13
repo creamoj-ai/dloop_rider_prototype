@@ -24,6 +24,8 @@ class _ChatBotScreenState extends ConsumerState<ChatBotScreen> {
     'Cos\'è il costo di hold?',
     'Come migliorare il rating?',
     'Quali bonus posso ottenere?',
+    'Come funziona la consegna luxury?',
+    'Cos\'è la cauzione di €250?',
   ];
 
   @override

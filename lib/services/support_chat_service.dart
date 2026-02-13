@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/chat_message.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 
 class SupportChatService {
@@ -23,7 +24,7 @@ class SupportChatService {
           .map((json) => SupportConversation.fromJson(json))
           .toList();
     }, onRetry: (attempt, e) {
-      print('⚡ SupportChatService.getConversations retry $attempt: $e');
+      dlog('⚡ SupportChatService.getConversations retry $attempt: $e');
     });
   }
 
@@ -60,7 +61,7 @@ class SupportChatService {
 
       return SupportConversation.fromJson(response);
     }, onRetry: (attempt, e) {
-      print('⚡ SupportChatService.getOrCreateConversation retry $attempt: $e');
+      dlog('⚡ SupportChatService.getOrCreateConversation retry $attempt: $e');
     });
   }
 
@@ -77,7 +78,7 @@ class SupportChatService {
           .map((json) => ChatMessage.fromJson(json))
           .toList();
     }, onRetry: (attempt, e) {
-      print('⚡ SupportChatService.getMessages retry $attempt: $e');
+      dlog('⚡ SupportChatService.getMessages retry $attempt: $e');
     });
   }
 
@@ -106,7 +107,7 @@ class SupportChatService {
 
       return ChatMessage.fromJson(response);
     }, onRetry: (attempt, e) {
-      print('⚡ SupportChatService.sendMessage retry $attempt: $e');
+      dlog('⚡ SupportChatService.sendMessage retry $attempt: $e');
     });
   }
 
@@ -120,7 +121,7 @@ class SupportChatService {
           .neq('sender_type', 'rider')
           .eq('is_read', false);
     } catch (e) {
-      print('❌ SupportChatService.markMessagesAsRead failed: $e');
+      dlog('❌ SupportChatService.markMessagesAsRead failed: $e');
     }
   }
 
@@ -134,7 +135,7 @@ class SupportChatService {
           .order('created_at', ascending: true)
           .map((data) => data.map((json) => ChatMessage.fromJson(json)).toList()),
       onReconnect: (attempt, e) {
-        print('⚡ SupportChatService.subscribeToMessages reconnect $attempt: $e');
+        dlog('⚡ SupportChatService.subscribeToMessages reconnect $attempt: $e');
       },
     );
   }

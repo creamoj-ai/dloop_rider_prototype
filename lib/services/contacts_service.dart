@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/rider_contact.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 
 class ContactsService {
@@ -21,7 +22,7 @@ class ContactsService {
           .map((data) =>
               data.map((json) => RiderContact.fromJson(json)).toList()),
       onReconnect: (attempt, e) {
-        print('⚡ ContactsService.subscribeToContacts reconnect $attempt: $e');
+        dlog('⚡ ContactsService.subscribeToContacts reconnect $attempt: $e');
       },
     );
   }
@@ -45,7 +46,7 @@ class ContactsService {
         'phone': phone,
       });
     }, onRetry: (attempt, e) {
-      print('⚡ ContactsService.addContact retry $attempt: $e');
+      dlog('⚡ ContactsService.addContact retry $attempt: $e');
     });
   }
 

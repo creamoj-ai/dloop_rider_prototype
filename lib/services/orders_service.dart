@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/order.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 
 class OrdersService {
@@ -28,7 +29,7 @@ class OrdersService {
           .map((json) => Order.fromJson(json))
           .toList();
     }, onRetry: (attempt, e) {
-      print('⚡ OrdersService.getTodayOrders retry $attempt: $e');
+      dlog('⚡ OrdersService.getTodayOrders retry $attempt: $e');
     });
   }
 
@@ -79,10 +80,10 @@ class OrdersService {
             .eq('id', orderId)
             .eq('rider_id', riderId);
       }, onRetry: (attempt, e) {
-        print('⚡ OrdersService.updateOrderStatus retry $attempt: $e');
+        dlog('⚡ OrdersService.updateOrderStatus retry $attempt: $e');
       });
     } catch (e) {
-      print('❌ OrdersService.updateOrderStatus failed after retries: $e');
+      dlog('❌ OrdersService.updateOrderStatus failed after retries: $e');
     }
   }
 
@@ -104,10 +105,10 @@ class OrdersService {
             .eq('id', orderId)
             .eq('status', 'pending');
       }, onRetry: (attempt, e) {
-        print('⚡ OrdersService.acceptBroadcastOrder retry $attempt: $e');
+        dlog('⚡ OrdersService.acceptBroadcastOrder retry $attempt: $e');
       });
     } catch (e) {
-      print('❌ OrdersService.acceptBroadcastOrder failed: $e');
+      dlog('❌ OrdersService.acceptBroadcastOrder failed: $e');
     }
   }
 
@@ -127,7 +128,7 @@ class OrdersService {
           .order('created_at', ascending: false)
           .map((data) => data.map((json) => Order.fromJson(json)).toList()),
       onReconnect: (attempt, e) {
-        print('⚡ OrdersService.subscribeToOrders reconnect $attempt: $e');
+        dlog('⚡ OrdersService.subscribeToOrders reconnect $attempt: $e');
       },
     );
   }

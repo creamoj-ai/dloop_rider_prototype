@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';
 import '../models/earning.dart';
@@ -243,18 +244,19 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
           availableOrders: pending,
         );
 
-        // If no data at all, add demo fallback
-        if (orders.isEmpty && state.orders.isEmpty && state.availableOrders.isEmpty) {
+        // If no data at all, add demo fallback (debug only)
+        if (kDebugMode && orders.isEmpty && state.orders.isEmpty && state.availableOrders.isEmpty) {
           _loadDemoOrders();
         }
       },
       onError: (_) {
-        if (state.availableOrders.isEmpty) _loadDemoOrders();
+        if (kDebugMode && state.availableOrders.isEmpty) _loadDemoOrders();
       },
     );
   }
 
   void _loadDemoOrders() {
+    if (!kDebugMode) return;
     state = state.copyWith(
       availableOrders: List.generate(4, (_) => ActiveOrder.generate()),
     );
@@ -347,8 +349,9 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
     }
   }
 
-  /// Aggiorna lista ordini disponibili (demo fallback)
+  /// Aggiorna lista ordini disponibili (demo fallback, debug only)
   void refreshAvailableOrders() {
+    if (!kDebugMode) return;
     state = state.copyWith(
       availableOrders: List.generate(3 + Random().nextInt(3), (_) => ActiveOrder.generate()),
     );

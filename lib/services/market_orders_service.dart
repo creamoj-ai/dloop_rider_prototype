@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/earning.dart';
 import '../models/market_order.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 import 'earnings_service.dart';
 import 'market_products_service.dart';
@@ -24,7 +25,7 @@ class MarketOrdersService {
           .map((data) =>
               data.map((json) => MarketOrder.fromJson(json)).toList()),
       onReconnect: (attempt, e) {
-        print('⚡ MarketOrdersService.subscribeToMarketOrders reconnect $attempt: $e');
+        dlog('⚡ MarketOrdersService.subscribeToMarketOrders reconnect $attempt: $e');
       },
     );
   }
@@ -50,7 +51,7 @@ class MarketOrdersService {
           .map((json) => MarketOrder.fromJson(json))
           .toList();
     }, onRetry: (attempt, e) {
-      print('⚡ MarketOrdersService.getMarketOrders retry $attempt: $e');
+      dlog('⚡ MarketOrdersService.getMarketOrders retry $attempt: $e');
     });
   }
 
@@ -85,7 +86,7 @@ class MarketOrdersService {
         'notes': notes,
       });
     }, onRetry: (attempt, e) {
-      print('⚡ MarketOrdersService.createMarketOrder retry $attempt: $e');
+      dlog('⚡ MarketOrdersService.createMarketOrder retry $attempt: $e');
     });
   }
 
@@ -116,10 +117,10 @@ class MarketOrdersService {
             .eq('id', orderId)
             .eq('rider_id', riderId);
       }, onRetry: (attempt, e) {
-        print('⚡ MarketOrdersService.updateMarketOrderStatus retry $attempt: $e');
+        dlog('⚡ MarketOrdersService.updateMarketOrderStatus retry $attempt: $e');
       });
     } catch (e) {
-      print('❌ MarketOrdersService.updateMarketOrderStatus failed: $e');
+      dlog('❌ MarketOrdersService.updateMarketOrderStatus failed: $e');
     }
   }
 
@@ -161,7 +162,7 @@ class MarketOrdersService {
       );
       await EarningsService.createEarning(earning);
     } catch (e) {
-      print('❌ MarketOrdersService.completeMarketOrder failed: $e');
+      dlog('❌ MarketOrdersService.completeMarketOrder failed: $e');
     }
   }
 }

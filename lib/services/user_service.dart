@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import '../models/user.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 
 class UserService {
@@ -22,10 +23,10 @@ class UserService {
 
         return User.fromJson(response);
       }, onRetry: (attempt, e) {
-        print('⚡ UserService.getCurrentUser retry $attempt: $e');
+        dlog('⚡ UserService.getCurrentUser retry $attempt: $e');
       });
     } catch (e) {
-      print('❌ UserService.getCurrentUser failed after retries: $e');
+      dlog('❌ UserService.getCurrentUser failed after retries: $e');
       return null;
     }
   }
@@ -43,7 +44,7 @@ class UserService {
 
       return User.fromJson(response);
     } catch (e) {
-      print('❌ Error getting user by ID: $e');
+      dlog('❌ Error getting user by ID: $e');
       return null;
     }
   }
@@ -77,10 +78,10 @@ class UserService {
 
         return User.fromJson(response);
       }, onRetry: (attempt, e) {
-        print('⚡ UserService.updateProfile retry $attempt: $e');
+        dlog('⚡ UserService.updateProfile retry $attempt: $e');
       });
     } catch (e) {
-      print('❌ UserService.updateProfile failed after retries: $e');
+      dlog('❌ UserService.updateProfile failed after retries: $e');
       return null;
     }
   }
@@ -100,7 +101,7 @@ class UserService {
 
       return true;
     } catch (e) {
-      print('❌ Error setting online status: $e');
+      dlog('❌ Error setting online status: $e');
       return false;
     }
   }
@@ -124,7 +125,7 @@ class UserService {
 
       return true;
     } catch (e) {
-      print('❌ Error updating location: $e');
+      dlog('❌ Error updating location: $e');
       return false;
     }
   }
@@ -145,7 +146,7 @@ class UserService {
 
       return true;
     } catch (e) {
-      print('❌ Error incrementing order stats: $e');
+      dlog('❌ Error incrementing order stats: $e');
       // Fallback: update manuale
       try {
         final user = await getCurrentUser();
@@ -161,7 +162,7 @@ class UserService {
 
         return true;
       } catch (e) {
-        print('❌ Fallback update failed: $e');
+        dlog('❌ Fallback update failed: $e');
         return false;
       }
     }
@@ -180,7 +181,7 @@ class UserService {
 
       return User.fromJson(response);
     } catch (e) {
-      print('❌ Error getting user by referral code: $e');
+      dlog('❌ Error getting user by referral code: $e');
       return null;
     }
   }
@@ -220,7 +221,7 @@ class UserService {
 
       return true;
     } catch (e) {
-      print('❌ Error deactivating account: $e');
+      dlog('❌ Error deactivating account: $e');
       return false;
     }
   }

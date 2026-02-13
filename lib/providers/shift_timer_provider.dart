@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repositories/session_repository.dart';
+import '../utils/logger.dart';
 
 class ShiftTimerState {
   final bool isRunning;
@@ -49,7 +49,7 @@ class ShiftTimerNotifier extends StateNotifier<ShiftTimerState> {
       try {
         sessionId = await _repo.startSession();
       } catch (e) {
-        debugPrint('Failed to start session in DB: $e');
+        dlog('Failed to start session in DB: $e');
       }
     }
 
@@ -71,7 +71,7 @@ class ShiftTimerNotifier extends StateNotifier<ShiftTimerState> {
           activeMinutes: state.elapsedSeconds ~/ 60,
         );
       } catch (e) {
-        debugPrint('Failed to update session metrics: $e');
+        dlog('Failed to update session metrics: $e');
       }
     }
   }
@@ -92,7 +92,7 @@ class ShiftTimerNotifier extends StateNotifier<ShiftTimerState> {
           activeMinutes: state.elapsedSeconds ~/ 60,
         );
       } catch (e) {
-        debugPrint('Failed to end session in DB: $e');
+        dlog('Failed to end session in DB: $e');
       }
     }
 

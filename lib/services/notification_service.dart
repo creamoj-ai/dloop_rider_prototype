@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/notification.dart';
+import '../utils/logger.dart';
 import '../utils/retry.dart';
 
 class NotificationService {
@@ -24,7 +25,7 @@ class NotificationService {
           .map((json) => AppNotification.fromJson(json))
           .toList();
     }, onRetry: (attempt, e) {
-      print('⚡ NotificationService.getNotifications retry $attempt: $e');
+      dlog('⚡ NotificationService.getNotifications retry $attempt: $e');
     });
   }
 
@@ -58,7 +59,7 @@ class NotificationService {
           .eq('id', notificationId)
           .eq('rider_id', riderId);
     } catch (e) {
-      print('❌ NotificationService.markAsRead failed: $e');
+      dlog('❌ NotificationService.markAsRead failed: $e');
     }
   }
 
@@ -74,7 +75,7 @@ class NotificationService {
           .eq('rider_id', riderId)
           .eq('is_read', false);
     } catch (e) {
-      print('❌ NotificationService.markAllAsRead failed: $e');
+      dlog('❌ NotificationService.markAllAsRead failed: $e');
     }
   }
 
@@ -93,7 +94,7 @@ class NotificationService {
           .order('created_at', ascending: false)
           .map((data) => data.map((json) => AppNotification.fromJson(json)).toList()),
       onReconnect: (attempt, e) {
-        print('⚡ NotificationService.subscribeToNotifications reconnect $attempt: $e');
+        dlog('⚡ NotificationService.subscribeToNotifications reconnect $attempt: $e');
       },
     );
   }
