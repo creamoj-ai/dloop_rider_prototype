@@ -10,8 +10,9 @@ class AppShell extends StatelessWidget {
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     if (location.startsWith('/money')) return 1;
-    if (location.startsWith('/market')) return 2;
-    if (location.startsWith('/you')) return 3;
+    if (location.startsWith('/benefits')) return 2;
+    if (location.startsWith('/market')) return 3;
+    if (location.startsWith('/you')) return 4;
     return 0;
   }
 
@@ -30,8 +31,10 @@ class AppShell extends StatelessWidget {
             case 1:
               context.go('/money');
             case 2:
-              context.go('/market');
+              context.go('/benefits');
             case 3:
+              context.go('/market');
+            case 4:
               context.go('/you');
           }
         },
@@ -54,7 +57,8 @@ class _AnimatedBottomNav extends StatelessWidget {
   static const _indicatorWidthFixed = 32.0;
 
   // Mock badges - in produzione verrebbero da stato/provider
-  static const List<int> _badges = [0, 2, 0, 1]; // Today, Money, Market, You
+  static const _proColor = Color(0xFFAA00FF);
+  static const List<int> _badges = [0, 2, 0, 0, 1]; // Today, Money, Benefits, Market, You
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +72,7 @@ class _AnimatedBottomNav extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final tabWidth = constraints.maxWidth / 4;
+          final tabWidth = constraints.maxWidth / 5;
           final indicatorLeft = (tabWidth * currentIndex) + (tabWidth - _indicatorWidthFixed) / 2;
 
           return Stack(
@@ -91,18 +95,26 @@ class _AnimatedBottomNav extends StatelessWidget {
                     onTap: () => onTap(1),
                   ),
                   _NavItem(
-                    icon: Icons.shopping_cart,
-                    label: 'Market',
+                    icon: Icons.workspace_premium,
+                    label: 'Vantaggi',
                     isSelected: currentIndex == 2,
                     badge: _badges[2],
                     onTap: () => onTap(2),
+                    accentColor: _proColor,
+                  ),
+                  _NavItem(
+                    icon: Icons.shopping_cart,
+                    label: 'Market',
+                    isSelected: currentIndex == 3,
+                    badge: _badges[3],
+                    onTap: () => onTap(3),
                   ),
                   _NavItem(
                     icon: Icons.person,
                     label: 'Profilo',
-                    isSelected: currentIndex == 3,
-                    badge: _badges[3],
-                    onTap: () => onTap(3),
+                    isSelected: currentIndex == 4,
+                    badge: _badges[4],
+                    onTap: () => onTap(4),
                   ),
                 ],
               ),
@@ -116,7 +128,7 @@ class _AnimatedBottomNav extends StatelessWidget {
                   width: _indicatorWidthFixed,
                   height: 3,
                   decoration: BoxDecoration(
-                    color: _selectedColor,
+                    color: currentIndex == 2 ? _proColor : _selectedColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -135,6 +147,7 @@ class _NavItem extends StatelessWidget {
   final bool isSelected;
   final int badge;
   final VoidCallback onTap;
+  final Color? accentColor;
 
   const _NavItem({
     required this.icon,
@@ -142,13 +155,13 @@ class _NavItem extends StatelessWidget {
     required this.isSelected,
     required this.badge,
     required this.onTap,
+    this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected
-        ? const Color(0xFFFF6B00)
-        : Colors.grey;
+    final activeColor = accentColor ?? const Color(0xFFFF6B00);
+    final color = isSelected ? activeColor : Colors.grey;
 
     return Expanded(
       child: GestureDetector(

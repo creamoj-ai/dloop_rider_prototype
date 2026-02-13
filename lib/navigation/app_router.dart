@@ -18,6 +18,7 @@ import '../screens/money/sub/market_screen.dart';
 import '../screens/you/you_screen.dart';
 import '../screens/you/pricing_settings_screen.dart';
 import '../screens/you/settings_screen.dart';
+import '../screens/you/partner_benefits_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
 import '../screens/support/support_chat_screen.dart';
 import '../screens/chatbot/chatbot_screen.dart';
@@ -86,6 +87,10 @@ final appRouter = GoRouter(
           ],
         ),
         GoRoute(
+          path: '/benefits',
+          pageBuilder: (context, state) => const NoTransitionPage(child: PartnerBenefitsScreen()),
+        ),
+        GoRoute(
           path: '/market',
           pageBuilder: (context, state) => const NoTransitionPage(child: MarketTabScreen()),
           routes: [
@@ -99,6 +104,7 @@ final appRouter = GoRouter(
             GoRoute(path: 'pricing', builder: (context, state) => const PricingSettingsScreen()),
             GoRoute(path: 'settings', builder: (context, state) => const SettingsScreen()),
             GoRoute(path: 'support', builder: (context, state) => const SupportChatScreen()),
+            GoRoute(path: 'benefits', builder: (context, state) => const PartnerBenefitsScreen()),
           ],
         ),
       ],

@@ -53,6 +53,7 @@ dependencies:
   geolocator: ^14.0.2
   http: ^1.2.0
   email_validator: ^3.0.0
+  shared_preferences: ^2.5.4
 
 dev_dependencies:
   flutter_test:

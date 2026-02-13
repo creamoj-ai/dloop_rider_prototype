@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/dloop_top_bar.dart';
 import '../../widgets/earning_notification.dart';
 import '../../widgets/in_app_notification_banner.dart';
 import '../../widgets/header_sheets.dart';
 import '../../providers/earnings_provider.dart';
 import '../../providers/notifications_provider.dart';
+import '../../theme/tokens.dart';
 import 'widgets/kpi_strip.dart';
 import 'widgets/active_mode_card.dart';
 import 'widgets/activity_tab.dart';
@@ -26,6 +29,33 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   int _lastNetworkEarningsCount = 0;
   final _bannerController = InAppNotificationController();
   int _lastNotificationsCount = 0;
+
+  static const _kChatbotIntroPref = 'has_seen_chatbot_intro';
+
+  @override
+  void initState() {
+    super.initState();
+    _maybeShowChatbotIntro();
+  }
+
+  Future<void> _maybeShowChatbotIntro() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_kChatbotIntroPref) == true) return;
+
+    // Delay 1.2s so the screen is fully rendered
+    await Future.delayed(const Duration(milliseconds: 1200));
+    if (!mounted) return;
+
+    await prefs.setBool(_kChatbotIntroPref, true);
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ChatbotIntroSheet(),
+    );
+  }
 
   void _showSearch() {
     showModalBottomSheet(
@@ -282,6 +312,179 @@ class _RecentSearchItem extends StatelessWidget {
           ),
           Icon(Icons.north_west, size: 16, color: Colors.grey.shade600),
         ],
+      ),
+    );
+  }
+}
+
+// ── Chatbot Intro Bottom Sheet ──────────────────────────────────
+
+class _ChatbotIntroSheet extends StatelessWidget {
+  const _ChatbotIntroSheet();
+
+  static const _examples = [
+    'Quanto ho guadagnato oggi?',
+    'Dove ci sono piu ordini?',
+    'Come funziona la cauzione?',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A1A1E),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade700,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Animated-style icon
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.earningsGreen.withOpacity(0.2),
+                    AppColors.turboOrange.withOpacity(0.15),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(36),
+              ),
+              child: const Icon(
+                Icons.assistant,
+                size: 38,
+                color: AppColors.earningsGreen,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Title
+            Text(
+              'Hai un assistente personale',
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+
+            // Subtitle — simple language, no tech jargon
+            Text(
+              'Chiedimi quanto hai guadagnato, dove sono le zone '
+              'calde, o come funziona la consegna luxury.\n'
+              'Sono qui per aiutarti, 24/7.',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: Colors.grey.shade400,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+
+            // Example chips
+            Text(
+              'Prova a chiedere:',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade500,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: _examples.map((text) {
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/today/ai-chat');
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.turboOrange.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.turboOrange.withOpacity(0.25),
+                      ),
+                    ),
+                    child: Text(
+                      text,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: AppColors.turboOrange,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 28),
+
+            // CTA primary
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push('/today/ai-chat');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.turboOrange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Prova ora',
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // CTA secondary
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Magari dopo',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

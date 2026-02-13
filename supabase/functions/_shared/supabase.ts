@@ -37,17 +37,27 @@ export function extractJwt(req: Request): string | null {
 }
 
 /**
- * Get the authenticated user ID from a JWT via Supabase.
- * Uses service role client which has admin auth access to validate any JWT.
+ * Get the authenticated user ID from a JWT via Supabase Auth API.
+ * Uses direct fetch to avoid supabase-js client key format issues.
  */
 export async function getUserId(jwt: string): Promise<string | null> {
-  const client = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false },
-  });
-
-  const { data, error } = await client.auth.getUser(jwt);
-  if (error || !data.user) return null;
-  return data.user.id;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        "Authorization": `Bearer ${jwt}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+    });
+    if (!res.ok) {
+      console.error("getUserId failed:", res.status, await res.text());
+      return null;
+    }
+    const user = await res.json();
+    return user?.id ?? null;
+  } catch (e) {
+    console.error("getUserId error:", e);
+    return null;
+  }
 }
 
 /**
