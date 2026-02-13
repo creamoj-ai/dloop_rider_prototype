@@ -7,6 +7,7 @@ import '../../theme/tokens.dart';
 import '../../providers/earnings_provider.dart';
 import '../../providers/active_orders_provider.dart';
 import '../../services/rush_hour_service.dart';
+import '../earn/widgets/relay_status_card.dart';
 
 /// Schermata gestione ordini multitasking (EARN-03 v2)
 class DeliveryNavigationScreen extends ConsumerStatefulWidget {
@@ -207,6 +208,9 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
                   _buildNotesRow(cs, order.orderNotes!),
                   const SizedBox(height: Spacing.md),
                 ],
+                // Relay status (dealer assignment)
+                RelayStatusCard(orderId: order.id),
+                const SizedBox(height: Spacing.md),
                 // Azioni rapide
                 Row(
                   children: [

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../models/rider_contact.dart';
 import '../../../providers/contacts_provider.dart';
+import '../../../providers/order_relay_provider.dart';
 import '../../../services/contacts_service.dart';
 import '../../../theme/tokens.dart';
 
@@ -64,7 +65,7 @@ class NetworkScreen extends ConsumerWidget {
                           fontWeight: FontWeight.w700,
                           color: Colors.white)),
                   const SizedBox(height: 12),
-                  ...dealers.map((d) => _dealerTile(cs, d, context)),
+                  ...dealers.map((d) => _dealerTile(cs, d, context, ref)),
                   const SizedBox(height: 24),
                 ],
                 if (clients.isNotEmpty) ...[
@@ -136,7 +137,8 @@ class NetworkScreen extends ConsumerWidget {
   }
 
   Widget _dealerTile(
-      ColorScheme cs, RiderContact d, BuildContext context) {
+      ColorScheme cs, RiderContact d, BuildContext context, WidgetRef ref) {
+    final relayCount = ref.watch(dealerRelayCountProvider(d.id));
     return Dismissible(
       key: Key(d.id),
       direction: DismissDirection.endToStart,
@@ -182,6 +184,21 @@ class NetworkScreen extends ConsumerWidget {
                             color: const Color(0xFF9E9E9E))),
                   ]),
             ),
+            if (relayCount > 0) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                    color: AppColors.routeBlue.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8)),
+                child: Text('$relayCount relay',
+                    style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.routeBlue)),
+              ),
+              const SizedBox(width: 6),
+            ],
             if (d.monthlyEarnings > 0)
               Text(
                   '\u20AC ${d.monthlyEarnings.toStringAsFixed(0)}/mese',

@@ -38,10 +38,10 @@ export function extractJwt(req: Request): string | null {
 
 /**
  * Get the authenticated user ID from a JWT via Supabase.
+ * Uses service role client which has admin auth access to validate any JWT.
  */
 export async function getUserId(jwt: string): Promise<string | null> {
-  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  const client = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
 
@@ -55,5 +55,5 @@ export async function getUserId(jwt: string): Promise<string | null> {
  */
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-key",
 };

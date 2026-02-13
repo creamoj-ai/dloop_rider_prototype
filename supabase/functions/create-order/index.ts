@@ -46,6 +46,8 @@ serve(async (req: Request) => {
       customer_address,
       distance_km,
       tip_amount,
+      dealer_contact_id,
+      estimated_amount,
     } = body;
 
     // Validate required fields
@@ -74,7 +76,7 @@ serve(async (req: Request) => {
 
     // Insert using service client (bypasses RLS)
     const db = getServiceClient();
-    const { error } = await db.from("orders").insert({
+    const orderRow: Record<string, unknown> = {
       id: orderId,
       rider_id: rider_id,
       restaurant_name: restaurant_name,
@@ -91,7 +93,14 @@ serve(async (req: Request) => {
       min_guarantee: MIN_GUARANTEE,
       status: "pending",
       source: "woz",
-    });
+    };
+
+    // Attach dealer if pre-assigned
+    if (dealer_contact_id) {
+      orderRow.dealer_contact_id = dealer_contact_id;
+    }
+
+    const { error } = await db.from("orders").insert(orderRow);
 
     if (error) {
       console.error("Insert error:", error);
@@ -101,12 +110,38 @@ serve(async (req: Request) => {
       );
     }
 
+    // Auto-create relay if dealer was pre-assigned
+    let relayId: string | null = null;
+    if (dealer_contact_id) {
+      const relayRow = {
+        order_id: orderId,
+        rider_id: rider_id,
+        dealer_contact_id: dealer_contact_id,
+        status: "pending",
+        relay_channel: "in_app",
+        payment_status: "pending",
+        estimated_amount: estimated_amount ?? null,
+      };
+      const { data: relayData, error: relayError } = await db
+        .from("order_relays")
+        .insert(relayRow)
+        .select("id")
+        .single();
+
+      if (relayError) {
+        console.error("Relay insert error (non-blocking):", relayError);
+      } else {
+        relayId = relayData?.id ?? null;
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         order_id: orderId,
         base_earning: baseEarning,
         rider_id: rider_id,
+        relay_id: relayId,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

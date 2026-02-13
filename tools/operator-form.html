@@ -17,9 +17,16 @@
     .earning-preview { margin-top: 20px; padding: 16px; background: #1a2e1a; border: 1px solid #00e676; border-radius: 12px; text-align: center; }
     .earning-preview .amount { font-size: 2rem; font-weight: 700; color: #00e676; }
     .earning-preview .label { font-size: 0.75rem; color: #888; }
-    button[type="submit"] { width: 100%; margin-top: 24px; padding: 14px; background: #00e676; color: #000; font-size: 1rem; font-weight: 700; border: none; border-radius: 12px; cursor: pointer; }
-    button[type="submit"]:hover { background: #00c853; }
-    button[type="submit"]:disabled { background: #333; color: #666; cursor: not-allowed; }
+    button[type="submit"], .btn-primary { width: 100%; margin-top: 24px; padding: 14px; background: #00e676; color: #000; font-size: 1rem; font-weight: 700; border: none; border-radius: 12px; cursor: pointer; }
+    button[type="submit"]:hover, .btn-primary:hover { background: #00c853; }
+    button[type="submit"]:disabled, .btn-primary:disabled { background: #333; color: #666; cursor: not-allowed; }
+    .btn-secondary { width: 100%; margin-top: 10px; padding: 12px; background: transparent; color: #00e676; font-size: 0.9rem; font-weight: 600; border: 1px solid #00e676; border-radius: 12px; cursor: pointer; }
+    .btn-secondary:hover { background: #00e67620; }
+    .btn-secondary:disabled { border-color: #333; color: #666; cursor: not-allowed; }
+    .btn-wa { border-color: #25D366; color: #25D366; }
+    .btn-wa:hover { background: #25D36620; }
+    .btn-stripe { border-color: #635BFF; color: #635BFF; }
+    .btn-stripe:hover { background: #635BFF20; }
     .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; z-index: 100; display: none; }
     .toast.success { background: #00e676; color: #000; }
     .toast.error { background: #f44336; color: #fff; }
@@ -31,11 +38,21 @@
     .log-entry { padding: 8px 12px; background: #1a1a1a; border-radius: 6px; margin-bottom: 6px; font-size: 0.8rem; }
     .log-entry .time { color: #888; }
     .log-entry .id { color: #00e676; font-family: monospace; }
+    .section-divider { border: none; border-top: 1px solid #333; margin: 20px 0; }
+    .relay-section { margin-top: 20px; padding: 16px; background: #1a1a2e; border: 1px solid #4455aa; border-radius: 12px; display: none; }
+    .relay-section h3 { font-size: 0.95rem; color: #8899ff; margin-bottom: 12px; }
+    .relay-info { font-size: 0.8rem; color: #888; margin-top: 8px; word-break: break-all; }
+    .relay-info a { color: #635BFF; text-decoration: none; }
+    .relay-info a:hover { text-decoration: underline; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; }
+    .badge-pending { background: #FFD60020; color: #FFD600; }
+    .badge-sent { background: #448AFF20; color: #448AFF; }
+    .badge-paid { background: #00e67620; color: #00e676; }
   </style>
 </head>
 <body>
   <h1>dloop Wizard of Oz</h1>
-  <p class="subtitle">Crea ordini manualmente per il rider</p>
+  <p class="subtitle">Crea ordini e gestisci relay dealer</p>
 
   <details class="config-section">
     <summary>Configurazione</summary>
@@ -71,6 +88,28 @@
       </div>
     </div>
 
+    <hr class="section-divider">
+
+    <label>Dealer Contact ID (opzionale)</label>
+    <input type="text" id="dealerContactId" placeholder="UUID del contatto dealer dal DB">
+
+    <label>Telefono Dealer (per WhatsApp)</label>
+    <input type="tel" id="dealerPhone" placeholder="es. +393331234567">
+
+    <div class="row">
+      <div>
+        <label>Importo Cliente (EUR)</label>
+        <input type="number" id="estimatedAmount" step="0.50" min="0" value="0" placeholder="Totale cliente">
+      </div>
+      <div>
+        <label>Telefono Cliente</label>
+        <input type="tel" id="customerPhone" placeholder="+39...">
+      </div>
+    </div>
+
+    <label>Dettagli Ordine (per dealer)</label>
+    <input type="text" id="orderDetails" placeholder="es. 1x Margherita, 1x Birra">
+
     <div class="earning-preview">
       <div class="label">Guadagno base stimato</div>
       <div class="amount" id="earningPreview">€ 3.00</div>
@@ -78,6 +117,26 @@
 
     <button type="submit" id="submitBtn">CREA ORDINE</button>
   </form>
+
+  <!-- Post-creation relay actions -->
+  <div class="relay-section" id="relaySection">
+    <h3>Relay Dealer</h3>
+    <div id="relayStatus">
+      <span>Ordine: </span><span class="id" id="relayOrderId">—</span>
+      <span> | Relay: </span><span class="id" id="relayRelayId">—</span>
+      <span> | Status: </span><span class="badge badge-pending" id="relayBadge">pending</span>
+    </div>
+
+    <button class="btn-secondary btn-wa" id="btnSendWa" onclick="sendWhatsApp()">
+      Invia WhatsApp al Dealer
+    </button>
+    <div class="relay-info" id="waInfo"></div>
+
+    <button class="btn-secondary btn-stripe" id="btnStripeLink" onclick="createStripeLink()">
+      Genera Link Pagamento Stripe
+    </button>
+    <div class="relay-info" id="stripeInfo"></div>
+  </div>
 
   <div class="toast" id="toast"></div>
 
@@ -89,6 +148,18 @@
   <script>
     const RATE_PER_KM = 1.50;
     const MIN_GUARANTEE = 3.00;
+
+    // Current order state (for relay actions)
+    let currentOrder = null;
+
+    // Helpers
+    function getConfig() {
+      return {
+        url: document.getElementById('cfgUrl').value.replace(/\/$/, ''),
+        key: document.getElementById('cfgKey').value,
+        rider: document.getElementById('cfgRider').value,
+      };
+    }
 
     // Update earning preview
     const distanceInput = document.getElementById('distanceKm');
@@ -121,15 +192,12 @@
       document.getElementById('logEntries').prepend(div);
     }
 
-    // Submit
+    // Submit order
     document.getElementById('orderForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const supabaseUrl = document.getElementById('cfgUrl').value.replace(/\/$/, '');
-      const adminKey = document.getElementById('cfgKey').value;
-      const riderId = document.getElementById('cfgRider').value;
-
-      if (!adminKey || !riderId) {
+      const cfg = getConfig();
+      if (!cfg.key || !cfg.rider) {
         showToast('Configura Admin Key e Rider UUID', 'error');
         return;
       }
@@ -138,8 +206,11 @@
       btn.disabled = true;
       btn.textContent = 'Invio...';
 
+      const dealerContactId = document.getElementById('dealerContactId').value.trim();
+      const estimatedAmount = parseFloat(document.getElementById('estimatedAmount').value) || null;
+
       const body = {
-        rider_id: riderId,
+        rider_id: cfg.rider,
         restaurant_name: document.getElementById('restaurantName').value,
         restaurant_address: document.getElementById('restaurantAddress').value,
         customer_name: document.getElementById('customerName').value,
@@ -148,12 +219,20 @@
         tip_amount: parseFloat(document.getElementById('tipAmount').value) || 0,
       };
 
+      // Add relay fields if dealer is pre-assigned
+      if (dealerContactId) {
+        body.dealer_contact_id = dealerContactId;
+      }
+      if (estimatedAmount) {
+        body.estimated_amount = estimatedAmount;
+      }
+
       try {
-        const res = await fetch(`${supabaseUrl}/functions/v1/create-order`, {
+        const res = await fetch(`${cfg.url}/functions/v1/create-order`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Admin-Key': adminKey,
+            'X-Admin-Key': cfg.key,
           },
           body: JSON.stringify(body),
         });
@@ -163,13 +242,32 @@
         if (data.success) {
           showToast(`Ordine creato! ${data.order_id.slice(0, 8)}...`, 'success');
           addLogEntry(data.order_id, body.restaurant_name, data.base_earning);
-          // Reset form (keep config)
+
+          // Store current order for relay actions
+          currentOrder = {
+            orderId: data.order_id,
+            relayId: data.relay_id,
+            dealerName: body.restaurant_name,
+            dealerPhone: document.getElementById('dealerPhone').value.trim(),
+            customerPhone: document.getElementById('customerPhone').value.trim(),
+            estimatedAmount: estimatedAmount,
+            orderDetails: document.getElementById('orderDetails').value.trim(),
+          };
+
+          // Show relay section if dealer was pre-assigned
+          if (data.relay_id) {
+            showRelaySection();
+          }
+
+          // Reset form fields (keep config + dealer fields)
           document.getElementById('restaurantName').value = '';
           document.getElementById('restaurantAddress').value = '';
           document.getElementById('customerName').value = '';
           document.getElementById('customerAddress').value = '';
           document.getElementById('distanceKm').value = '2.0';
           document.getElementById('tipAmount').value = '0';
+          document.getElementById('orderDetails').value = '';
+          document.getElementById('estimatedAmount').value = '0';
           updatePreview();
         } else {
           showToast(`Errore: ${data.error}`, 'error');
@@ -181,6 +279,115 @@
       btn.disabled = false;
       btn.textContent = 'CREA ORDINE';
     });
+
+    // Show relay section with current order info
+    function showRelaySection() {
+      const section = document.getElementById('relaySection');
+      section.style.display = 'block';
+      document.getElementById('relayOrderId').textContent = currentOrder.orderId.slice(0, 8) + '...';
+      document.getElementById('relayRelayId').textContent = currentOrder.relayId ? currentOrder.relayId.slice(0, 8) + '...' : '—';
+      document.getElementById('relayBadge').textContent = 'pending';
+      document.getElementById('relayBadge').className = 'badge badge-pending';
+      document.getElementById('waInfo').textContent = '';
+      document.getElementById('stripeInfo').innerHTML = '';
+      document.getElementById('btnSendWa').disabled = !currentOrder.dealerPhone;
+      document.getElementById('btnStripeLink').disabled = !currentOrder.estimatedAmount;
+    }
+
+    // Send WhatsApp to dealer
+    async function sendWhatsApp() {
+      if (!currentOrder || !currentOrder.relayId) {
+        showToast('Nessun relay attivo', 'error');
+        return;
+      }
+
+      const cfg = getConfig();
+      const btn = document.getElementById('btnSendWa');
+      btn.disabled = true;
+      btn.textContent = 'Invio WhatsApp...';
+
+      try {
+        const res = await fetch(`${cfg.url}/functions/v1/relay-dealer`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Key': cfg.key,
+          },
+          body: JSON.stringify({
+            relay_id: currentOrder.relayId,
+            dealer_phone: currentOrder.dealerPhone,
+            dealer_name: currentOrder.dealerName,
+            order_details: currentOrder.orderDetails || 'Nuovo ordine',
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('WhatsApp inviato al dealer!', 'success');
+          document.getElementById('waInfo').textContent = `WA Message ID: ${data.wa_message_id || '—'}`;
+          document.getElementById('relayBadge').textContent = 'sent';
+          document.getElementById('relayBadge').className = 'badge badge-sent';
+        } else {
+          showToast(`Errore WA: ${data.error}`, 'error');
+          document.getElementById('waInfo').textContent = `Errore: ${data.details || data.error}`;
+        }
+      } catch (err) {
+        showToast(`Network error: ${err.message}`, 'error');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Invia WhatsApp al Dealer';
+    }
+
+    // Create Stripe Payment Link
+    async function createStripeLink() {
+      if (!currentOrder || !currentOrder.relayId) {
+        showToast('Nessun relay attivo', 'error');
+        return;
+      }
+
+      const cfg = getConfig();
+      const btn = document.getElementById('btnStripeLink');
+      btn.disabled = true;
+      btn.textContent = 'Generazione link...';
+
+      try {
+        const res = await fetch(`${cfg.url}/functions/v1/stripe-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Key': cfg.key,
+          },
+          body: JSON.stringify({
+            relay_id: currentOrder.relayId,
+            order_id: currentOrder.orderId,
+            amount: currentOrder.estimatedAmount,
+            description: currentOrder.orderDetails || 'Ordine DLOOP',
+            customer_phone: currentOrder.customerPhone || null,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('Link Stripe creato!', 'success');
+          document.getElementById('stripeInfo').innerHTML =
+            `<a href="${data.payment_url}" target="_blank">${data.payment_url}</a>` +
+            (data.wa_message_id ? `<br>Inviato al cliente via WA` : '');
+          document.getElementById('relayBadge').textContent = 'payment sent';
+          document.getElementById('relayBadge').className = 'badge badge-sent';
+        } else {
+          showToast(`Errore Stripe: ${data.error}`, 'error');
+          document.getElementById('stripeInfo').textContent = `Errore: ${data.details || data.error}`;
+        }
+      } catch (err) {
+        showToast(`Network error: ${err.message}`, 'error');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Genera Link Pagamento Stripe';
+    }
 
     // Persist config in localStorage
     ['cfgUrl', 'cfgKey', 'cfgRider'].forEach(id => {
