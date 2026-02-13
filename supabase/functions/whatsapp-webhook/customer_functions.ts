@@ -124,13 +124,21 @@ export async function executeCustomerFunction(
   switch (name) {
     case "search_products":
       return await searchProducts(db, args.query as string);
-    case "create_order":
+    case "create_order": {
+      // Get customer name from conversation
+      const { data: conv } = await db
+        .from("whatsapp_conversations")
+        .select("customer_name")
+        .eq("id", conversationId)
+        .single();
       return await createOrder(db, phone, {
         productId: args.product_id as string,
         quantity: (args.quantity as number) ?? 1,
         deliveryAddress: args.delivery_address as string,
         customerNotes: args.customer_notes as string | undefined,
+        customerName: (conv?.customer_name as string) ?? "Cliente WhatsApp",
       });
+    }
     case "check_order_status":
       return await checkOrderStatus(
         db,
@@ -156,14 +164,27 @@ async function searchProducts(
   db: SupabaseClient,
   query: string
 ): Promise<string> {
-  // Fuzzy search: name ILIKE or category ILIKE
-  const { data, error } = await db
+  // Search by name (primary), then by category/description as fallback
+  const pattern = `%${query.trim()}%`;
+
+  let { data, error } = await db
     .from("market_products")
-    .select("id, name, description, price, category, stock_quantity")
+    .select("id, name, description, price, category, stock")
     .eq("is_active", true)
-    .or(`name.ilike.%${query}%,category.ilike.%${query}%,description.ilike.%${query}%`)
+    .ilike("name", pattern)
     .order("name")
     .limit(5);
+
+  // Fallback: search by category if no name match
+  if (!error && (!data || data.length === 0)) {
+    ({ data, error } = await db
+      .from("market_products")
+      .select("id, name, description, price, category, stock")
+      .eq("is_active", true)
+      .ilike("category", pattern)
+      .order("name")
+      .limit(5));
+  }
 
   if (error) return JSON.stringify({ error: error.message });
   if (!data || data.length === 0) {
@@ -178,7 +199,7 @@ async function searchProducts(
       name: p.name,
       price: `€${(p.price as number)?.toFixed(2)}`,
       category: p.category,
-      available: (p.stock_quantity as number) > 0,
+      available: (p.stock as number) > 0,
       description: (p.description as string)?.slice(0, 100),
     })),
   });
@@ -192,12 +213,13 @@ async function createOrder(
     quantity: number;
     deliveryAddress: string;
     customerNotes?: string;
+    customerName: string;
   }
 ): Promise<string> {
   // Verify product exists and is available
   const { data: product, error: prodErr } = await db
     .from("market_products")
-    .select("id, name, price, stock_quantity")
+    .select("id, name, price, stock")
     .eq("id", opts.productId)
     .eq("is_active", true)
     .single();
@@ -206,28 +228,32 @@ async function createOrder(
     return JSON.stringify({ error: "Prodotto non trovato o non disponibile." });
   }
 
-  if ((product.stock_quantity as number) < opts.quantity) {
+  if ((product.stock as number) < opts.quantity) {
     return JSON.stringify({
-      error: `Disponibilità insufficiente. Stock attuale: ${product.stock_quantity}`,
+      error: `Disponibilità insufficiente. Stock attuale: ${product.stock}`,
     });
   }
 
-  const totalAmount = (product.price as number) * opts.quantity;
+  const unitPrice = product.price as number;
+  const totalPrice = unitPrice * opts.quantity;
 
   // Create the order
   const { data: order, error: orderErr } = await db
     .from("market_orders")
     .insert({
+      customer_name: opts.customerName,
       customer_phone: phone,
       product_id: opts.productId,
+      product_name: product.name,
       quantity: opts.quantity,
-      total_amount: totalAmount,
-      delivery_address: opts.deliveryAddress,
-      customer_notes: opts.customerNotes ?? null,
+      unit_price: unitPrice,
+      total_price: totalPrice,
+      customer_address: opts.deliveryAddress,
+      notes: opts.customerNotes ?? null,
       status: "pending",
       source: "whatsapp",
     })
-    .select("id, status, total_amount")
+    .select("id, status, total_price")
     .single();
 
   if (orderErr) {
@@ -239,9 +265,9 @@ async function createOrder(
     order_id: order.id,
     product: product.name,
     quantity: opts.quantity,
-    total: `€${totalAmount.toFixed(2)}`,
+    total: `€${totalPrice.toFixed(2)}`,
     status: "pending",
-    message: `Ordine creato! ${opts.quantity}x ${product.name} per €${totalAmount.toFixed(2)}. In consegna a: ${opts.deliveryAddress}`,
+    message: `Ordine creato! ${opts.quantity}x ${product.name} per €${totalPrice.toFixed(2)}. In consegna a: ${opts.deliveryAddress}`,
   });
 }
 
@@ -252,7 +278,7 @@ async function checkOrderStatus(
 ): Promise<string> {
   let query = db
     .from("market_orders")
-    .select("id, product_id, quantity, total_amount, status, delivery_address, created_at, customer_notes")
+    .select("id, product_id, product_name, quantity, total_price, status, customer_address, created_at, notes")
     .eq("customer_phone", phone)
     .eq("source", "whatsapp");
 
@@ -283,8 +309,8 @@ async function checkOrderStatus(
   return JSON.stringify({
     order_id: (order.id as string).slice(0, 8),
     status: statusLabels[order.status as string] ?? order.status,
-    total: `€${(order.total_amount as number)?.toFixed(2)}`,
-    delivery_address: order.delivery_address,
+    total: `€${(order.total_price as number)?.toFixed(2)}`,
+    delivery_address: order.customer_address,
     created_at: order.created_at,
   });
 }

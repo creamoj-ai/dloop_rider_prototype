@@ -404,7 +404,7 @@ async function getMarketProducts(
 ): Promise<string> {
   let query = db
     .from("market_products")
-    .select("id, name, description, price, category, stock_quantity, image_url")
+    .select("id, name, description, price, category, stock, image_url")
     .eq("is_active", true)
     .order("name");
 
@@ -428,7 +428,7 @@ async function getMarketProducts(
       name: p.name,
       category: p.category,
       price: `€${(p.price as number)?.toFixed(2)}`,
-      available: (p.stock_quantity as number) > 0,
+      available: (p.stock as number) > 0,
       description: p.description,
     })),
   });

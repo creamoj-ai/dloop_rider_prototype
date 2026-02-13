@@ -99,7 +99,12 @@ serve(async (req: Request) => {
 
       // Execute each function call
       for (const toolCall of response.toolCalls) {
-        const args = JSON.parse(toolCall.function.arguments || "{}");
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(toolCall.function.arguments || "{}");
+        } catch {
+          console.error("Failed to parse tool args:", toolCall.function.arguments);
+        }
         const result = await executeFunction(
           toolCall.function.name,
           args,
