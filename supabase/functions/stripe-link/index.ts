@@ -11,6 +11,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
 import { sendWhatsAppMessage } from "../whatsapp-webhook/whatsapp_api.ts";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate_limit.ts";
 
 const WOZ_ADMIN_KEY = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
@@ -28,6 +29,11 @@ serve(async (req: Request) => {
     const adminKey = req.headers.get("X-Admin-Key");
     if (!WOZ_ADMIN_KEY || adminKey !== WOZ_ADMIN_KEY) {
       return json({ error: "Unauthorized" }, 401);
+    }
+
+    // Rate limit: 20 links/min
+    if (!checkRateLimit("stripe-link", 20)) {
+      return rateLimitResponse(corsHeaders);
     }
 
     const body = await req.json();

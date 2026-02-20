@@ -3,6 +3,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
 import { normalizePhone } from "../_shared/phone_utils.ts";
+import { checkRateLimit } from "../_shared/rate_limit.ts";
 import { processInboundMessage } from "./processor.ts";
 import { processDealerMessage } from "./dealer_processor.ts";
 
@@ -91,6 +92,12 @@ async function handleIncomingMessage(
   const name =
     (contact?.profile as Record<string, unknown>)?.name as string | undefined;
   const msgType = msg.type as string;
+
+  // Rate limit: 60 messages/min per phone number
+  if (!checkRateLimit(`wa:${phone}`, 60)) {
+    console.warn(`Rate limited: ${phone}`);
+    return;
+  }
 
   // Build InboundMessage based on type
   const inbound: Record<string, unknown> = { phone, name };

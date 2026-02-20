@@ -10,6 +10,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
 import { sendWhatsAppMessage } from "../whatsapp-webhook/whatsapp_api.ts";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate_limit.ts";
 
 const WOZ_ADMIN_KEY = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
 
@@ -31,6 +32,11 @@ serve(async (req: Request) => {
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Rate limit: 20 relays/min
+    if (!checkRateLimit("relay-dealer", 20)) {
+      return rateLimitResponse(corsHeaders);
     }
 
     const body = await req.json();

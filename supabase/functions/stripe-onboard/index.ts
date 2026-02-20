@@ -8,6 +8,7 @@
 //
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate_limit.ts";
 
 const WOZ_ADMIN_KEY = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
@@ -26,6 +27,11 @@ serve(async (req: Request) => {
 
   if (!STRIPE_SECRET_KEY) {
     return json({ error: "STRIPE_SECRET_KEY not configured" }, 500);
+  }
+
+  // Rate limit: 10 onboards/min
+  if (!checkRateLimit("stripe-onboard", 10)) {
+    return rateLimitResponse(corsHeaders);
   }
 
   const db = getServiceClient();
