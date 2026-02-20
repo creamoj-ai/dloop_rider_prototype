@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../models/rider_contact.dart';
 import '../../../providers/contacts_provider.dart';
 import '../../../providers/order_relay_provider.dart';
+import '../../../providers/dealer_platform_provider.dart';
+import '../../../providers/dealer_subscription_provider.dart';
 import '../../../services/contacts_service.dart';
 import '../../../theme/tokens.dart';
 
@@ -139,6 +142,20 @@ class NetworkScreen extends ConsumerWidget {
   Widget _dealerTile(
       ColorScheme cs, RiderContact d, BuildContext context, WidgetRef ref) {
     final relayCount = ref.watch(dealerRelayCountProvider(d.id));
+    final tierMap = ref.watch(dealerTierMapProvider);
+    final tier = tierMap[d.id];
+    final platforms = ref.watch(dealerPlatformsStreamProvider);
+    // Find Stripe status for this dealer
+    final platform = platforms.whenOrNull(
+      data: (list) {
+        final matches = list.where((p) => p.contactId == d.id && p.isActive);
+        return matches.isNotEmpty ? matches.first : null;
+      },
+    );
+    final stripeReady = platform?.isStripeReady ?? false;
+    final stripeStatus = platform?.stripeOnboardingStatus;
+    final hasStripe = platform?.stripeAccountId != null;
+
     return Dismissible(
       key: Key(d.id),
       direction: DismissDirection.endToStart,
@@ -158,76 +175,145 @@ class NetworkScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
             color: cs.surface, borderRadius: BorderRadius.circular(12)),
-        child: Row(
+        child: Column(
           children: [
-            CircleAvatar(
-                radius: 18,
-                backgroundColor:
-                    AppColors.earningsGreen.withOpacity(0.2),
-                child: const Icon(Icons.person,
-                    color: AppColors.earningsGreen, size: 18)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(d.name,
+            Row(
+              children: [
+                CircleAvatar(
+                    radius: 18,
+                    backgroundColor:
+                        AppColors.earningsGreen.withOpacity(0.2),
+                    child: const Icon(Icons.person,
+                        color: AppColors.earningsGreen, size: 18)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(d.name,
+                            style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white)),
+                        const SizedBox(height: 2),
+                        Text(
+                            d.phone ?? '${d.totalOrders} ordini',
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF9E9E9E))),
+                      ]),
+                ),
+                // Stripe badge
+                _stripeBadge(stripeReady, hasStripe, stripeStatus),
+                const SizedBox(width: 6),
+                // Tier badge
+                if (tier != null) ...[
+                  _tierBadge(tier),
+                  const SizedBox(width: 6),
+                ],
+                if (relayCount > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                        color: AppColors.routeBlue.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text('$relayCount relay',
                         style: GoogleFonts.inter(
-                            fontSize: 14,
+                            fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white)),
-                    const SizedBox(height: 2),
+                            color: AppColors.routeBlue)),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ],
+            ),
+            if (d.monthlyEarnings > 0 || d.isActive) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const SizedBox(width: 48), // align with content
+                  if (d.monthlyEarnings > 0)
                     Text(
-                        d.phone ?? '${d.totalOrders} ordini',
+                        '\u20AC ${d.monthlyEarnings.toStringAsFixed(0)}/mese',
                         style: GoogleFonts.inter(
                             fontSize: 12,
                             color: const Color(0xFF9E9E9E))),
-                  ]),
-            ),
-            if (relayCount > 0) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                    color: AppColors.routeBlue.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8)),
-                child: Text('$relayCount relay',
-                    style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.routeBlue)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (d.isActive
+                              ? AppColors.earningsGreen
+                              : AppColors.turboOrange)
+                          .withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                        d.isActive ? 'Attivo' : 'Potenziale',
+                        style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: d.isActive
+                                ? AppColors.earningsGreen
+                                : AppColors.turboOrange)),
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
             ],
-            if (d.monthlyEarnings > 0)
-              Text(
-                  '\u20AC ${d.monthlyEarnings.toStringAsFixed(0)}/mese',
-                  style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF9E9E9E))),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: (d.isActive
-                        ? AppColors.earningsGreen
-                        : AppColors.turboOrange)
-                    .withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                  d.isActive ? 'Attivo' : 'Potenziale',
-                  style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: d.isActive
-                          ? AppColors.earningsGreen
-                          : AppColors.turboOrange)),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _stripeBadge(bool ready, bool hasAccount, String? status) {
+    final Color color;
+    final IconData icon;
+    if (ready) {
+      color = AppColors.earningsGreen;
+      icon = Icons.credit_card;
+    } else if (hasAccount) {
+      color = AppColors.turboOrange;
+      icon = Icons.credit_card;
+    } else {
+      color = Colors.grey.shade600;
+      icon = Icons.credit_card_off;
+    }
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Icon(icon, color: color, size: 14),
+    );
+  }
+
+  Widget _tierBadge(String tier) {
+    final Color color;
+    switch (tier.toLowerCase()) {
+      case 'pro':
+        color = AppColors.routeBlue;
+      case 'business':
+        color = AppColors.turboOrange;
+      case 'enterprise':
+        color = AppColors.bonusPurple;
+      default:
+        color = Colors.grey;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(tier,
+          style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color)),
     );
   }
 
