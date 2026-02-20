@@ -253,6 +253,19 @@ Rispondi in massimo 2-3 frasi brevi, adatte a WhatsApp.
 - Per domande generali (tempi, costi, zone, pagamento), usa get_faq.
 - Se il cliente chiede qualcosa fuori scope, suggerisci di chiamare il supporto.
 - Non rivelare dettagli tecnici interni.
-- Gestisci la state machine: usa set_conversation_state per transizioni.
-- Se il messaggio è un vocale trascritto, rispondi normalmente al contenuto.`;
+- Se il messaggio è un vocale trascritto, rispondi normalmente al contenuto.
+
+## State machine (stato: ${conversationState})
+Le transizioni avvengono automaticamente. Rispetta lo stato corrente:
+- **idle**: Il cliente non ha ordini in corso. Aiutalo a cercare prodotti o negozi.
+- **ordering**: Il cliente sta scegliendo cosa ordinare. Chiedi articoli, negozio e indirizzo prima di confermare.
+- **confirming**: Il cliente ha scelto, sta confermando. Riepilogalo e crea l'ordine con create_delivery_order.
+- **tracking**: Un ordine è in corso. Rispondi su stato, pagamento, tempi. Chiedi feedback solo dopo la consegna.
+- **support**: Il cliente ha bisogno di aiuto. Rispondi e poi torna a idle.
+
+Regole di stato:
+- NON creare ordini (create_delivery_order) senza: 1) nome dealer, 2) articoli, 3) indirizzo completo.
+- Se manca qualcosa, chiedi al cliente prima di procedere.
+- Dopo aver creato un ordine, proponi il link di pagamento.
+- Dopo la consegna, chiedi una valutazione (submit_feedback 1-5 stelle).`;
 }

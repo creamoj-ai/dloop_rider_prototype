@@ -263,44 +263,76 @@ export async function executeCustomerFunction(
         phone,
         args.order_id as string | undefined
       );
-    case "cancel_order":
-      return await cancelOrder(db, phone, args.order_id as string);
+    case "cancel_order": {
+      const cancelResult = await cancelOrder(db, phone, args.order_id as string);
+      // Auto-transition back to idle after cancellation
+      const cancelParsed = JSON.parse(cancelResult);
+      if (cancelParsed.success) {
+        await db.from("whatsapp_conversations")
+          .update({ state: "idle" })
+          .eq("id", conversationId);
+      }
+      return cancelResult;
+    }
     case "set_conversation_state":
       return await setConversationState(
         db,
         conversationId,
         args.new_state as string
       );
-    case "browse_dealer_menu":
-      return await browseDealerMenu(
+    case "browse_dealer_menu": {
+      const menuResult = await browseDealerMenu(
         db,
         args.dealer_name as string | undefined,
         args.product_type as string | undefined
       );
+      // Auto-transition to ordering when browsing menus
+      await db.from("whatsapp_conversations")
+        .update({ state: "ordering" })
+        .eq("id", conversationId);
+      return menuResult;
+    }
     case "create_delivery_order": {
       const { data: conv2 } = await db
         .from("whatsapp_conversations")
         .select("customer_name")
         .eq("id", conversationId)
         .single();
-      return await createDeliveryOrder(db, phone, conversationId, {
+      const orderResult = await createDeliveryOrder(db, phone, conversationId, {
         items: args.items as string,
         deliveryAddress: args.delivery_address as string,
         dealerName: args.dealer_name as string | undefined,
         customerNotes: args.customer_notes as string | undefined,
         customerName: (conv2?.customer_name as string) ?? "Cliente WhatsApp",
       });
+      // Auto-transition to tracking state on success
+      const parsed = JSON.parse(orderResult);
+      if (parsed.success) {
+        await db.from("whatsapp_conversations")
+          .update({ state: "tracking" })
+          .eq("id", conversationId);
+      }
+      return orderResult;
     }
     case "get_payment_link":
       return await getPaymentLink(db, args.order_id as string);
-    case "submit_feedback":
-      return await submitFeedback(
+    case "submit_feedback": {
+      const feedbackResult = await submitFeedback(
         db,
         phone,
         args.order_id as string,
         args.rating as number,
         args.comment as string | undefined
       );
+      // Auto-transition back to idle after feedback
+      const fbParsed = JSON.parse(feedbackResult);
+      if (fbParsed.success) {
+        await db.from("whatsapp_conversations")
+          .update({ state: "idle" })
+          .eq("id", conversationId);
+      }
+      return feedbackResult;
+    }
     case "get_faq":
       return await getFaq(db, args.topic as string);
     default:
