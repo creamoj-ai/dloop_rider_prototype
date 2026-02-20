@@ -283,6 +283,11 @@ async function confirmOrder(
     `Il dealer ha confermato l'ordine. Preparazione in corso.`
   );
 
+  // Proactive notification to customer (fire-and-forget)
+  if (relay.order_id) {
+    triggerCustomerNotify(relay.order_id as string, "order_confirmed");
+  }
+
   return JSON.stringify({
     success: true,
     relay_id: (relay.id as string).slice(0, 8),
@@ -406,6 +411,11 @@ async function markOrderReady(
     "Ordine pronto per il ritiro!",
     "Il dealer ha preparato l'ordine. Vai a ritirarlo!"
   );
+
+  // Proactive notification to customer (fire-and-forget)
+  if (relay.order_id) {
+    triggerCustomerNotify(relay.order_id as string, "order_ready");
+  }
 
   return JSON.stringify({
     success: true,
@@ -596,4 +606,22 @@ async function setDealerConversationState(
     success: true,
     new_state: newState,
   });
+}
+
+// ── Proactive Customer Notification (fire-and-forget) ─────────────
+
+function triggerCustomerNotify(orderId: string, event: string): void {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const adminKey = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
+
+  fetch(`${supabaseUrl}/functions/v1/whatsapp-notify`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Key": adminKey,
+      "Authorization": `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ order_id: orderId, event }),
+  }).catch((e) => console.error(`Customer notify [${event}] failed:`, e));
 }

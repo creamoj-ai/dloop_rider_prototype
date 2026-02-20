@@ -184,6 +184,11 @@ async function handlePaymentSucceeded(
       console.log(`📊 Fee audit created: order=${metadata.order_id}, total=${totalCents}, platform=${appFeeCents}`);
     }
   }
+
+  // Proactive notification to customer (fire-and-forget)
+  if (metadata.order_id) {
+    triggerCustomerNotify(metadata.order_id, "payment_received");
+  }
 }
 
 async function handlePaymentFailed(
@@ -300,6 +305,24 @@ async function verifyWebhookSignature(
   }
 
   return JSON.parse(payload);
+}
+
+// --- Proactive Notification ---
+
+function triggerCustomerNotify(orderId: string, event: string): void {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const adminKey = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
+
+  fetch(`${supabaseUrl}/functions/v1/whatsapp-notify`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Key": adminKey,
+      "Authorization": `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ order_id: orderId, event }),
+  }).catch((e) => console.error(`Customer notify [${event}] failed:`, e));
 }
 
 // --- Types ---
