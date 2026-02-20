@@ -9,7 +9,7 @@
 //
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
-import { sendWhatsAppMessage } from "../whatsapp-webhook/whatsapp_api.ts";
+import { sendTemplateOrText, WA_TEMPLATES } from "../whatsapp-webhook/whatsapp_api.ts";
 import { checkRateLimit, rateLimitResponse } from "../_shared/rate_limit.ts";
 
 const WOZ_ADMIN_KEY = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
@@ -52,15 +52,19 @@ serve(async (req: Request) => {
       );
     }
 
-    // Compose WhatsApp message
+    // Send WhatsApp notification (template with text fallback)
     const details = order_details || "nuovo ordine";
-    const message =
+    const fallbackMessage =
       `Ciao ${dealer_name}! Nuovo ordine DLOOP:\n` +
       `${details}\n\n` +
       `Rispondi OK per confermare la preparazione.`;
 
-    // Send WhatsApp message
-    const waResult = await sendWhatsAppMessage(dealer_phone, message);
+    const waResult = await sendTemplateOrText(
+      dealer_phone,
+      WA_TEMPLATES.NUOVO_ORDINE,
+      [dealer_name, details],
+      fallbackMessage
+    );
 
     if (!waResult.success) {
       console.error("WhatsApp send failed:", waResult.error);

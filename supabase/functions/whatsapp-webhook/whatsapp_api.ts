@@ -124,6 +124,35 @@ export async function sendTemplate(
   }
 }
 
+// ── Template Names (must be pre-approved on Meta Business) ─────────
+export const WA_TEMPLATES = {
+  NUOVO_ORDINE: "dloop_nuovo_ordine",     // params: [dealer_name, order_details]
+  ORDINE_CONFERMATO: "dloop_ordine_confermato", // params: [order_id, dealer_name]
+  ORDINE_PRONTO: "dloop_ordine_pronto",   // params: [order_id, estimated_time]
+  PAGAMENTO: "dloop_pagamento",           // params: [amount, payment_link]
+  BENVENUTO: "dloop_benvenuto",           // params: [customer_name]
+} as const;
+
+/**
+ * Try sending a template message first. If it fails (template not approved),
+ * fall back to a plain text message. This allows seamless transition when
+ * Meta approves templates without code changes.
+ */
+export async function sendTemplateOrText(
+  to: string,
+  templateName: string,
+  params: string[],
+  fallbackText: string
+): Promise<SendResult> {
+  // Try template first
+  const templateResult = await sendTemplate(to, templateName, params);
+  if (templateResult.success) return templateResult;
+
+  // Template failed (likely not approved yet) — fallback to plain text
+  console.log(`Template ${templateName} failed, falling back to text: ${templateResult.error}`);
+  return await sendWhatsAppMessage(to, fallbackText);
+}
+
 /**
  * Download media from WhatsApp (for voice messages).
  * Returns the raw bytes.

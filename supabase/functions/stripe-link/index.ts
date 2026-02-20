@@ -10,7 +10,7 @@
 //
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
-import { sendWhatsAppMessage } from "../whatsapp-webhook/whatsapp_api.ts";
+import { sendTemplateOrText, WA_TEMPLATES } from "../whatsapp-webhook/whatsapp_api.ts";
 import { checkRateLimit, rateLimitResponse } from "../_shared/rate_limit.ts";
 
 const WOZ_ADMIN_KEY = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
@@ -230,16 +230,21 @@ serve(async (req: Request) => {
         .eq("id", order_id);
     }
 
-    // Step 5 (optional): Send payment link to customer via WhatsApp
+    // Step 5 (optional): Send payment link to customer via WhatsApp (template with fallback)
     let waMessageId: string | null = null;
     if (customer_phone) {
-      const waMessage =
+      const fallbackMessage =
         `Ciao! Ecco il link per pagare il tuo ordine DLOOP:\n` +
         `${paymentUrl}\n\n` +
         `Importo: €${amount.toFixed(2)}\n` +
         `Grazie per aver scelto DLOOP!`;
 
-      const waResult = await sendWhatsAppMessage(customer_phone, waMessage);
+      const waResult = await sendTemplateOrText(
+        customer_phone,
+        WA_TEMPLATES.PAGAMENTO,
+        [`€${amount.toFixed(2)}`, paymentUrl],
+        fallbackMessage
+      );
       if (waResult.success) {
         waMessageId = waResult.messageId ?? null;
       } else {
