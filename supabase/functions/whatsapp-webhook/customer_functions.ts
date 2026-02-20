@@ -658,6 +658,16 @@ async function createDeliveryOrder(
     });
   }
 
+  // Get rider's pricing or use defaults
+  const { data: pricing } = await db
+    .from("rider_pricing")
+    .select("base_fee, per_km_fee")
+    .eq("rider_id", dealerContact.rider_id as string)
+    .single();
+
+  const baseEarning = (pricing?.base_fee as number) ?? 3.5;
+  const minGuarantee = Math.max(baseEarning, 3.0);
+
   // Create order in the main orders table
   const { data: order, error: orderErr } = await db
     .from("orders")
@@ -671,14 +681,14 @@ async function createDeliveryOrder(
       wa_conversation_id: conversationId,
       status: "pending",
       source: "whatsapp",
-      base_earning: 3.5,
+      base_earning: baseEarning,
       bonus_earning: 0,
       tip_amount: 0,
       rush_multiplier: 1.0,
       hold_cost: 0,
       hold_minutes: 0,
-      min_guarantee: 3.0,
-      total_earning: 3.5,
+      min_guarantee: minGuarantee,
+      total_earning: baseEarning,
       distance_km: 0,
       dealer_contact_id: dealerContact.id,
     })

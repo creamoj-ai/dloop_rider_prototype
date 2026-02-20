@@ -379,21 +379,26 @@ function getCautionDepositInfo(): string {
           "Garanzia per merci di valore trasportate (specialmente luxury)",
       },
       piano_pro: {
-        costo: "€19/mese",
+        costo: "€29/mese",
         cauzione: "€0 — NESSUNA cauzione richiesta",
         assicurazione: {
-          tipo: "RC Professionale",
-          copertura: "Danni a merci trasportate fino a €5.000/sinistro",
-          stipulata_da: "DLOOP con partner assicurativo convenzionato",
+          tipo: "Assicurazione Qover",
+          copertura_infortuni: "Infortuni durante l'attività di consegna",
+          copertura_rc: "Responsabilità civile verso terzi",
+          copertura_malattia: "Copertura in caso di malattia",
+          partner: "Qover (usato anche da Deliveroo, Glovo, Wolt)",
         },
         vantaggi_extra: [
-          "Priorità sugli ordini luxury",
+          "Assicurazione Qover inclusa",
+          "Esenzione deposito cauzionale €250",
+          "Accesso a Partner Benefits",
+          "Zone prioritarie",
           "Badge PRO visibile ai dealer",
           "Supporto prioritario",
         ],
       },
       consiglio:
-        "Per chi fa più di 3-4 consegne luxury al mese, il piano PRO si ripaga da solo con il risparmio sulla cauzione e i bonus.",
+        "Il piano PRO a €29/mese include l'assicurazione Qover e ti esonera dal deposito di €250. Si ripaga da solo con i vantaggi e la tranquillità.",
     },
   });
 }
