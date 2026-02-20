@@ -302,7 +302,7 @@ export async function executeCustomerFunction(
         args.comment as string | undefined
       );
     case "get_faq":
-      return getFaq(args.topic as string);
+      return await getFaq(db, args.topic as string);
     default:
       return JSON.stringify({ error: `Funzione sconosciuta: ${name}` });
   }
@@ -531,17 +531,39 @@ async function browseDealerMenu(
 ): Promise<string> {
   // If dealer name provided, find the dealer and their products
   if (dealerName) {
-    const pattern = `%${dealerName.trim()}%`;
-    const { data: dealers } = await db
-      .from("rider_contacts")
-      .select("id, rider_id, name, phone")
-      .eq("contact_type", "dealer")
-      .ilike("name", pattern)
-      .limit(3);
+    const normalized = dealerName.trim();
+    // Multi-pattern fuzzy search: split into words for broader matching
+    const words = normalized.split(/\s+/).filter((w) => w.length > 2);
+    const patterns = [
+      `%${normalized}%`,
+      ...words.map((w) => `%${w}%`),
+    ];
+    // Search with OR across all patterns
+    let dealers: Record<string, unknown>[] | null = null;
+    for (const pattern of patterns) {
+      const { data } = await db
+        .from("rider_contacts")
+        .select("id, rider_id, name, phone, is_available")
+        .eq("contact_type", "dealer")
+        .ilike("name", pattern)
+        .limit(5);
+      if (data && data.length > 0) {
+        dealers = data;
+        break;
+      }
+    }
 
     if (!dealers || dealers.length === 0) {
+      // List available dealers as suggestion
+      const { data: allDealers } = await db
+        .from("rider_contacts")
+        .select("name")
+        .eq("contact_type", "dealer")
+        .eq("status", "active")
+        .limit(10);
+      const names = (allDealers ?? []).map((d: Record<string, unknown>) => d.name).join(", ");
       return JSON.stringify({
-        message: `Nessun negozio trovato per "${dealerName}". Prova un nome diverso.`,
+        message: `Nessun negozio trovato per "${dealerName}".${names ? ` Negozi disponibili: ${names}` : " Prova un nome diverso."}`,
       });
     }
 
@@ -557,6 +579,7 @@ async function browseDealerMenu(
 
       results.push({
         dealer_name: dealer.name,
+        is_available: dealer.is_available !== false,
         products: (products ?? []).map((p: Record<string, unknown>) => ({
           id: p.id,
           name: p.name,
@@ -716,6 +739,53 @@ async function createDeliveryOrder(
     console.error("Failed to create relay:", relayErr);
   }
 
+  // Get relay ID for stripe-link
+  const { data: relayData } = await db
+    .from("order_relays")
+    .select("id")
+    .eq("order_id", order.id)
+    .limit(1)
+    .single();
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const adminKey = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Admin-Key": adminKey,
+    "Authorization": `Bearer ${anonKey}`,
+  };
+
+  // Auto-dispatch: fire-and-forget
+  try {
+    fetch(`${supabaseUrl}/functions/v1/dispatch-order`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ order_id: order.id }),
+    }).catch((e) => console.error("Auto-dispatch failed:", e));
+  } catch (e) {
+    console.error("Auto-dispatch error:", e);
+  }
+
+  // Auto-generate Stripe payment link: fire-and-forget
+  if (relayData?.id) {
+    try {
+      fetch(`${supabaseUrl}/functions/v1/stripe-link`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          relay_id: relayData.id,
+          amount: baseEarning,
+          description: opts.items,
+          customer_phone: phone,
+          order_id: order.id,
+        }),
+      }).catch((e) => console.error("Auto-stripe-link failed:", e));
+    } catch (e) {
+      console.error("Auto-stripe-link error:", e);
+    }
+  }
+
   return JSON.stringify({
     success: true,
     order_id: (order.id as string).slice(0, 8),
@@ -723,7 +793,8 @@ async function createDeliveryOrder(
     items: opts.items,
     delivery_address: opts.deliveryAddress,
     estimated_time: "30-45 min",
-    message: `Ordine inviato a ${dealerContact.name}! ID: ${(order.id as string).slice(0, 8)}. Il rider ti aggiornerà sullo stato. Tempo stimato: 30-45 min.`,
+    payment_link: "In arrivo via WhatsApp",
+    message: `Ordine inviato a ${dealerContact.name}! ID: ${(order.id as string).slice(0, 8)}. Riceverai il link di pagamento a breve. Tempo stimato: 30-45 min.`,
   });
 }
 
@@ -832,7 +903,37 @@ async function submitFeedback(
   });
 }
 
-function getFaq(topic: string): string {
+async function getFaq(db: SupabaseClient, topic: string): Promise<string> {
+  const key = topic.toLowerCase().trim();
+
+  // Try DB first (faq_entries table)
+  const { data: faqRows } = await db
+    .from("faq_entries")
+    .select("topic, answer")
+    .eq("is_active", true);
+
+  if (faqRows && faqRows.length > 0) {
+    // Exact match
+    const exact = faqRows.find(
+      (r: Record<string, unknown>) => (r.topic as string).toLowerCase() === key
+    );
+    if (exact) return JSON.stringify({ answer: exact.answer });
+
+    // Fuzzy match
+    for (const row of faqRows) {
+      const faqKey = (row.topic as string).toLowerCase();
+      if (key.includes(faqKey) || faqKey.includes(key)) {
+        return JSON.stringify({ answer: row.answer });
+      }
+    }
+
+    const topics = faqRows.map((r: Record<string, unknown>) => r.topic).join(", ");
+    return JSON.stringify({
+      answer: `Non ho una risposta specifica. Posso aiutarti con: ${topics}.`,
+    });
+  }
+
+  // Fallback: hardcoded FAQ (used if faq_entries table doesn't exist or is empty)
   const faqs: Record<string, string> = {
     tempi:
       "La consegna richiede di solito 30-60 minuti, a seconda della distanza e del tempo di preparazione del negozio.",
@@ -852,20 +953,12 @@ function getFaq(topic: string): string {
       "Puoi annullare un ordine solo se è ancora in stato 'in attesa'. Una volta confermato dal negozio, non è più annullabile.",
   };
 
-  const key = topic.toLowerCase().trim();
-
-  // Try exact match
-  if (faqs[key]) {
-    return JSON.stringify({ answer: faqs[key] });
-  }
-
-  // Fuzzy match
+  if (faqs[key]) return JSON.stringify({ answer: faqs[key] });
   for (const [faqKey, answer] of Object.entries(faqs)) {
     if (key.includes(faqKey) || faqKey.includes(key)) {
       return JSON.stringify({ answer });
     }
   }
-
   return JSON.stringify({
     answer:
       "Non ho una risposta specifica per questa domanda. Posso aiutarti con: tempi, costi, zone, pagamento, come funziona, supporto, orari, annullamento.",
