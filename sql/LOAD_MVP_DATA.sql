@@ -1,0 +1,616 @@
+-- ============================================
+-- LOAD MVP TEST DATA - ESEGUI IN ORDINE
+-- ============================================
+-- Questo file contiene tutti gli script da caricare su Supabase
+--
+-- ISTRUZIONI:
+-- 1. Vai su https://app.supabase.com/
+-- 2. Seleziona il tuo progetto
+-- 3. Vai a "SQL Editor"
+-- 4. Copia tutto il contenuto di questo file
+-- 5. Incolla nel SQL Editor
+-- 6. Premi "Run"
+--
+-- I dati saranno caricati automaticamente per l'utente: creamoj@gmail.com
+-- ============================================
+
+-- ============================================
+-- STEP 1/3: Create clients table
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.clients (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    rider_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    phone TEXT,
+    address TEXT,
+    lat DOUBLE PRECISION,
+    lng DOUBLE PRECISION,
+    zone_id UUID REFERENCES public.hot_zones(id) ON DELETE SET NULL,
+    loyalty_tier TEXT NOT NULL DEFAULT 'bronze' CHECK (loyalty_tier IN ('bronze', 'silver', 'gold', 'platinum')),
+    loyalty_points INT NOT NULL DEFAULT 0,
+    total_orders INT NOT NULL DEFAULT 0,
+    total_spent NUMERIC(10,2) NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'vip')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_clients_rider_id ON public.clients(rider_id);
+CREATE INDEX IF NOT EXISTS idx_clients_status ON public.clients(status);
+CREATE INDEX IF NOT EXISTS idx_clients_zone_id ON public.clients(zone_id);
+
+-- RLS
+ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Riders can view own clients"
+    ON public.clients FOR SELECT
+    USING (rider_id = auth.uid());
+
+CREATE POLICY "Riders can insert own clients"
+    ON public.clients FOR INSERT
+    WITH CHECK (rider_id = auth.uid());
+
+CREATE POLICY "Riders can update own clients"
+    ON public.clients FOR UPDATE
+    USING (rider_id = auth.uid());
+
+CREATE POLICY "Riders can delete own clients"
+    ON public.clients FOR DELETE
+    USING (rider_id = auth.uid());
+
+-- Enable Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.clients;
+
+-- Updated_at trigger
+CREATE OR REPLACE FUNCTION public.update_clients_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_clients_updated_at
+    BEFORE UPDATE ON public.clients
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_clients_updated_at();
+
+-- ============================================
+-- STEP 2/3: Insert 500 products (250 grocery + 250 pet)
+-- ============================================
+DO $$
+DECLARE
+  v_rider_id UUID;
+BEGIN
+  SELECT id INTO v_rider_id FROM auth.users WHERE email = 'creamoj@gmail.com' LIMIT 1;
+  IF v_rider_id IS NULL THEN
+    RAISE NOTICE 'No rider found for creamoj@gmail.com';
+    RETURN;
+  END IF;
+
+  -- GROCERY PRODUCTS (250 items)
+  INSERT INTO market_products (rider_id, name, category, description, price, cost_price, stock, is_active) VALUES
+  -- Pasta & Cereals
+  (v_rider_id, 'Pasta Barilla 500g', 'bevande', 'Spaghetti Barilla', 2.50, 1.20, 10, true),
+  (v_rider_id, 'Riso Arborio 1kg', 'bevande', 'Riso per risotto', 3.20, 1.60, 8, true),
+  (v_rider_id, 'Pane tostato Mulino', 'bevande', 'Pane tostato integrale', 2.80, 1.40, 12, true),
+  (v_rider_id, 'Cornflakes Kelloggs', 'bevande', 'Cereali colazione', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Farina 0 Molino Grassi', 'bevande', 'Farina di grano tenero', 1.80, 0.90, 20, true),
+  (v_rider_id, 'Pasta all''uovo Rustichella', 'bevande', 'Spaghetti all''uovo', 4.20, 2.10, 8, true),
+  (v_rider_id, 'Orzo Peroni', 'bevande', 'Orzotto', 2.10, 1.05, 10, true),
+  (v_rider_id, 'Cous cous Barilla', 'bevande', 'Cous cous integrale', 2.70, 1.35, 12, true),
+  (v_rider_id, 'Pane azzimo Streits', 'bevande', 'Pane sans levain', 3.80, 1.90, 6, true),
+  (v_rider_id, 'Muesli Nestlé', 'bevande', 'Muesli con frutta secca', 4.50, 2.25, 7, true),
+  (v_rider_id, 'Pasta integrale De Cecco', 'bevande', 'Penne integrali', 2.90, 1.45, 11, true),
+  (v_rider_id, 'Pane carasau Sardus', 'bevande', 'Pane carasau tradizionale', 2.40, 1.20, 14, true),
+  (v_rider_id, 'Riso integrale Scotti', 'bevande', 'Riso integrale', 3.60, 1.80, 9, true),
+  (v_rider_id, 'Pasta fresca Rana', 'bevande', 'Tagliatelle fresche', 3.80, 1.90, 7, true),
+  (v_rider_id, 'Biscotti Mulino Bianco', 'bevande', 'Biscotti integrali', 2.60, 1.30, 13, true),
+  (v_rider_id, 'Crackers Mulino Bianco', 'bevande', 'Crackers ai cereali', 1.90, 0.95, 18, true),
+  (v_rider_id, 'Avena istantanea Quaker', 'bevande', 'Avena per porridge', 3.20, 1.60, 10, true),
+  (v_rider_id, 'Polenta Bramata', 'bevande', 'Polenta istantanea', 1.50, 0.75, 22, true),
+  (v_rider_id, 'Pasta biologica Montebello', 'bevande', 'Penne biologiche', 3.40, 1.70, 9, true),
+  (v_rider_id, 'Biscotti al cioccolato Pavesi', 'bevande', 'Biscotti al cioccolato', 2.20, 1.10, 16, true),
+  (v_rider_id, 'Latte intero Granarolo 1L', 'bevande', 'Latte intero fresco', 1.50, 0.75, 25, true),
+  (v_rider_id, 'Latte scremato Parmalat 1L', 'bevande', 'Latte scremato', 1.30, 0.65, 27, true),
+  (v_rider_id, 'Yogurt Danone 150g', 'bevande', 'Yogurt bianco naturale', 0.85, 0.42, 30, true),
+  (v_rider_id, 'Mozzarella di bufala 250g', 'bevande', 'Mozzarella fresca', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Parmigiano Reggiano 200g', 'bevande', 'Parmigiano DOP', 6.80, 3.40, 5, true),
+  (v_rider_id, 'Ricotta Galbani 500g', 'bevande', 'Ricotta di mucca', 3.20, 1.60, 8, true),
+  (v_rider_id, 'Yogurt greco Fage 150g', 'bevande', 'Yogurt greco', 1.80, 0.90, 20, true),
+  (v_rider_id, 'Formaggi misti Galbani 250g', 'bevande', 'Assortimento formaggi', 5.50, 2.75, 5, true),
+  (v_rider_id, 'Burro Lurisia 250g', 'bevande', 'Burro panna fresca', 3.80, 1.90, 7, true),
+  (v_rider_id, 'Formaggio Emmental 300g', 'bevande', 'Emmental fette', 4.20, 2.10, 6, true),
+  (v_rider_id, 'Pollo intero Aia 1.2kg', 'bevande', 'Pollo allevamento controllato', 7.50, 3.75, 4, true),
+  (v_rider_id, 'Petto di pollo 500g', 'bevande', 'Petto di pollo fresco', 6.80, 3.40, 5, true),
+  (v_rider_id, 'Coscia di pollo 600g', 'bevande', 'Coscia di pollo', 5.20, 2.60, 6, true),
+  (v_rider_id, 'Speck San Daniele 100g', 'bevande', 'Speck DOP affettato', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Prosciutto Parma 100g', 'bevande', 'Prosciutto DOP', 6.50, 3.25, 5, true),
+  (v_rider_id, 'Mortadella Bologna 200g', 'bevande', 'Mortadella IGP', 4.20, 2.10, 7, true),
+  (v_rider_id, 'Pancetta affumicata 100g', 'bevande', 'Pancetta artigianale', 3.80, 1.90, 8, true),
+  (v_rider_id, 'Carne macinata di vitello', 'bevande', 'Vitello macinato fresco', 8.50, 4.25, 3, true),
+  (v_rider_id, 'Fesa di vitello 600g', 'bevande', 'Fesa di vitello', 12.50, 6.25, 2, true),
+  (v_rider_id, 'Bistecca di manzo 400g', 'bevande', 'Bistecca prima scelta', 14.80, 7.40, 2, true),
+  (v_rider_id, 'Pomodori ciliegini 500g', 'bevande', 'Pomodori freschi', 2.80, 1.40, 12, true),
+  (v_rider_id, 'Insalata iceberg 1 pezzo', 'bevande', 'Insalata fresca', 1.50, 0.75, 20, true),
+  (v_rider_id, 'Spinaci freschi 300g', 'bevande', 'Spinaci novelli', 2.20, 1.10, 14, true),
+  (v_rider_id, 'Insalata verde 300g', 'bevande', 'Mix salate', 1.80, 0.90, 18, true),
+  (v_rider_id, 'Carote 1kg', 'bevande', 'Carote fresche', 1.20, 0.60, 30, true),
+  (v_rider_id, 'Zucchine 1kg', 'bevande', 'Zucchine italiane', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Peperoni rossi 1kg', 'bevande', 'Peperoni freschi', 3.50, 1.75, 10, true),
+  (v_rider_id, 'Melanzane 1kg', 'bevande', 'Melanzane fresche', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Cipolle 1kg', 'bevande', 'Cipolle gialle', 1.10, 0.55, 35, true),
+  (v_rider_id, 'Aglio 500g', 'bevande', 'Aglio bianco', 2.50, 1.25, 10, true),
+  (v_rider_id, 'Broccoli 500g', 'bevande', 'Broccoli calabresi', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Cavolfiore 600g', 'bevande', 'Cavolfiore fresco', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Limoni 1kg', 'bevande', 'Limoni freschi', 1.80, 0.90, 18, true),
+  (v_rider_id, 'Banane 1kg', 'bevande', 'Banane gialle', 1.60, 0.80, 20, true),
+  (v_rider_id, 'Mele Gala 1kg', 'bevande', 'Mele rosse', 2.10, 1.05, 16, true),
+  (v_rider_id, 'Pera Williams 1kg', 'bevande', 'Pere fresche', 2.30, 1.15, 14, true),
+  (v_rider_id, 'Arance 2kg', 'bevande', 'Arance rosse', 2.50, 1.25, 13, true),
+  (v_rider_id, 'Kiwi 4 pezzi', 'bevande', 'Kiwi verdi', 1.80, 0.90, 19, true),
+  (v_rider_id, 'Fragole 400g', 'bevande', 'Fragole fresche', 3.80, 1.90, 8, true),
+  (v_rider_id, 'Mirtilli 150g', 'bevande', 'Mirtilli freschi', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Olio extravergine 500ml', 'bevande', 'Olio EVO DOP', 7.80, 3.90, 4, true),
+  (v_rider_id, 'Aceto balsamico 250ml', 'bevande', 'Aceto balsamico', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Salsa di pomodoro 500g', 'bevande', 'Sugo pronto', 1.80, 0.90, 20, true),
+  (v_rider_id, 'Maionese Hellmann''s 475ml', 'bevande', 'Maionese classica', 3.20, 1.60, 10, true),
+  (v_rider_id, 'Ketchup Heinz 500ml', 'bevande', 'Ketchup americano', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Mostarda Cremona 500g', 'bevande', 'Mostarda di frutta', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Salsa soia Kikkoman 150ml', 'bevande', 'Salsa soia', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Pepe nero macinato 50g', 'bevande', 'Pepe fresco', 3.50, 1.75, 8, true),
+  (v_rider_id, 'Sale fino iodato 1kg', 'bevande', 'Sale da cucina', 0.80, 0.40, 40, true),
+  (v_rider_id, 'Origano secco 50g', 'bevande', 'Origano secco', 3.20, 1.60, 9, true),
+  (v_rider_id, 'Acqua minerale 1.5L', 'bevande', 'Acqua naturale', 0.60, 0.30, 50, true),
+  (v_rider_id, 'Acqua minerale frizzante', 'bevande', 'Acqua gassata', 0.65, 0.32, 48, true),
+  (v_rider_id, 'Caffè Lavazza 250g', 'bevande', 'Caffè macinato', 3.80, 1.90, 8, true),
+  (v_rider_id, 'Caffè Illy 250g', 'bevande', 'Caffè tostato', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Thé nero 25 bustine', 'bevande', 'Thé classico', 1.80, 0.90, 18, true),
+  (v_rider_id, 'Thé verde 25 bustine', 'bevande', 'Thé verde fresco', 2.10, 1.05, 15, true),
+  (v_rider_id, 'Camomilla 25 bustine', 'bevande', 'Camomilla dolce', 1.50, 0.75, 22, true),
+  (v_rider_id, 'Latte intero UHT 1L', 'bevande', 'Latte a lunga conservazione', 1.20, 0.60, 28, true),
+  (v_rider_id, 'Succo d''arancia Zuegg 1L', 'bevande', 'Succo 100% naturale', 2.50, 1.25, 13, true),
+  (v_rider_id, 'Succo di mela Sunpride', 'bevande', 'Succo di mela', 1.80, 0.90, 19, true),
+  (v_rider_id, 'Coca Cola 1.5L', 'bevande', 'Bibita gassata', 2.10, 1.05, 15, true),
+  (v_rider_id, 'Fanta aranciata 1.5L', 'bevande', 'Bibita arancia', 1.80, 0.90, 18, true),
+  (v_rider_id, 'Sprite 1.5L', 'bevande', 'Bibita limone', 2.00, 1.00, 16, true),
+  (v_rider_id, 'Limonata San Pellegrino', 'bevande', 'Bibita naturale', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Tè freddo Estathé 250ml', 'bevande', 'Thé freddo', 1.50, 0.75, 22, true),
+  (v_rider_id, 'Vino rosso Barolo 750ml', 'bevande', 'Vino piemontese', 12.50, 6.25, 3, true),
+  (v_rider_id, 'Vino bianco Pinot Grigio', 'bevande', 'Vino veneto', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Birra Heineken 500ml', 'bevande', 'Birra bionda', 1.80, 0.90, 19, true),
+  (v_rider_id, 'Prosecco Valdobbiadene', 'bevande', 'Spumante veneto', 9.80, 4.90, 3, true),
+  (v_rider_id, 'Champagne Moët & Chandon', 'bevande', 'Champagne francese', 25.50, 12.75, 1, true),
+  (v_rider_id, 'Chocolate Lindt 100g', 'bevande', 'Cioccolato svizzero', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Perugina Bacio 125g', 'bevande', 'Cioccolatini', 3.50, 1.75, 9, true),
+  (v_rider_id, 'M&M''s 200g', 'bevande', 'Caramelle cioccolato', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Kinder Sorpresa', 'bevande', 'Ovetto sorpresa', 1.20, 0.60, 26, true),
+  (v_rider_id, 'Ferrero Rocher 100g', 'bevande', 'Cioccolatini premium', 3.80, 1.90, 8, true),
+  (v_rider_id, 'Raffaello 100g', 'bevande', 'Dolcetti al cocco', 3.20, 1.60, 10, true),
+  (v_rider_id, 'Snickers 45g', 'bevande', 'Barretta cacahuete', 0.90, 0.45, 32, true),
+  (v_rider_id, 'Mars 45g', 'bevande', 'Barretta nougat', 0.90, 0.45, 32, true),
+  (v_rider_id, 'Twix 45g', 'bevande', 'Barretta caramello', 0.80, 0.40, 35, true),
+  (v_rider_id, 'Bounty 45g', 'bevande', 'Barretta cocco', 0.85, 0.42, 33, true),
+  (v_rider_id, 'Tuc Crackers 100g', 'bevande', 'Cracker salati', 1.50, 0.75, 21, true),
+  (v_rider_id, 'Doritos Naturale 150g', 'bevande', 'Snack mais', 1.80, 0.90, 19, true),
+  (v_rider_id, 'Lay''s Classiche 150g', 'bevande', 'Chips di patate', 1.50, 0.75, 21, true),
+  (v_rider_id, 'Pringles Paprika 150g', 'bevande', 'Chips tubolari', 2.10, 1.05, 15, true),
+  (v_rider_id, 'Nutella 750g', 'bevande', 'Crema nocciola', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Barattolo arachidi', 'bevande', 'Arachidi tostate', 3.50, 1.75, 9, true),
+  (v_rider_id, 'Noci sgusciate 200g', 'bevande', 'Noci crude', 4.80, 2.40, 5, true),
+  (v_rider_id, 'Mandorle tostate 200g', 'bevande', 'Mandorle naturali', 5.50, 2.75, 5, true),
+  (v_rider_id, 'Pistacchio sgusciato 200g', 'bevande', 'Pistacchio siciliano', 7.50, 3.75, 3, true),
+  (v_rider_id, 'Caramelle Haribo 200g', 'bevande', 'Caramelle gommose', 1.50, 0.75, 21, true),
+  (v_rider_id, 'Pizza surgelata 400g', 'bevande', 'Pizza classica', 3.50, 1.75, 9, true),
+  (v_rider_id, 'Verdure miste surgelate', 'bevande', 'Minestrona', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Piselli surgelati 400g', 'bevande', 'Piselli freschi', 1.80, 0.90, 19, true),
+  (v_rider_id, 'Spinaci surgelati 300g', 'bevande', 'Spinaci blanchiati', 2.10, 1.05, 15, true),
+  (v_rider_id, 'Gelato Algida Stracciatella', 'bevande', 'Gelato vasca', 3.80, 1.90, 8, true),
+  (v_rider_id, 'Bastoncini pesce Findus', 'bevande', 'Fish fingers', 5.50, 2.75, 5, true),
+  (v_rider_id, 'Crocchette di patate', 'bevande', 'Crocchette surgelate', 4.20, 2.10, 6, true),
+  (v_rider_id, 'Lasagna della nonna Findus', 'bevande', 'Lasagna pronta', 6.50, 3.25, 4, true),
+  (v_rider_id, 'Arancini siciliani 400g', 'bevande', 'Arancini fritti', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Gnocchi di patata 400g', 'bevande', 'Gnocchi freschi', 3.50, 1.75, 9, true),
+  (v_rider_id, 'Tortellini ricotta e spinaci', 'bevande', 'Tortellini fresco', 4.80, 2.40, 5, true),
+  (v_rider_id, 'Cannelloni farciti 400g', 'bevande', 'Cannelloni pronti', 5.50, 2.75, 5, true),
+  (v_rider_id, 'Polpettine di carne surgelate', 'bevande', 'Polpette surgelate', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Pollo nuggets 300g', 'bevande', 'Nuggets pollo', 4.20, 2.10, 6, true),
+  (v_rider_id, 'Patatine fritte 500g', 'bevande', 'French fries', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Broccoli rametti surgelati', 'bevande', 'Broccoli verdure', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Latte fresco 500ml', 'bevande', 'Latte colazione', 0.95, 0.47, 32, true),
+  (v_rider_id, 'Succo d''arancia fresco 500ml', 'bevande', 'Succo fresco', 2.10, 1.05, 15, true),
+  (v_rider_id, 'Panettone Motta 750g', 'bevande', 'Panettone natalizio', 7.50, 3.75, 3, true),
+  (v_rider_id, 'Biscotti della domenica', 'bevande', 'Biscotti colazione', 1.80, 0.90, 19, true),
+  (v_rider_id, 'Torta margherita Motta', 'bevande', 'Torta surgelata', 3.50, 1.75, 9, true),
+  (v_rider_id, 'Croissant al cioccolato 4pz', 'bevande', 'Cornetti surgelati', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Marmellata di fragola', 'bevande', 'Confettura fragola', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Miele acacia 500g', 'bevande', 'Miele naturale', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Formaggio fresco spalmabile', 'bevande', 'Spalmabile latteria', 1.80, 0.90, 19, true),
+  (v_rider_id, 'Prosciutto cotto 100g', 'bevande', 'Affettato scelta', 1.50, 0.75, 21, true),
+  (v_rider_id, 'Uova fresche 6 pezzi', 'bevande', 'Uova allevamento', 2.10, 1.05, 15, true),
+  (v_rider_id, 'Burro panna fresca 250g', 'bevande', 'Burro qualità', 3.20, 1.60, 10, true),
+  (v_rider_id, 'Caffè in cialde 36 pz', 'bevande', 'Caffè monodose', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Riso Basmati 1kg', 'bevande', 'Riso indiano', 3.50, 1.75, 9, true),
+  (v_rider_id, 'Quinoa 500g', 'bevande', 'Quinoa biologica', 6.50, 3.25, 4, true),
+  (v_rider_id, 'Lenticchie rosse 500g', 'bevande', 'Lenticchie secche', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Ceci secchi 1kg', 'bevande', 'Ceci biologici', 3.20, 1.60, 10, true),
+  (v_rider_id, 'Fagioli neri 500g', 'bevande', 'Fagioli secchi', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Tofu biologico 400g', 'bevande', 'Tofu fresco', 3.80, 1.90, 8, true),
+  (v_rider_id, 'Tempeh biologico 200g', 'bevande', 'Tempeh fermentato', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Seitan 250g', 'bevande', 'Seitan proteico', 4.20, 2.10, 6, true),
+  (v_rider_id, 'Latte di mandorla 1L', 'bevande', 'Bevanda vegetale', 2.10, 1.05, 15, true),
+  (v_rider_id, 'Latte di soia 1L', 'bevande', 'Bevanda soia', 1.80, 0.90, 19, true),
+  (v_rider_id, 'Latte di riso 1L', 'bevande', 'Bevanda riso', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Bevanda di cocco 1L', 'bevande', 'Bevanda coconut', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Burro di arachidi 500g', 'bevande', 'Burro arachidi puro', 5.50, 2.75, 5, true),
+  (v_rider_id, 'Burro di mandorla 250g', 'bevande', 'Burro mandorle', 6.80, 3.40, 4, true),
+  (v_rider_id, 'Tahina 300g', 'bevande', 'Tahina semi sesamo', 4.20, 2.10, 6, true),
+  (v_rider_id, 'Miele di manuka 500g', 'bevande', 'Miele medicato', 15.50, 7.75, 2, true),
+  (v_rider_id, 'Melassa 500g', 'bevande', 'Melassa di canna', 3.50, 1.75, 9, true),
+  (v_rider_id, 'Zucchero di canna 1kg', 'bevande', 'Zucchero biologico', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Stevia 100g', 'bevande', 'Dolcificante naturale', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Eritritolo 500g', 'bevande', 'Dolcificante zero calorie', 6.50, 3.25, 4, true),
+  (v_rider_id, 'Farina di mandorla 200g', 'bevande', 'Farina proteica', 4.80, 2.40, 5, true),
+  (v_rider_id, 'Farina di cocco 200g', 'bevande', 'Farina basso indice', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Crusca di avena 500g', 'bevande', 'Crusca fibre', 3.20, 1.60, 10, true),
+  (v_rider_id, 'Germe di grano 200g', 'bevande', 'Germe proteico', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Lievito nutritivo 200g', 'bevande', 'Lievito salato', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Lievito birra 150g', 'bevande', 'Lievito umido', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Acido citrico 500g', 'bevande', 'Conservante naturale', 2.80, 1.40, 11, true),
+  (v_rider_id, 'Bicarbonato 500g', 'bevande', 'Bicarbonato puro', 1.50, 0.75, 21, true),
+  (v_rider_id, 'Sale himalayano 500g', 'bevande', 'Sale rosa', 3.80, 1.90, 8, true),
+  (v_rider_id, 'Alghe nori 10 fogli', 'bevande', 'Alghe sushi', 2.50, 1.25, 12, true),
+  (v_rider_id, 'Kombu 100g', 'bevande', 'Alga marina', 3.20, 1.60, 10, true),
+  (v_rider_id, 'Spirulina 100g', 'bevande', 'Alga blu-verde', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Chlorella 100g', 'bevande', 'Alga verde', 9.80, 4.90, 3, true),
+  (v_rider_id, 'Polline d''api 200g', 'bevande', 'Polline fresco', 12.50, 6.25, 2, true),
+  (v_rider_id, 'Propoli 30ml', 'bevande', 'Estratto propoli', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Miele di manuka 250g', 'bevande', 'Miele medicato premium', 18.50, 9.25, 1, true),
+  (v_rider_id, 'Aceto di mele biologico', 'bevande', 'Aceto naturale', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Aceto di riso 500ml', 'bevande', 'Aceto giapponese', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Olio di cocco 500ml', 'bevande', 'Olio vegetale', 6.80, 3.40, 4, true),
+  (v_rider_id, 'Olio di avocado 500ml', 'bevande', 'Olio premium', 7.50, 3.75, 3, true),
+  (v_rider_id, 'Olio di sesamo 250ml', 'bevande', 'Olio aromatico', 6.50, 3.25, 4, true),
+  (v_rider_id, 'Olio di lino 250ml', 'bevande', 'Olio omega-3', 7.80, 3.90, 4, true),
+  (v_rider_id, 'Burro di cacao puro 100g', 'bevande', 'Burro cacao', 5.50, 2.75, 5, true),
+  (v_rider_id, 'Cacao in polvere 200g', 'bevande', 'Cacao amaro', 4.20, 2.10, 6, true),
+  (v_rider_id, 'Cacao magro 200g', 'bevande', 'Cacao senza grassi', 3.80, 1.90, 8, true),
+  (v_rider_id, 'Fave di cacao 200g', 'bevande', 'Cacao grezzo', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Caffè verde 500g', 'bevande', 'Caffè non torrefatto', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Chicchi di caffè interi', 'bevande', 'Caffè arabica', 9.50, 4.75, 3, true),
+  (v_rider_id, 'Caffè decaffeinato biologico', 'bevande', 'Caffè senza caffeina bio', 7.50, 3.75, 3, true),
+  (v_rider_id, 'Matcha in polvere 100g', 'bevande', 'Thé verde polvere', 12.50, 6.25, 2, true),
+  (v_rider_id, 'Matcha latte kit 50g', 'bevande', 'Kit matcha completo', 14.50, 7.25, 2, true),
+  (v_rider_id, 'Thé pu-erh 100g', 'bevande', 'Thé fermentato', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Thé chai 100g', 'bevande', 'Thé spezie', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Thé rooibos 100g', 'bevande', 'Thé rosso sudafricano', 4.50, 2.25, 6, true),
+  (v_rider_id, 'Erbe aromatiche miste', 'bevande', 'Thé tisana mista', 3.50, 1.75, 9, true),
+  (v_rider_id, 'Paprika affumicata 100g', 'bevande', 'Paprika ungherese', 5.80, 2.90, 5, true),
+  (v_rider_id, 'Curcuma in polvere 100g', 'bevande', 'Curcuma fresca', 6.50, 3.25, 4, true),
+  (v_rider_id, 'Zenzero secco 100g', 'bevande', 'Zenzero macinato', 5.50, 2.75, 5, true),
+  (v_rider_id, 'Peperoncino di Cayenna', 'bevande', 'Peperoncino rosso', 4.80, 2.40, 5, true);
+
+  RAISE NOTICE 'Seeded 250 grocery products for rider %', v_rider_id;
+
+  -- PET PRODUCTS (250 items)
+  INSERT INTO market_products (rider_id, name, category, description, price, cost_price, stock, is_active) VALUES
+  (v_rider_id, 'Purina ProPlan Adult 14kg', 'integratori', 'Cibo cani adulti', 28.50, 14.25, 2, true),
+  (v_rider_id, 'Royal Canin Large Adult', 'integratori', 'Cibo razze grandi', 32.80, 16.40, 2, true),
+  (v_rider_id, 'Bosch Soft 12kg', 'integratori', 'Cibo morbido naturale', 24.50, 12.25, 2, true),
+  (v_rider_id, 'Farmina ND Chicken Puppy', 'integratori', 'Cibo cuccioli', 26.50, 13.25, 2, true),
+  (v_rider_id, 'Acana Grasslands 11.4kg', 'integratori', 'Cibo senza cereali', 35.50, 17.75, 2, true),
+  (v_rider_id, 'Orijen High Protein', 'integratori', 'Cibo proteico', 38.80, 19.40, 2, true),
+  (v_rider_id, 'Taste of Wild High Prairie', 'integratori', 'Cibo grano-free', 34.50, 17.25, 2, true),
+  (v_rider_id, 'Go! Natural Grain Free', 'integratori', 'Cibo naturale', 29.80, 14.90, 2, true),
+  (v_rider_id, 'Purina ONE Ricco di Carne', 'integratori', 'Cibo proteico cane', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Hill''s Science Diet Adult', 'integratori', 'Cibo scientificamente', 27.50, 13.75, 2, true),
+  (v_rider_id, 'Iams ProActive Health', 'integratori', 'Cibo salute attivo', 19.80, 9.90, 2, true),
+  (v_rider_id, 'Pedigree Carne e Verdure', 'integratori', 'Cibo economico', 12.50, 6.25, 3, true),
+  (v_rider_id, 'Friskies Mix', 'integratori', 'Cibo variato cane', 10.80, 5.40, 3, true),
+  (v_rider_id, 'Sheba Umido 200g', 'integratori', 'Cibo umido monoporzione', 0.95, 0.47, 50, true),
+  (v_rider_id, 'Cesar Umido 150g', 'integratori', 'Pasto umido delicato', 1.20, 0.60, 45, true),
+  (v_rider_id, 'N&D Chicken & Pomegranate', 'integratori', 'Cibo pollo melograno', 30.80, 15.40, 2, true),
+  (v_rider_id, 'Brit Premium by Nature', 'integratori', 'Cibo premium britannico', 23.50, 11.75, 2, true),
+  (v_rider_id, 'Canine Pro Plan Sensitive', 'integratori', 'Cibo sensibilità cane', 25.80, 12.90, 2, true),
+  (v_rider_id, 'German Sheperd Mix', 'integratori', 'Cibo pastore tedesco', 28.50, 14.25, 2, true),
+  (v_rider_id, 'Labrador Specialized', 'integratori', 'Cibo labrador specifico', 27.80, 13.90, 2, true),
+  (v_rider_id, 'Small Breed Mix', 'integratori', 'Cibo razze piccole', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Urinary Care', 'integratori', 'Cibo cure urinarie', 26.50, 13.25, 2, true),
+  (v_rider_id, 'Skin Coat Health', 'integratori', 'Cibo pelle e mantello', 29.50, 14.75, 2, true),
+  (v_rider_id, 'Weight Control', 'integratori', 'Cibo controllo peso', 24.80, 12.40, 2, true),
+  (v_rider_id, 'Adult Sensitive Stomach', 'integratori', 'Cibo stomaco sensibile', 21.50, 10.75, 2, true),
+  (v_rider_id, 'Puppy Large Breed', 'integratori', 'Cibo cuccioli gatti grandi', 29.50, 14.75, 2, true),
+  (v_rider_id, 'Senior 10+ Years', 'integratori', 'Cibo cani anziani', 23.50, 11.75, 2, true),
+  (v_rider_id, 'Active Outdoor', 'integratori', 'Cibo cani attivi', 26.50, 13.25, 2, true),
+  (v_rider_id, 'Sterilized Grain Free', 'integratori', 'Cibo sterilizzati', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Dental Care', 'integratori', 'Cibo salute dentale', 24.50, 12.25, 2, true),
+  (v_rider_id, 'Immune Health Support', 'integratori', 'Cibo sistema immunitario', 27.50, 13.75, 2, true),
+  (v_rider_id, 'Joint Health', 'integratori', 'Cibo salute articolazioni', 28.50, 14.25, 2, true),
+  (v_rider_id, 'Soft Mouth Chunks', 'integratori', 'Cibo morbido morsi', 19.50, 9.75, 3, true),
+  (v_rider_id, 'Beef & Vegetable Mix', 'integratori', 'Cibo manzo verdure', 18.80, 9.40, 3, true),
+  (v_rider_id, 'Chicken & Rice Formula', 'integratori', 'Cibo pollo riso', 16.50, 8.25, 3, true),
+  (v_rider_id, 'Turkey & Sweet Potato', 'integratori', 'Cibo tacchino patata dolce', 25.50, 12.75, 2, true),
+  (v_rider_id, 'Lamb & Barley', 'integratori', 'Cibo agnello orzo', 21.80, 10.90, 2, true),
+  (v_rider_id, 'Fish & Potato', 'integratori', 'Cibo pesce patata', 23.50, 11.75, 2, true),
+  (v_rider_id, 'Duck & Pea', 'integratori', 'Cibo anatra piselli', 26.50, 13.25, 2, true),
+  (v_rider_id, 'Rabbit & Vegetables', 'integratori', 'Cibo coniglio verdure', 27.80, 13.90, 2, true),
+  (v_rider_id, 'Venison & Beans', 'integratori', 'Cibo cervo fagioli', 28.50, 14.25, 2, true),
+  (v_rider_id, 'Buffalo & Apples', 'integratori', 'Cibo bufalo mele', 29.50, 14.75, 2, true),
+  (v_rider_id, 'Bison & Salmon', 'integratori', 'Cibo bisonte salmone', 32.50, 16.25, 2, true),
+  (v_rider_id, 'Kangaroo & Lentils', 'integratori', 'Cibo canguro lenticchie', 31.50, 15.75, 2, true),
+  (v_rider_id, 'Ostrich & Fruits', 'integratori', 'Cibo struzzo frutti', 30.50, 15.25, 2, true),
+  (v_rider_id, 'Organic Grain Free', 'integratori', 'Cibo biologico senza grani', 35.80, 17.90, 2, true),
+  (v_rider_id, 'Raw Frozen Diet', 'integratori', 'Cibo crudo congelato', 28.50, 14.25, 2, true),
+  (v_rider_id, 'Freeze Dried Raw', 'integratori', 'Cibo crudo liofilizzato', 32.50, 16.25, 2, true),
+  (v_rider_id, 'Air Dried Premium', 'integratori', 'Cibo secco premium', 36.50, 18.25, 2, true),
+  (v_rider_id, 'Wet Food Pouch 200g', 'integratori', 'Cibo umido busta', 2.50, 1.25, 20, true),
+  (v_rider_id, 'Wet Food Can 400g', 'integratori', 'Cibo umido scatola', 3.80, 1.90, 15, true),
+  (v_rider_id, 'Salmon Oil Supplement', 'integratori', 'Olio salmone integratore', 12.50, 6.25, 3, true),
+  (v_rider_id, 'Probiotics Powder', 'integratori', 'Probiotici polvere', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Joint Support Chews', 'integratori', 'Snack articolazioni', 7.50, 3.75, 5, true),
+  (v_rider_id, 'Omega-3 Fish Oil', 'integratori', 'Integratore omega-3', 10.50, 5.25, 3, true),
+  (v_rider_id, 'Glucosamine Chondroitin', 'integratori', 'Glucosamina condroitina', 9.80, 4.90, 3, true),
+  (v_rider_id, 'Fiber Supplement', 'integratori', 'Integratore fibra', 6.50, 3.25, 5, true),
+  (v_rider_id, 'Digestive Enzymes', 'integratori', 'Enzimi digestivi', 11.50, 5.75, 3, true),
+  (v_rider_id, 'Multivitamin Tablets', 'integratori', 'Multivitaminico compresse', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Calcium Supplement', 'integratori', 'Calcio integratore', 7.50, 3.75, 4, true),
+  (v_rider_id, 'Iron Supplement', 'integratori', 'Ferro integratore', 6.50, 3.25, 5, true),
+  (v_rider_id, 'Vitamin D3 Drops', 'integratori', 'Vitamina D3 gocce', 5.50, 2.75, 5, true),
+  (v_rider_id, 'Vitamin B Complex', 'integratori', 'Complesso B vitamina', 7.50, 3.75, 4, true),
+  (v_rider_id, 'Immune Booster', 'integratori', 'Potenziatore immunità', 9.50, 4.75, 3, true),
+  (v_rider_id, 'Allergy Relief Tablet', 'integratori', 'Compresse allergie', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Anxiety Relief', 'integratori', 'Ansia rilassamento', 10.50, 5.25, 3, true),
+  (v_rider_id, 'Sleep Support', 'integratori', 'Sonno melatonina', 9.80, 4.90, 3, true),
+  (v_rider_id, 'Royal Canin Feline Adult', 'integratori', 'Cibo gatto adulto', 18.50, 9.25, 3, true),
+  (v_rider_id, 'Hill''s Science Diet Cat', 'integratori', 'Cibo felino scientifico', 16.80, 8.40, 3, true),
+  (v_rider_id, 'Purina Pro Plan Feline', 'integratori', 'Cibo gatto qualità', 17.50, 8.75, 3, true),
+  (v_rider_id, 'Iams Proactive Cat', 'integratori', 'Cibo gatto salute', 14.50, 7.25, 3, true),
+  (v_rider_id, 'Sheba Mixed Selection', 'integratori', 'Cibo umido gatto variegato', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Gourmet Gold Umido', 'integratori', 'Cibo umido gatto premium', 7.50, 3.75, 4, true),
+  (v_rider_id, 'Whiskas Crunchy Mix', 'integratori', 'Cibo gatto economico', 6.50, 3.25, 5, true),
+  (v_rider_id, 'Friskies Classic Pate', 'integratori', 'Cibo umido pate gatto', 1.80, 0.90, 30, true),
+  (v_rider_id, 'Fancy Feast Gourmet', 'integratori', 'Cibo umido lussuoso gatto', 2.50, 1.25, 25, true),
+  (v_rider_id, 'Acana Pacifica Feline', 'integratori', 'Cibo gatto senza cereali', 28.50, 14.25, 2, true),
+  (v_rider_id, 'Orijen Tundra Feline', 'integratori', 'Cibo gatto ad alto proteico', 32.50, 16.25, 2, true),
+  (v_rider_id, 'Taste of Wild Canyon River', 'integratori', 'Cibo gatto grano-free', 26.50, 13.25, 2, true),
+  (v_rider_id, 'Go! Natural Feline', 'integratori', 'Cibo gatto naturale', 24.50, 12.25, 2, true),
+  (v_rider_id, 'Farmina ND Kitten', 'integratori', 'Cibo micetto', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Bosch Sanabelle Cat', 'integratori', 'Cibo gatto naturale', 19.50, 9.75, 3, true),
+  (v_rider_id, 'N&D Feline Grain Free', 'integratori', 'Cibo gatto senza grani', 25.80, 12.90, 2, true),
+  (v_rider_id, 'Canagan Grain Free Cat', 'integratori', 'Cibo gatto alto proteico', 28.50, 14.25, 2, true),
+  (v_rider_id, 'Feringa Pura Carne Gatto', 'integratori', 'Cibo gatto pura carne', 3.80, 1.90, 15, true),
+  (v_rider_id, 'Animonda Gatto Adult', 'integratori', 'Cibo gatto qualità premium', 3.50, 1.75, 16, true),
+  (v_rider_id, 'Bozita Frio Cat', 'integratori', 'Cibo gatto naturale svedese', 18.50, 9.25, 3, true),
+  (v_rider_id, 'Urban Kitty Indoor', 'integratori', 'Cibo gatto indoor', 21.50, 10.75, 2, true),
+  (v_rider_id, 'Kitten Growth Formula', 'integratori', 'Cibo cucciolo gatto', 20.50, 10.25, 2, true),
+  (v_rider_id, 'Senior 7+ Years', 'integratori', 'Cibo gatto anziano', 19.50, 9.75, 3, true),
+  (v_rider_id, 'Urinary Care Feline', 'integratori', 'Cibo gatto cure urinarie', 23.50, 11.75, 2, true),
+  (v_rider_id, 'Skin & Coat Cat', 'integratori', 'Cibo gatto pelle mantello', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Weight Control Feline', 'integratori', 'Cibo gatto controllo peso', 18.50, 9.25, 3, true),
+  (v_rider_id, 'Sensitive Stomach Cat', 'integratori', 'Cibo gatto stomaco sensibile', 20.50, 10.25, 2, true),
+  (v_rider_id, 'Kidney Care', 'integratori', 'Cibo gatto reni', 24.50, 12.25, 2, true),
+  (v_rider_id, 'Diabetes Management', 'integratori', 'Cibo gatto diabete', 26.50, 13.25, 2, true),
+  (v_rider_id, 'Hyperthyroidism Diet', 'integratori', 'Cibo gatto tiroide', 25.50, 12.75, 2, true),
+  (v_rider_id, 'Hairball Control', 'integratori', 'Cibo gatto palle pelo', 17.50, 8.75, 3, true),
+  (v_rider_id, 'Allergy Relief', 'integratori', 'Cibo gatto allergie', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Immune Health Cat', 'integratori', 'Cibo gatto immunità', 23.50, 11.75, 2, true),
+  (v_rider_id, 'Dental Care Cat', 'integratori', 'Cibo gatto denti', 16.50, 8.25, 3, true),
+  (v_rider_id, 'Sterilized Cat', 'integratori', 'Cibo gatto sterilizzato', 15.50, 7.75, 3, true),
+  (v_rider_id, 'Chicken Recipe', 'integratori', 'Cibo gatto pollo', 17.50, 8.75, 3, true),
+  (v_rider_id, 'Fish & Seafood Mix', 'integratori', 'Cibo gatto pesce mare', 18.50, 9.25, 3, true),
+  (v_rider_id, 'Beef & Liver', 'integratori', 'Cibo gatto manzo fegato', 16.50, 8.25, 3, true),
+  (v_rider_id, 'Turkey & Salmon', 'integratori', 'Cibo gatto tacchino salmone', 19.50, 9.75, 3, true),
+  (v_rider_id, 'Duck & Green Peas', 'integratori', 'Cibo gatto anatra piselli', 20.50, 10.25, 2, true),
+  (v_rider_id, 'Rabbit & Vegetables', 'integratori', 'Cibo gatto coniglio verdure', 21.50, 10.75, 2, true),
+  (v_rider_id, 'Venison & Berries', 'integratori', 'Cibo gatto cervo bacche', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Kangaroo & Cranberry', 'integratori', 'Cibo gatto canguro mirtilli', 23.50, 11.75, 2, true),
+  (v_rider_id, 'Organic Grain Free Cat', 'integratori', 'Cibo gatto biologico', 28.50, 14.25, 2, true),
+  (v_rider_id, 'Raw Frozen Cat Diet', 'integratori', 'Cibo gatto crudo congelato', 24.50, 12.25, 2, true),
+  (v_rider_id, 'Kitten Starter Pack', 'integratori', 'Cibo micetto avviamento', 25.50, 12.75, 2, true),
+  (v_rider_id, 'Pedigree Marrobone', 'integratori', 'Snack osso midollo', 2.50, 1.25, 20, true),
+  (v_rider_id, 'Dentastix Daily Oral', 'integratori', 'Snack pulizia denti', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Greenies Original', 'integratori', 'Snack naturale denti', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Kong Snackstuff', 'integratori', 'Snack da riempire', 3.80, 1.90, 14, true),
+  (v_rider_id, 'Bacon Flavored Treats', 'integratori', 'Snack gusto pancetta', 2.80, 1.40, 18, true),
+  (v_rider_id, 'Chicken Jerky Strips', 'integratori', 'Snack pollo essiccato', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Beef Chews Long Lasting', 'integratori', 'Snack manzo lunga durata', 5.80, 2.90, 10, true),
+  (v_rider_id, 'Rawhide Rolls', 'integratori', 'Snack cuoio crudo', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Bully Sticks', 'integratori', 'Snack naturale manzo', 6.50, 3.25, 8, true),
+  (v_rider_id, 'Cheese Flavor Biscuits', 'integratori', 'Snack formaggio croccante', 2.50, 1.25, 20, true),
+  (v_rider_id, 'Peanut Butter Treats', 'integratori', 'Snack burro arachidi', 3.20, 1.60, 16, true),
+  (v_rider_id, 'Sweet Potato Chews', 'integratori', 'Snack patata dolce', 4.80, 2.40, 11, true),
+  (v_rider_id, 'Apple Slices Dental', 'integratori', 'Snack mela denti', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Carrot Treats', 'integratori', 'Snack carota vegetale', 2.80, 1.40, 18, true),
+  (v_rider_id, 'Pumpkin Flavor Biscuits', 'integratori', 'Snack zucca dolce', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Fish Flavor Treats', 'integratori', 'Snack pesce gusto', 3.20, 1.60, 16, true),
+  (v_rider_id, 'Liver Flavor Chews', 'integratori', 'Snack fegato', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Mixed Flavor Biscuits', 'integratori', 'Snack vari gusti', 2.50, 1.25, 20, true),
+  (v_rider_id, 'Training Treat Pack', 'integratori', 'Snack addestramento multigusto', 3.80, 1.90, 14, true),
+  (v_rider_id, 'Freeze Dried Treats', 'integratori', 'Snack liofilizzato', 7.50, 3.75, 7, true),
+  (v_rider_id, 'Natural Grain Free Bites', 'integratori', 'Snack naturale senza grani', 4.80, 2.40, 11, true),
+  (v_rider_id, 'Organic Treat Biscuits', 'integratori', 'Snack biologico', 5.50, 2.75, 9, true),
+  (v_rider_id, 'Jerky Strips Mixed', 'integratori', 'Snack carne mista essiccata', 6.50, 3.25, 8, true),
+  (v_rider_id, 'Soft & Chewy Treats', 'integratori', 'Snack morbido masticabile', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Crunchy Dental Sticks', 'integratori', 'Snack denti croccante', 3.20, 1.60, 16, true),
+  (v_rider_id, 'Bacon Wrapped Treats', 'integratori', 'Snack pancetta avvolta', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Chicken Wrapped Treats', 'integratori', 'Snack pollo avvolta', 4.20, 2.10, 13, true),
+  (v_rider_id, 'Peanut Butter Filled', 'integratori', 'Snack ripieno burro arachidi', 5.50, 2.75, 9, true),
+  (v_rider_id, 'Cheese Filled Bones', 'integratori', 'Snack osso ripieno formaggio', 5.50, 2.75, 9, true),
+  (v_rider_id, 'Sweet Potato & Chicken', 'integratori', 'Snack patata dolce pollo', 4.80, 2.40, 11, true),
+  (v_rider_id, 'Salmon Oil Treats', 'integratori', 'Snack olio salmone', 5.50, 2.75, 9, true),
+  (v_rider_id, 'Dental Chew Mix', 'integratori', 'Snack denti misto', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Beef Flavor Bits', 'integratori', 'Snack manzo pezzetti', 3.80, 1.90, 14, true),
+  (v_rider_id, 'Veggie Mix Treats', 'integratori', 'Snack verdure miste', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Poultry Flavor Pack', 'integratori', 'Snack pollame assortito', 4.20, 2.10, 13, true),
+  (v_rider_id, 'Temptations Treats', 'integratori', 'Snack gatto croccante', 2.50, 1.25, 20, true),
+  (v_rider_id, 'Greenies Feline', 'integratori', 'Snack gatto pulizia denti', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Catnip Organic', 'integratori', 'Snack gatto erba gatta', 3.80, 1.90, 14, true),
+  (v_rider_id, 'Freeze Dried Meat', 'integratori', 'Snack gatto carne liofilizzata', 6.50, 3.25, 8, true),
+  (v_rider_id, 'Chicken Flavor Bite', 'integratori', 'Snack gatto pollo', 2.80, 1.40, 18, true),
+  (v_rider_id, 'Salmon Flavor Bites', 'integratori', 'Snack gatto salmone', 3.20, 1.60, 16, true),
+  (v_rider_id, 'Fish Flavor Crunchy', 'integratori', 'Snack gatto pesce croccante', 2.50, 1.25, 20, true),
+  (v_rider_id, 'Beef Flavor Treats', 'integratori', 'Snack gatto manzo', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Tuna Flavor Strips', 'integratori', 'Snack gatto tonno strisce', 3.80, 1.90, 14, true),
+  (v_rider_id, 'Shrimp Flavor Bites', 'integratori', 'Snack gatto gamberetti', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Cheese Flavor Nibbles', 'integratori', 'Snack gatto formaggio', 2.50, 1.25, 20, true),
+  (v_rider_id, 'Chicken & Liver Mix', 'integratori', 'Snack gatto pollo fegato', 3.20, 1.60, 16, true),
+  (v_rider_id, 'Duck & Green Pea', 'integratori', 'Snack gatto anatra piselli', 3.80, 1.90, 14, true),
+  (v_rider_id, 'Rabbit & Apple', 'integratori', 'Snack gatto coniglio mela', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Liver Flavored Bits', 'integratori', 'Snack gatto fegato pezzi', 2.80, 1.40, 18, true),
+  (v_rider_id, 'Dental Care Treats', 'integratori', 'Snack gatto pulizia denti', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Soft Chewy Treats', 'integratori', 'Snack gatto morbido masticabile', 3.20, 1.60, 16, true),
+  (v_rider_id, 'Crunchy & Chewy Mix', 'integratori', 'Snack gatto croccante morbido', 3.80, 1.90, 14, true),
+  (v_rider_id, 'Natural Grain Free', 'integratori', 'Snack gatto naturale senza grani', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Organic Treat Bites', 'integratori', 'Snack gatto biologico', 4.80, 2.40, 11, true),
+  (v_rider_id, 'Freeze Dried Mix', 'integratori', 'Snack gatto misto liofilizzato', 6.80, 3.40, 7, true),
+  (v_rider_id, 'Catnip Filled Toys', 'integratori', 'Snack gatto giocattoli erbetta', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Chicken Jerky Bits', 'integratori', 'Snack gatto pollo essiccato', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Fish Jerky Strips', 'integratori', 'Snack gatto pesce strisce', 4.20, 2.10, 13, true),
+  (v_rider_id, 'Meat Flavor Balls', 'integratori', 'Snack gatto carne palline', 3.80, 1.90, 14, true),
+  (v_rider_id, 'Flavor Variety Pack', 'integratori', 'Snack gatto varietà gusti', 5.50, 2.75, 9, true),
+  (v_rider_id, 'High Protein Bites', 'integratori', 'Snack gatto ad alto proteico', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Weight Control Treats', 'integratori', 'Snack gatto controllo peso', 3.80, 1.90, 14, true),
+  (v_rider_id, 'Senior Cat Treats', 'integratori', 'Snack gatto anziano', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Kitten Starter Pack', 'integratori', 'Snack micetto introduttivo', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Dog Collar Leather', 'integratori', 'Collare cane pelle', 12.50, 6.25, 3, true),
+  (v_rider_id, 'Dog Leash 2m', 'integratori', 'Guinzaglio cane 2m', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Retractable Leash 5m', 'integratori', 'Guinzaglio estensibile 5m', 15.50, 7.75, 3, true),
+  (v_rider_id, 'Dog Harness Comfort', 'integratori', 'Pettorina cane comfort', 18.50, 9.25, 3, true),
+  (v_rider_id, 'Dog ID Tag', 'integratori', 'Medaglietta identificazione', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Dog Bed Orthopedic', 'integratori', 'Cuccia cane ortopedica', 45.50, 22.75, 1, true),
+  (v_rider_id, 'Dog Crate Metal', 'integratori', 'Gabbia cane metallo', 35.50, 17.75, 1, true),
+  (v_rider_id, 'Dog Food Bowl Stainless', 'integratori', 'Ciotola inox cane', 6.50, 3.25, 5, true),
+  (v_rider_id, 'Dog Water Fountain', 'integratori', 'Fontanella acqua cane', 25.50, 12.75, 2, true),
+  (v_rider_id, 'Dog Towel Microfiber', 'integratori', 'Asciugamano cane microfibra', 12.50, 6.25, 3, true),
+  (v_rider_id, 'Dog Grooming Brush', 'integratori', 'Spazzola cane toelettatura', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Dog Nail Clipper', 'integratori', 'Tagliaunghie cane', 6.50, 3.25, 5, true),
+  (v_rider_id, 'Dog Shampoo Bottle', 'integratori', 'Shampoo cane flacone', 5.80, 2.90, 6, true),
+  (v_rider_id, 'Dog Conditioner Bottle', 'integratori', 'Balsamo cane flacone', 5.80, 2.90, 6, true),
+  (v_rider_id, 'Dog Toothbrush Set', 'integratori', 'Spazzolino denti cane', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Dog Toothpaste Minty', 'integratori', 'Dentifricio cane menta', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Dog Coat Raincoat', 'integratori', 'Impermeabile cane', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Dog Sweater', 'integratori', 'Maglione cane', 18.50, 9.25, 3, true),
+  (v_rider_id, 'Dog Boots Winter', 'integratori', 'Stivali cane inverno', 16.50, 8.25, 3, true),
+  (v_rider_id, 'Dog Bandana Collar', 'integratori', 'Foulard collare cane', 5.50, 2.75, 9, true),
+  (v_rider_id, 'Cat Collar Bell', 'integratori', 'Collare gatto campanello', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Cat Leash Harness', 'integratori', 'Guinzaglio pettorina gatto', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Cat ID Tag', 'integratori', 'Medaglietta gatto', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Cat Bed Elevated', 'integratori', 'Cuccia gatto rialzata', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Cat Tree Scratching', 'integratori', 'Albero gatto tiragraffi', 35.50, 17.75, 1, true),
+  (v_rider_id, 'Cat Scratching Post', 'integratori', 'Tiragraffi cilindro gatto', 15.50, 7.75, 3, true),
+  (v_rider_id, 'Cat Scratching Mat', 'integratori', 'Tappeto tiragraffi gatto', 12.50, 6.25, 3, true),
+  (v_rider_id, 'Cat Litter Box', 'integratori', 'Lettiera gatto', 18.50, 9.25, 3, true),
+  (v_rider_id, 'Cat Litter Scoop', 'integratori', 'Paletta lettiera', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Cat Litter Liners', 'integratori', 'Sacchetti lettiera', 6.50, 3.25, 5, true),
+  (v_rider_id, 'Cat Food Bowl Ceramic', 'integratori', 'Ciotola ceramica gatto', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Cat Water Fountain', 'integratori', 'Fontanella acqua gatto', 28.50, 14.25, 2, true),
+  (v_rider_id, 'Cat Grooming Brush', 'integratori', 'Spazzola gatto', 7.50, 3.75, 5, true),
+  (v_rider_id, 'Cat Slicker Brush', 'integratori', 'Spazzola fina gatto', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Cat Nail Clipper', 'integratori', 'Tagliaunghie gatto', 6.50, 3.25, 5, true),
+  (v_rider_id, 'Cat Shampoo Bottle', 'integratori', 'Shampoo gatto', 5.80, 2.90, 6, true),
+  (v_rider_id, 'Cat Conditioner', 'integratori', 'Balsamo gatto', 5.80, 2.90, 6, true),
+  (v_rider_id, 'Cat Eye Wipes', 'integratori', 'Salviette occhi gatto', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Cat Ear Cleaner', 'integratori', 'Detergente orecchi gatto', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Cat Toothbrush', 'integratori', 'Spazzolino gatto', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Cat Toothpaste', 'integratori', 'Dentifricio gatto', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Cat Toy Ball', 'integratori', 'Pallina giocattolo gatto', 3.50, 1.75, 15, true),
+  (v_rider_id, 'Cat Toy Mouse', 'integratori', 'Topolino giocattolo gatto', 2.50, 1.25, 20, true),
+  (v_rider_id, 'Cat Toy Feather', 'integratori', 'Piuma giocattolo gatto', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Cat Toy Laser', 'integratori', 'Laser giocattolo gatto', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Cat Toy Interactive', 'integratori', 'Giocattolo interattivo gatto', 12.50, 6.25, 3, true),
+  (v_rider_id, 'Cat Tunnel Play', 'integratori', 'Tunnel gioco gatto', 15.50, 7.75, 3, true),
+  (v_rider_id, 'Dog Toy Ball', 'integratori', 'Pallina giocattolo cane', 4.50, 2.25, 12, true),
+  (v_rider_id, 'Dog Toy Kong', 'integratori', 'Kong giocattolo resistente', 9.50, 4.75, 3, true),
+  (v_rider_id, 'Dog Toy Rope', 'integratori', 'Corda giocattolo cane', 5.50, 2.75, 9, true),
+  (v_rider_id, 'Dog Toy Frisbee', 'integratori', 'Frisbee cane disco', 6.50, 3.25, 8, true),
+  (v_rider_id, 'Dog Toy Squeaky', 'integratori', 'Giocattolo cane cigolante', 7.50, 3.75, 7, true),
+  (v_rider_id, 'Dog Toy Fetch Stick', 'integratori', 'Bastone fetch cane', 8.50, 4.25, 4, true),
+  (v_rider_id, 'Dog Toy Tug', 'integratori', 'Giocattolo tira e molla', 6.50, 3.25, 8, true),
+  (v_rider_id, 'Pet Nail Grinder', 'integratori', 'Smerigliatrice unghie', 22.50, 11.25, 2, true),
+  (v_rider_id, 'Pet First Aid Kit', 'integratori', 'Kit pronto soccorso', 18.50, 9.25, 3, true),
+  (v_rider_id, 'Pet Waste Bags', 'integratori', 'Sacchetti escrementi biodegradabili', 5.80, 2.90, 6, true),
+  (v_rider_id, 'Pet Poop Scooper', 'integratori', 'Paletta escrementi', 6.50, 3.25, 5, true);
+
+  RAISE NOTICE 'Seeded 250 pet products for rider %', v_rider_id;
+  RAISE NOTICE 'Total 500 products seeded successfully';
+
+END $$;
+
+-- ============================================
+-- STEP 3/3: Insert 20 dealers + 10 customers
+-- ============================================
+DO $$
+DECLARE
+  v_rider_id UUID;
+BEGIN
+  -- Get test rider
+  SELECT id INTO v_rider_id FROM auth.users WHERE email = 'creamoj@gmail.com' LIMIT 1;
+  IF v_rider_id IS NULL THEN
+    RAISE NOTICE 'No rider found for creamoj@gmail.com';
+    RETURN;
+  END IF;
+
+  -- TEST DEALERS (20 items) - grocery + pet
+  INSERT INTO rider_contacts (rider_id, name, contact_type, status, phone, total_orders, monthly_earnings) VALUES
+  -- GROCERY DEALERS (10)
+  (v_rider_id, 'Carrefour Express Napoli', 'dealer', 'active', '+39 081 2345678', 142, 120.00),
+  (v_rider_id, 'Esselunga Vomero', 'dealer', 'active', '+39 081 5555111', 98, 95.00),
+  (v_rider_id, 'CooperMarkt Centro', 'dealer', 'active', '+39 081 6666222', 76, 80.00),
+  (v_rider_id, 'Auchan Fuorigrotta', 'dealer', 'potential', '+39 081 7777333', 12, 45.00),
+  (v_rider_id, 'Amazon Fresh Napoli', 'dealer', 'active', '+39 081 8888444', 156, 145.00),
+  (v_rider_id, 'Marianna Supermercati', 'dealer', 'active', '+39 081 9999555', 89, 85.00),
+  (v_rider_id, 'Spesa Online Napoli', 'dealer', 'active', '+39 081 1010111', 124, 110.00),
+  (v_rider_id, 'Alimentari Vomero', 'dealer', 'active', '+39 081 1111222', 67, 75.00),
+  (v_rider_id, 'Bio Market Napoli', 'dealer', 'potential', '+39 081 1212333', 34, 60.00),
+  (v_rider_id, 'Express Alimentari', 'dealer', 'active', '+39 081 1313444', 145, 135.00),
+
+  -- PET DEALERS (10)
+  (v_rider_id, 'PetStore Napoli', 'dealer', 'active', '+39 081 2000111', 78, 85.00),
+  (v_rider_id, 'Zooplus Campania', 'dealer', 'active', '+39 081 2001222', 56, 65.00),
+  (v_rider_id, 'Veterinari Napoli', 'dealer', 'active', '+39 081 2002333', 92, 100.00),
+  (v_rider_id, 'Grooming Center Vomero', 'dealer', 'potential', '+39 081 2003444', 23, 50.00),
+  (v_rider_id, 'Pet Supplies Napoli', 'dealer', 'active', '+39 081 2004555', 64, 72.00),
+  (v_rider_id, 'Negozio Animali Centro', 'dealer', 'active', '+39 081 2005666', 45, 55.00),
+  (v_rider_id, 'Veterinaria San Domenico', 'dealer', 'active', '+39 081 2006777', 87, 95.00),
+  (v_rider_id, 'Toelettatura Cani Gatti', 'dealer', 'potential', '+39 081 2007888', 28, 45.00),
+  (v_rider_id, 'Pet Shop Premium', 'dealer', 'active', '+39 081 2008999', 102, 115.00),
+  (v_rider_id, 'Mangimi e Accessori', 'dealer', 'active', '+39 081 2009100', 71, 78.00);
+
+  RAISE NOTICE 'Seeded 20 dealers for rider %', v_rider_id;
+
+  -- TEST CUSTOMERS (10)
+  INSERT INTO clients (rider_id, full_name, phone, address, lat, lng, loyalty_tier, loyalty_points, total_orders, total_spent, status) VALUES
+  (v_rider_id, 'Marco Rossi', '+39 333 1234567', 'Via Vomero 42, Napoli', 40.8450, 14.2580, 'gold', 1200, 45, 650.00, 'active'),
+  (v_rider_id, 'Anna Bianchi', '+39 333 2234567', 'Piazza del Plebiscito 1, Napoli', 40.8530, 14.2650, 'silver', 580, 28, 420.00, 'active'),
+  (v_rider_id, 'Giuseppe Verdi', '+39 333 3234567', 'Via Fuorigrotta 88, Napoli', 40.8200, 14.1950, 'bronze', 280, 15, 200.00, 'active'),
+  (v_rider_id, 'Lucia Ferrari', '+39 333 4234567', 'Via Chiaia 65, Napoli', 40.8390, 14.2470, 'bronze', 125, 8, 120.00, 'active'),
+  (v_rider_id, 'Paolo Rizzo', '+39 333 5234567', 'Via Posillipo 12, Napoli', 40.8100, 14.2100, 'silver', 450, 22, 380.00, 'vip'),
+  (v_rider_id, 'Elena Rossi', '+39 333 6234567', 'Piazza Montesanto 5, Napoli', 40.8560, 14.2650, 'bronze', 95, 5, 85.00, 'active'),
+  (v_rider_id, 'Francesco Russo', '+39 333 7234567', 'Via Cavalleggeri d''Aosta 6, Napoli', 40.8450, 14.1850, 'gold', 980, 38, 580.00, 'vip'),
+  (v_rider_id, 'Gabriella Gallo', '+39 333 8234567', 'Via San Carlo Arena 25, Napoli', 40.8650, 14.2450, 'bronze', 165, 9, 145.00, 'active'),
+  (v_rider_id, 'Salvatore Marino', '+39 333 9234567', 'Via Arenella 14, Napoli', 40.8150, 14.2450, 'silver', 320, 16, 265.00, 'active'),
+  (v_rider_id, 'Vittoria Lombardi', '+39 333 0234567', 'Via Soccavo 33, Napoli', 40.7950, 14.1650, 'bronze', 210, 12, 175.00, 'active');
+
+  RAISE NOTICE 'Seeded 10 customers for rider %', v_rider_id;
+  RAISE NOTICE 'Total: 20 dealers + 10 customers seeded successfully';
+
+END $$;
+
+-- ============================================
+-- FINE - Tutti i dati sono stati caricati!
+-- ============================================
+-- Verifica: Seleziona i dati caricati
+SELECT
+  'Clients' as table_name, COUNT(*) as total_records
+FROM public.clients
+UNION ALL
+SELECT
+  'Market Products' as table_name, COUNT(*) as total_records
+FROM market_products
+WHERE rider_id = (SELECT id FROM auth.users WHERE email = 'creamoj@gmail.com' LIMIT 1)
+UNION ALL
+SELECT
+  'Rider Contacts' as table_name, COUNT(*) as total_records
+FROM rider_contacts
+WHERE rider_id = (SELECT id FROM auth.users WHERE email = 'creamoj@gmail.com' LIMIT 1);
