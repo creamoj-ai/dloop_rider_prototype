@@ -1,9 +1,11 @@
 // Shared Supabase client factory for Edge Functions
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+// Connect to MAIN database (imhjdsjtaommutdmkouf) where WhatsApp tables are
+// Use custom env var names (Supabase doesn't allow SUPABASE_ prefix in secrets)
+const SUPABASE_URL = Deno.env.get("DB_URL") ?? Deno.env.get("SUPABASE_URL") ?? "https://imhjdsjtaommutdmkouf.supabase.co";
+const SUPABASE_ANON_KEY = Deno.env.get("DB_ANON_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("DB_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 /**
  * Service client — bypasses RLS.
