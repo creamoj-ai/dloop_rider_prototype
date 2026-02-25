@@ -5,8 +5,8 @@
 
 set -e
 
-PROJECT_ID="imhjdsjtaommutdmkouf"
-SUPABASE_URL="https://imhjdsjtaommutdmkouf.supabase.co"
+PROJECT_ID="aqpwfurradxbnqvycvkm"
+SUPABASE_URL="https://aqpwfurradxbnqvycvkm.supabase.co"
 
 echo "🚀 WhatsApp Bot MVP - Deployment"
 echo "=================================="

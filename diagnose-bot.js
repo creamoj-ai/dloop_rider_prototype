@@ -3,9 +3,9 @@
  * Checks webhook, database, and message flows programmatically
  */
 
-const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltaGpkc2p0YW9tbXV0ZG1rb3VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5NzIzOTcsImV4cCI6MjA3ODU0ODM5N30.WgOimZMgGBC58LkvIocdeJ3hHz7y0eLrfLY57VvAYKw';
-const supabaseUrl = 'https://imhjdsjtaommutdmkouf.supabase.co';
-const projectRef = 'imhjdsjtaommutdmkouf';
+const anonKey = 'sb_publishable_NBWU-byCV0TIsj5-8Mixog_CEV7IkrB';
+const supabaseUrl = 'https://aqpwfurradxbnqvycvkm.supabase.co';
+const projectRef = 'aqpwfurradxbnqvycvkm';
 
 console.log(`
 ╔════════════════════════════════════════════════════════════════╗
@@ -20,7 +20,7 @@ console.log(`
 async function checkDatabaseConnectivity() {
   console.log('\n📊 [1] Testing Database Connectivity...\n');
   try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/riders?limit=1`, {
+    const res = await fetch(`${supabaseUrl}/rest/v1/whatsapp_conversations?limit=1`, {
       headers: {
         'apikey': anonKey,
         'Content-Type': 'application/json'
