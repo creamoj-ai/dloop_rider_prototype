@@ -18,7 +18,22 @@ import { normalizePhone } from "../_shared/phone_utils.ts";
 import { processInboundMessage } from "../whatsapp-webhook/processor.ts";
 import { processDealerMessage } from "../whatsapp-webhook/dealer_processor.ts";
 
+const VERIFY_TOKEN = "dloop_wa_verify_2026";
+
 serve(async (req: Request) => {
+  // GET: Webhook verification (for Meta)
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    const mode = url.searchParams.get("hub.mode");
+    const token = url.searchParams.get("hub.verify_token");
+    const challenge = url.searchParams.get("hub.challenge");
+
+    if (mode === "subscribe" && token === VERIFY_TOKEN) {
+      return new Response(challenge, { status: 200 });
+    }
+    return new Response("Forbidden", { status: 403 });
+  }
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
