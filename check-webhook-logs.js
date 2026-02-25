@@ -1,22 +1,16 @@
-console.log(`
-╔════════════════════════════════════════════════════════════════╗
-║         Check WhatsApp Webhook Logs in Supabase                ║
-╚════════════════════════════════════════════════════════════════╝
+const https = require('https');
 
-Per vedere cosa è successo:
+const options = {
+  hostname: 'api.supabase.co',
+  port: 443,
+  path: '/v1/projects/aqpwfurradxbnqvycvkm/analytics/logs/function-edge-logs?limit=50&timestamp=desc',
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY_HERE'  // Questo non ha accesso, ma vediamo
+  }
+};
 
-1. Vai a: https://supabase.com/dashboard/project/aqpwfurradxbnqvycvkm/functions
-
-2. Clicca su "whatsapp-webhook" nella lista
-
-3. Vai alla tab "Logs" (in alto)
-
-4. Cerca i messaggi degli ultimi 5 minuti
-
-Controlla se vedi:
-   ✅ POST request ricevuto da Meta
-   ✅ Il testo del messaggio
-   ❌ Errori (red)
-
-Se vedi errori, screenshot e incolla qui!
-`);
+console.log('⚠️  Nota: Non possiamo accedere ai logs via API senza autenticazione.');
+console.log('👉 Vai direttamente a Supabase Dashboard:');
+console.log('   https://supabase.com/dashboard/project/aqpwfurradxbnqvycvkm/functions/whatsapp-webhook');
+console.log('   Clicca tab "Logs" per vedere gli errori in tempo reale.');
