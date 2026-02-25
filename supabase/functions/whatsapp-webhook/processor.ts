@@ -176,8 +176,8 @@ async function getOrCreateConversation(
     .from("whatsapp_conversations")
     .select("*")
     .eq("phone", phone)
-    .eq("role", "customer")
-    .single();
+    .eq("conversation_type", "customer")
+    .maybeSingle();
 
   if (existing) {
     // Update name if provided and not set
@@ -196,7 +196,7 @@ async function getOrCreateConversation(
     .insert({
       phone,
       customer_name: name ?? null,
-      role: "customer",
+      conversation_type: "customer",
       state: "idle",
     })
     .select("*")

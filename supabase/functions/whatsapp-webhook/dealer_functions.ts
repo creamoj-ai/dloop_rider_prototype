@@ -200,9 +200,9 @@ async function findLatestRelay(
   statuses: string[]
 ): Promise<Record<string, unknown> | null> {
   const { data } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select("id, order_id, status, dealer_message, estimated_amount, created_at")
-    .eq("dealer_contact_id", dealerContactId)
+    .eq("dealer_id", dealerContactId)
     .in("status", statuses)
     .order("created_at", { ascending: false })
     .limit(1);
@@ -239,10 +239,10 @@ async function confirmOrder(
 
   if (relayId) {
     const { data } = await db
-      .from("order_relays")
+      .from("whatsapp_order_relays")
       .select("id, order_id, status, dealer_message, estimated_amount")
       .eq("id", relayId)
-      .eq("dealer_contact_id", dealerContactId)
+      .eq("dealer_id", dealerContactId)
       .single();
     relay = data;
   } else {
@@ -263,7 +263,7 @@ async function confirmOrder(
 
   // Update relay status
   const { error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .update({
       status: "confirmed",
       confirmed_at: new Date().toISOString(),
@@ -306,10 +306,10 @@ async function declineOrder(
 
   if (relayId) {
     const { data } = await db
-      .from("order_relays")
+      .from("whatsapp_order_relays")
       .select("id, order_id, status")
       .eq("id", relayId)
-      .eq("dealer_contact_id", dealerContactId)
+      .eq("dealer_id", dealerContactId)
       .single();
     relay = data;
   } else {
@@ -331,7 +331,7 @@ async function declineOrder(
   const replyText = reason ? `Rifiutato: ${reason}` : "Rifiutato";
 
   const { error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .update({
       status: "cancelled",
       dealer_reply: replyText,
@@ -367,10 +367,10 @@ async function markOrderReady(
 
   if (relayId) {
     const { data } = await db
-      .from("order_relays")
+      .from("whatsapp_order_relays")
       .select("id, order_id, status")
       .eq("id", relayId)
-      .eq("dealer_contact_id", dealerContactId)
+      .eq("dealer_id", dealerContactId)
       .single();
     relay = data;
   } else {
@@ -393,7 +393,7 @@ async function markOrderReady(
   }
 
   const { error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .update({
       status: "ready",
       ready_at: new Date().toISOString(),
@@ -429,11 +429,11 @@ async function viewPendingOrders(
   dealerContactId: string
 ): Promise<string> {
   const { data, error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select(
       "id, status, dealer_message, estimated_amount, created_at, orders(customer_name, customer_address)"
     )
-    .eq("dealer_contact_id", dealerContactId)
+    .eq("dealer_id", dealerContactId)
     .in("status", ["pending", "sent", "confirmed", "preparing", "ready"])
     .order("created_at", { ascending: false })
     .limit(10);
@@ -542,9 +542,9 @@ async function getDailySummary(
   const todayISO = today.toISOString();
 
   const { data, error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select("id, status, estimated_amount, actual_amount, created_at")
-    .eq("dealer_contact_id", dealerContactId)
+    .eq("dealer_id", dealerContactId)
     .gte("created_at", todayISO);
 
   if (error) {

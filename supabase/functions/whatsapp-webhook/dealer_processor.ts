@@ -272,10 +272,10 @@ async function processWithNLU(
 
   // Count pending orders for context
   const { count: pendingCount } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select("id", { count: "exact", head: true })
-    .eq("dealer_contact_id", dealer.id)
-    .in("status", ["pending", "sent", "confirmed", "preparing"]);
+    .eq("dealer_id", dealer.id)
+    .in("status", ["pending", "confirmed", "preparing"]);
 
   // Build system prompt
   const systemPrompt = buildDealerSystemPrompt(
@@ -360,8 +360,8 @@ async function getOrCreateDealerConversation(
     .from("whatsapp_conversations")
     .select("*")
     .eq("phone", phone)
-    .eq("role", "dealer")
-    .single();
+    .eq("conversation_type", "dealer")
+    .maybeSingle();
 
   if (existing) return existing;
 
@@ -371,8 +371,7 @@ async function getOrCreateDealerConversation(
     .insert({
       phone,
       customer_name: dealerName,
-      role: "dealer",
-      dealer_contact_id: dealerContactId,
+      conversation_type: "dealer",
       state: "idle",
     })
     .select("*")

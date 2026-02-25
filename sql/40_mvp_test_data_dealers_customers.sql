@@ -13,30 +13,30 @@ BEGIN
   END IF;
 
   -- TEST DEALERS (20 items) - grocery + pet
-  INSERT INTO rider_contacts (rider_id, name, contact_type, status, phone, total_orders, monthly_earnings) VALUES
+  INSERT INTO rider_contacts (rider_id, name, contact_type, status, phone, total_orders, monthly_earnings, category) VALUES
   -- GROCERY DEALERS (10)
-  (v_rider_id, 'Carrefour Express Napoli', 'dealer', 'active', '+39 081 2345678', 142, 120.00),
-  (v_rider_id, 'Esselunga Vomero', 'dealer', 'active', '+39 081 5555111', 98, 95.00),
-  (v_rider_id, 'CooperMarkt Centro', 'dealer', 'active', '+39 081 6666222', 76, 80.00),
-  (v_rider_id, 'Auchan Fuorigrotta', 'dealer', 'potential', '+39 081 7777333', 12, 45.00),
-  (v_rider_id, 'Amazon Fresh Napoli', 'dealer', 'active', '+39 081 8888444', 156, 145.00),
-  (v_rider_id, 'Marianna Supermercati', 'dealer', 'active', '+39 081 9999555', 89, 85.00),
-  (v_rider_id, 'Spesa Online Napoli', 'dealer', 'active', '+39 081 1010111', 124, 110.00),
-  (v_rider_id, 'Alimentari Vomero', 'dealer', 'active', '+39 081 1111222', 67, 75.00),
-  (v_rider_id, 'Bio Market Napoli', 'dealer', 'potential', '+39 081 1212333', 34, 60.00),
-  (v_rider_id, 'Express Alimentari', 'dealer', 'active', '+39 081 1313444', 145, 135.00),
+  (v_rider_id, 'Carrefour Express Napoli', 'dealer', 'active', '+39 081 2345678', 142, 120.00, 'grocery'),
+  (v_rider_id, 'Esselunga Vomero', 'dealer', 'active', '+39 081 5555111', 98, 95.00, 'grocery'),
+  (v_rider_id, 'CooperMarkt Centro', 'dealer', 'active', '+39 081 6666222', 76, 80.00, 'grocery'),
+  (v_rider_id, 'Auchan Fuorigrotta', 'dealer', 'potential', '+39 081 7777333', 12, 45.00, 'grocery'),
+  (v_rider_id, 'Amazon Fresh Napoli', 'dealer', 'active', '+39 081 8888444', 156, 145.00, 'grocery'),
+  (v_rider_id, 'Marianna Supermercati', 'dealer', 'active', '+39 081 9999555', 89, 85.00, 'grocery'),
+  (v_rider_id, 'Spesa Online Napoli', 'dealer', 'active', '+39 081 1010111', 124, 110.00, 'grocery'),
+  (v_rider_id, 'Alimentari Vomero', 'dealer', 'active', '+39 081 1111222', 67, 75.00, 'grocery'),
+  (v_rider_id, 'Bio Market Napoli', 'dealer', 'potential', '+39 081 1212333', 34, 60.00, 'grocery'),
+  (v_rider_id, 'Express Alimentari', 'dealer', 'active', '+39 081 1313444', 145, 135.00, 'grocery'),
 
   -- PET DEALERS (10)
-  (v_rider_id, 'PetStore Napoli', 'dealer', 'active', '+39 081 2000111', 78, 85.00),
-  (v_rider_id, 'Zooplus Campania', 'dealer', 'active', '+39 081 2001222', 56, 65.00),
-  (v_rider_id, 'Veterinari Napoli', 'dealer', 'active', '+39 081 2002333', 92, 100.00),
-  (v_rider_id, 'Grooming Center Vomero', 'dealer', 'potential', '+39 081 2003444', 23, 50.00),
-  (v_rider_id, 'Pet Supplies Napoli', 'dealer', 'active', '+39 081 2004555', 64, 72.00),
-  (v_rider_id, 'Negozio Animali Centro', 'dealer', 'active', '+39 081 2005666', 45, 55.00),
-  (v_rider_id, 'Veterinaria San Domenico', 'dealer', 'active', '+39 081 2006777', 87, 95.00),
-  (v_rider_id, 'Toelettatura Cani Gatti', 'dealer', 'potential', '+39 081 2007888', 28, 45.00),
-  (v_rider_id, 'Pet Shop Premium', 'dealer', 'active', '+39 081 2008999', 102, 115.00),
-  (v_rider_id, 'Mangimi e Accessori', 'dealer', 'active', '+39 081 2009100', 71, 78.00);
+  (v_rider_id, 'PetStore Napoli', 'dealer', 'active', '+39 081 2000111', 78, 85.00, 'pet'),
+  (v_rider_id, 'Zooplus Campania', 'dealer', 'active', '+39 081 2001222', 56, 65.00, 'pet'),
+  (v_rider_id, 'Veterinari Napoli', 'dealer', 'active', '+39 081 2002333', 92, 100.00, 'pet'),
+  (v_rider_id, 'Grooming Center Vomero', 'dealer', 'potential', '+39 081 2003444', 23, 50.00, 'pet'),
+  (v_rider_id, 'Pet Supplies Napoli', 'dealer', 'active', '+39 081 2004555', 64, 72.00, 'pet'),
+  (v_rider_id, 'Negozio Animali Centro', 'dealer', 'active', '+39 081 2005666', 45, 55.00, 'pet'),
+  (v_rider_id, 'Veterinaria San Domenico', 'dealer', 'active', '+39 081 2006777', 87, 95.00, 'pet'),
+  (v_rider_id, 'Toelettatura Cani Gatti', 'dealer', 'potential', '+39 081 2007888', 28, 45.00, 'pet'),
+  (v_rider_id, 'Pet Shop Premium', 'dealer', 'active', '+39 081 2008999', 102, 115.00, 'pet'),
+  (v_rider_id, 'Mangimi e Accessori', 'dealer', 'active', '+39 081 2009100', 71, 78.00, 'pet');
 
   RAISE NOTICE 'Seeded 20 dealers for rider %', v_rider_id;
 

@@ -745,7 +745,7 @@ async function createDeliveryOrder(
       min_guarantee: minGuarantee,
       total_earning: baseEarning,
       distance_km: 0,
-      dealer_contact_id: dealerContact.id,
+      dealer_id: dealerContact.rider_id,
     })
     .select("id")
     .single();
@@ -757,14 +757,16 @@ async function createDeliveryOrder(
   }
 
   // Auto-create order relay
-  const { error: relayErr } = await db.from("order_relays").insert({
+  const { error: relayErr } = await db.from("whatsapp_order_relays").insert({
+    conversation_id: opts.conversationId,
     order_id: order.id,
-    rider_id: dealerContact.rider_id,
-    dealer_contact_id: dealerContact.id,
-    relay_channel: "whatsapp",
+    dealer_id: dealerContact.rider_id,
+    customer_phone: opts.phone,
+    customer_name: opts.customerName,
     status: "pending",
-    dealer_message: opts.items,
-    estimated_amount: 0,
+    products: opts.items,
+    total_price: 0,
+    notes: opts.notes,
   });
 
   if (relayErr) {
@@ -773,7 +775,7 @@ async function createDeliveryOrder(
 
   // Get relay ID for stripe-link
   const { data: relayData } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select("id")
     .eq("order_id", order.id)
     .limit(1)
@@ -836,7 +838,7 @@ async function getPaymentLink(
 ): Promise<string> {
   // Check if this order has a relay with a Stripe link
   const { data: relay } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select("id, stripe_payment_link, payment_status, estimated_amount, actual_amount")
     .eq("order_id", orderId)
     .limit(1)

@@ -326,7 +326,7 @@ async function generateReport() {
   console.log('\n' + '═'.repeat(80));
   console.log('\n🔍 NEXT DIAGNOSTIC STEPS:\n');
   console.log('1. Check Supabase function logs:');
-  console.log('   https://supabase.com/dashboard/project/imhjdsjtaommutdmkouf/functions');
+  console.log(`   https://supabase.com/dashboard/project/${projectRef}/functions`);
   console.log('\n2. Run database query for recent messages:');
   console.log(`   SELECT * FROM whatsapp_messages WHERE created_at > NOW() - INTERVAL '30 minutes' ORDER BY created_at DESC;`);
   console.log('\n3. Verify webhook is receiving POST requests from Meta');
