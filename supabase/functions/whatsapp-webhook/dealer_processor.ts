@@ -68,9 +68,12 @@ export async function processDealerMessage(
   // 3. Save inbound message
   await db.from("whatsapp_messages").insert({
     conversation_id: conversationId,
+    phone: phone,
     direction: "inbound",
     content: messageContent,
     message_type: messageType,
+    wa_message_id: (message as any).id ?? null,
+    status: "sent",
   });
 
   await db
@@ -108,6 +111,7 @@ export async function processDealerMessage(
   // 7. Save outbound message
   await db.from("whatsapp_messages").insert({
     conversation_id: conversationId,
+    phone: phone,
     direction: "outbound",
     content: reply,
     message_type: "text",

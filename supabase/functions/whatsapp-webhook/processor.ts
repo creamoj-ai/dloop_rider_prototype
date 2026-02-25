@@ -59,9 +59,12 @@ export async function processInboundMessage(
   // 3. Save inbound message to DB
   await db.from("whatsapp_messages").insert({
     conversation_id: conversationId,
+    phone: phone,
     direction: "inbound",
     content: messageContent,
     message_type: messageType,
+    wa_message_id: (message as any).id ?? null,
+    status: "sent",
   });
 
   // Update last_message_at
@@ -153,6 +156,7 @@ export async function processInboundMessage(
   // 9. Save outbound message to DB
   await db.from("whatsapp_messages").insert({
     conversation_id: conversationId,
+    phone: phone,
     direction: "outbound",
     content: reply,
     message_type: "text",
