@@ -1,5 +1,6 @@
 // Edge Function: whatsapp-webhook — WhatsApp Cloud API webhook handler
 // Routes messages to customer or dealer pipeline based on phone lookup.
+// Redeploy to new Supabase project: imhjdsjtaommutdmkouf
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
 import { normalizePhone } from "../_shared/phone_utils.ts";
