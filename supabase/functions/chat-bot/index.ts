@@ -138,7 +138,7 @@ serve(async (req: Request) => {
       role: "assistant",
       content: assistantContent,
       tokens_used: response.usage.total_tokens,
-      model: "gpt-4o-mini",
+      model: "gpt-3.5-turbo",
     });
 
     // 9. Return response
