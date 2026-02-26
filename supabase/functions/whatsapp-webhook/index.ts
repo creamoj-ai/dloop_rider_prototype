@@ -1,14 +1,100 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getServiceClient } from "../_shared/supabase.ts";
+import { normalizePhone } from "../_shared/phone_utils.ts";
+import { processInboundMessage } from "./processor.ts";
+import { processDealerMessage } from "./dealer_processor.ts";
+
+const VERIFY_TOKEN = "dloop_wa_verify_2026";
 
 serve(async (req: Request) => {
+  // GET: Webhook verification
   if (req.method === "GET") {
     const url = new URL(req.url);
     const challenge = url.searchParams.get("hub.challenge");
-    return new Response(challenge, { status: 200 });
+    const token = url.searchParams.get("hub.verify_token");
+
+    if (token === VERIFY_TOKEN) {
+      return new Response(challenge, { status: 200 });
+    }
+    return new Response("Forbidden", { status: 403 });
   }
 
+  // POST: Process incoming messages
   if (req.method === "POST") {
-    return new Response("OK", { status: 200 });
+    try {
+      const body = await req.json();
+
+      // Always return 200 to Meta immediately (async processing)
+      const response = new Response("OK", { status: 200 });
+
+      // Process message asynchronously
+      (async () => {
+        try {
+          const db = getServiceClient();
+
+          // Parse Meta webhook structure
+          if (!body.entry?.[0]?.changes?.[0]?.value?.messages) {
+            console.log("Invalid webhook structure");
+            return;
+          }
+
+          const value = body.entry[0].changes[0].value;
+          const message = value.messages[0];
+          const contact = value.contacts[0];
+          const phone = normalizePhone(message.from);
+
+          let content = "";
+          if (message.type === "text") {
+            content = message.text.body;
+          } else if (message.type === "audio") {
+            content = `[Audio: ${message.audio.id}]`;
+          } else {
+            content = `[${message.type} message]`;
+          }
+
+          console.log(`📨 Message from ${phone}: "${content.substring(0, 50)}"`);
+
+          // Check if dealer
+          const { data: dealerContacts } = await db
+            .from("rider_contacts")
+            .select("id, rider_id, name, phone")
+            .eq("contact_type", "dealer");
+
+          const isDealerMessage = dealerContacts?.some(
+            (d: any) => normalizePhone(d.phone) === phone
+          );
+
+          // Route and process
+          if (isDealerMessage) {
+            const dealer = dealerContacts.find(
+              (d: any) => normalizePhone(d.phone) === phone
+            );
+            console.log(`🏬 Routing to dealer: ${dealer.name}`);
+            await processDealerMessage(db, { phone, text: content, name: contact?.profile?.name }, {
+              id: dealer.id,
+              rider_id: dealer.rider_id,
+              name: dealer.name,
+            });
+          } else {
+            console.log("👤 Routing to customer");
+            await processInboundMessage(db, {
+              phone,
+              text: content,
+              name: contact?.profile?.name,
+            });
+          }
+
+          console.log("✅ Message processed");
+        } catch (error) {
+          console.error("❌ Processing error:", error);
+        }
+      })();
+
+      return response;
+    } catch (error) {
+      console.error("Webhook error:", error);
+      return new Response("OK", { status: 200 });
+    }
   }
 
   if (req.method === "OPTIONS") {
