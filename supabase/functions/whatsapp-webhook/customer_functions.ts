@@ -758,15 +758,15 @@ async function createDeliveryOrder(
 
   // Auto-create order relay
   const { error: relayErr } = await db.from("whatsapp_order_relays").insert({
-    conversation_id: opts.conversationId,
+    conversation_id: conversationId,
     order_id: order.id,
     dealer_id: dealerContact.rider_id,
-    customer_phone: opts.phone,
+    customer_phone: phone,
     customer_name: opts.customerName,
     status: "pending",
     products: opts.items,
     total_price: 0,
-    notes: opts.notes,
+    notes: opts.customerNotes,
   });
 
   if (relayErr) {
@@ -781,8 +781,8 @@ async function createDeliveryOrder(
     .limit(1)
     .single();
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const supabaseUrl = Deno.env.get("DB_URL") ?? "";
+  const anonKey = Deno.env.get("DB_ANON_KEY") ?? "";
   const adminKey = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
   const headers = {
     "Content-Type": "application/json",

@@ -611,8 +611,8 @@ async function setDealerConversationState(
 // ── Proactive Customer Notification (fire-and-forget) ─────────────
 
 function triggerCustomerNotify(orderId: string, event: string): void {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const supabaseUrl = Deno.env.get("DB_URL") ?? "";
+  const anonKey = Deno.env.get("DB_ANON_KEY") ?? "";
   const adminKey = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
 
   fetch(`${supabaseUrl}/functions/v1/whatsapp-notify`, {

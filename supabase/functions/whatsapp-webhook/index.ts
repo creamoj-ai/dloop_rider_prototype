@@ -30,14 +30,16 @@ serve(async (req: Request) => {
       // Process message asynchronously
       (async () => {
         try {
+          console.log("[1] Getting service client...");
           const db = getServiceClient();
 
           // Parse Meta webhook structure
           if (!body.entry?.[0]?.changes?.[0]?.value?.messages) {
-            console.log("Invalid webhook structure");
+            console.log("[2] Invalid webhook structure");
             return;
           }
 
+          console.log("[3] Extracting message data...");
           const value = body.entry[0].changes[0].value;
           const message = value.messages[0];
           const contact = value.contacts[0];
@@ -52,13 +54,19 @@ serve(async (req: Request) => {
             content = `[${message.type} message]`;
           }
 
-          console.log(`📨 Message from ${phone}: "${content.substring(0, 50)}"`);
+          console.log(`[4] 📨 Message from ${phone}: "${content.substring(0, 50)}"`);
 
           // Check if dealer
-          const { data: dealerContacts } = await db
+          console.log("[5] Checking if dealer message...");
+          const { data: dealerContacts, error: dealerError } = await db
             .from("rider_contacts")
             .select("id, rider_id, name, phone")
             .eq("contact_type", "dealer");
+
+          if (dealerError) {
+            console.error("[5-ERROR] Failed to fetch dealer contacts:", dealerError);
+            throw dealerError;
+          }
 
           const isDealerMessage = dealerContacts?.some(
             (d: any) => normalizePhone(d.phone) === phone
@@ -69,24 +77,28 @@ serve(async (req: Request) => {
             const dealer = dealerContacts.find(
               (d: any) => normalizePhone(d.phone) === phone
             );
-            console.log(`🏬 Routing to dealer: ${dealer.name}`);
+            console.log(`[6] 🏬 Routing to dealer: ${dealer.name}`);
             await processDealerMessage(db, { phone, text: content, name: contact?.profile?.name }, {
               id: dealer.id,
               rider_id: dealer.rider_id,
               name: dealer.name,
             });
           } else {
-            console.log("👤 Routing to customer");
-            await processInboundMessage(db, {
+            console.log("[6] 👤 Routing to customer - calling processInboundMessage...");
+            const result = await processInboundMessage(db, {
               phone,
               text: content,
               name: contact?.profile?.name,
             });
+            console.log("[7] Customer processing result:", result);
           }
 
-          console.log("✅ Message processed");
+          console.log("[8] ✅ Message processed successfully");
         } catch (error) {
-          console.error("❌ Processing error:", error);
+          console.error("[ERROR] ❌ Processing error:", error);
+          console.error("[ERROR] Details:", error instanceof Error ? error.message : String(error));
+          console.error("[ERROR] Stack:", error instanceof Error ? error.stack : "N/A");
+          console.error("[ERROR] Full object:", JSON.stringify(error, null, 2));
         }
       })();
 
