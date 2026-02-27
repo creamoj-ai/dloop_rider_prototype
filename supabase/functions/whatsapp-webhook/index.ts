@@ -1,143 +1,80 @@
-// WhatsApp Webhook — Clean implementation based on working simulate endpoint
+// WhatsApp Webhook — Twilio Integration (simplified)
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
 import { normalizePhone } from "../_shared/phone_utils.ts";
 import { processInboundMessage } from "./processor.ts";
 import { processDealerMessage } from "./dealer_processor.ts";
 
-const VERIFY_TOKEN = "dloop_wa_verify_2026";
-
 serve(async (req: Request) => {
-  // GET: Test endpoint or Meta webhook verification
-  if (req.method === "GET") {
-    const url = new URL(req.url);
-    const testParam = url.searchParams.get("test");
-
-    // Test endpoint: /function/whatsapp-webhook?test=1
-    if (testParam === "1") {
-      console.log("🧪 Running simulate test...");
-      try {
-        const db = getServiceClient();
-        const testMessage = {
-          From: "whatsapp:+393737902538",
-          To: "whatsapp:+14155238886",
-          Body: "Ciao, sto testando il bot Twilio! 🧪",
-        };
-
-        const phone = normalizePhone(testMessage.From.replace("whatsapp:", ""));
-        const content = testMessage.Body;
-
-        await processInboundMessage(db, {
-          phone,
-          text: content,
-          name: "Test User",
-        });
-
-        return new Response(JSON.stringify({ success: true, message: "Test sent!" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      } catch (error) {
-        return new Response(JSON.stringify({
-          success: false,
-          error: error instanceof Error ? error.message : String(error)
-        }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    // Meta webhook verification
-    const mode = url.searchParams.get("hub.mode");
-    const token = url.searchParams.get("hub.verify_token");
-    const challenge = url.searchParams.get("hub.challenge");
-
-    if (mode === "subscribe" && token === VERIFY_TOKEN) {
-      console.log("✅ Webhook verified by Meta");
-      return new Response(challenge, { status: 200 });
-    }
-    return new Response("Forbidden", { status: 403 });
-  }
-
-  // OPTIONS: CORS
+  // CORS
   if (req.method === "OPTIONS") {
     return new Response("OK", { headers: corsHeaders });
   }
 
-  // POST: Process WhatsApp messages from Twilio or Meta
+  // POST: Process WhatsApp messages (Twilio or Meta)
   if (req.method === "POST") {
     try {
       const body = await req.json();
+      console.log("📨 Webhook received:", JSON.stringify(body).substring(0, 100));
 
-      // Detect webhook source (Twilio or Meta)
       let phone = "";
       let content = "";
       let contactName = "";
 
+      // Twilio webhook format
       if (body.From) {
-        // Twilio webhook format
-        console.log("📨 Webhook received from Twilio");
+        console.log("📨 Source: Twilio");
         phone = normalizePhone(body.From.replace("whatsapp:", ""));
         content = body.Body || "";
-        // Twilio doesn't provide contact name in webhook
         contactName = "";
-      } else if (body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
-        // Meta webhook format
-        console.log("📨 Webhook received from Meta");
-        const value = body.entry[0].changes[0].value;
-        const message = value.messages[0];
-        const contact = value.contacts?.[0];
+      }
+      // Meta webhook format
+      else if (body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
+        console.log("📨 Source: Meta");
+        const message = body.entry[0].changes[0].value.messages[0];
+        const contact = body.entry[0].changes[0].value.contacts?.[0];
         phone = normalizePhone(message.from);
 
         if (message.type === "text") {
           content = message.text.body;
-        } else if (message.type === "audio") {
-          content = `[Audio: ${message.audio.id}]`;
         } else {
-          content = `[${message.type} message]`;
+          content = `[${message.type}]`;
         }
         contactName = contact?.profile?.name || "";
-      } else {
-        console.log("⚠️ No messages in webhook");
+      }
+      else {
+        console.log("⚠️ No messages found");
         return new Response("OK", { status: 200 });
       }
 
-      // Return 200 immediately (async processing)
+      console.log(`📨 Message from ${phone}: "${content.substring(0, 50)}"`);
+
+      // Return 200 immediately
       const response = new Response("OK", { status: 200 });
 
-      // Process asynchronously
+      // Process async
       (async () => {
         try {
-
-          console.log(`📨 Message from ${phone}: "${content.substring(0, 50)}"`);
-
-          // Get database client
           const db = getServiceClient();
 
-          // Check if sender is a dealer
+          // Check if dealer
           const { data: dealerContacts } = await db
             .from("rider_contacts")
             .select("id, rider_id, name, phone")
             .eq("contact_type", "dealer");
 
-          const matchedDealer = (dealerContacts ?? []).find(
+          const dealer = (dealerContacts ?? []).find(
             (d: any) => normalizePhone(d.phone) === phone
           );
 
-          // Route to dealer or customer
-          if (matchedDealer) {
-            console.log(`🏬 Dealer message from ${matchedDealer.name}`);
+          if (dealer) {
+            console.log(`🏬 Dealer: ${dealer.name}`);
             await processDealerMessage(db,
               { phone, text: content, name: contactName },
-              {
-                id: matchedDealer.id,
-                rider_id: matchedDealer.rider_id,
-                name: matchedDealer.name,
-              }
+              { id: dealer.id, rider_id: dealer.rider_id, name: dealer.name }
             );
           } else {
-            console.log(`👤 Customer message`);
+            console.log(`👤 Customer`);
             await processInboundMessage(db, {
               phone,
               text: content,
@@ -145,17 +82,16 @@ serve(async (req: Request) => {
             });
           }
 
-          console.log("✅ Message processed and response sent");
+          console.log("✅ Done");
         } catch (error) {
-          console.error("❌ Processing error:", error instanceof Error ? error.message : String(error));
-          console.error("Stack:", error instanceof Error ? error.stack : "N/A");
+          console.error("❌ Error:", error instanceof Error ? error.message : String(error));
         }
       })();
 
       return response;
     } catch (error) {
-      console.error("❌ Webhook parse error:", error);
-      return new Response("OK", { status: 200 }); // Return 200 anyway
+      console.error("❌ Parse error:", error);
+      return new Response("OK", { status: 200 });
     }
   }
 
