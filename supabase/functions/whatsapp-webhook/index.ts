@@ -1,99 +1,165 @@
-// WhatsApp Webhook — Twilio Integration (simplified)
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
-import { normalizePhone } from "../_shared/phone_utils.ts";
-import { processInboundMessage } from "./processor.ts";
-import { processDealerMessage } from "./dealer_processor.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.46.1";
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')!;
+const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')!;
+const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')!;
+
+const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+
+async function sendTwilioMessage(to: string, text: string) {
+  const fromNumber = TWILIO_PHONE_NUMBER.replace('+', '');
+  const toNumber = to.replace('+', '');
+
+  const authHeader = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+  const formData = new URLSearchParams();
+  formData.append('From', `whatsapp:+${fromNumber}`);
+  formData.append('To', `whatsapp:+${toNumber}`);
+  formData.append('Body', text);
+
+  const res = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${authHeader}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    }
+  );
+
+  const data = await res.json();
+  if (!res.ok) {
+    console.error('Twilio error:', data);
+    throw new Error(`Twilio error ${res.status}`);
+  }
+  return data;
+}
 
 serve(async (req: Request) => {
-  // CORS
-  if (req.method === "OPTIONS") {
-    return new Response("OK", { headers: corsHeaders });
-  }
-
-  // POST: Process WhatsApp messages (Twilio or Meta)
-  if (req.method === "POST") {
+  if (req.method === 'POST') {
     try {
       const body = await req.json();
-      console.log("📨 Webhook received:", JSON.stringify(body).substring(0, 100));
+      console.log('📨 Webhook received');
 
-      let phone = "";
-      let content = "";
-      let contactName = "";
+      let phone = '';
+      let content = '';
 
-      // Twilio webhook format
+      // Twilio format
       if (body.From) {
-        console.log("📨 Source: Twilio");
-        phone = normalizePhone(body.From.replace("whatsapp:", ""));
-        content = body.Body || "";
-        contactName = "";
+        phone = body.From.replace('whatsapp:', '');
+        content = body.Body || '';
+        console.log(`📨 Twilio message from ${phone}`);
       }
-      // Meta webhook format
+      // Meta format
       else if (body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
-        console.log("📨 Source: Meta");
-        const message = body.entry[0].changes[0].value.messages[0];
-        const contact = body.entry[0].changes[0].value.contacts?.[0];
-        phone = normalizePhone(message.from);
-
-        if (message.type === "text") {
-          content = message.text.body;
-        } else {
-          content = `[${message.type}]`;
-        }
-        contactName = contact?.profile?.name || "";
+        const msg = body.entry[0].changes[0].value.messages[0];
+        phone = msg.from;
+        content = msg.text?.body || '';
+        console.log(`📨 Meta message from ${phone}`);
       }
       else {
-        console.log("⚠️ No messages found");
-        return new Response("OK", { status: 200 });
+        console.log('⚠️ No message');
+        return new Response('OK', { status: 200 });
       }
 
-      console.log(`📨 Message from ${phone}: "${content.substring(0, 50)}"`);
-
       // Return 200 immediately
-      const response = new Response("OK", { status: 200 });
+      const response = new Response('OK', { status: 200 });
 
-      // Process async
+      // Process async (non-blocking)
       (async () => {
         try {
-          const db = getServiceClient();
+          console.log(`Processing message: "${content.substring(0, 50)}"`);
 
-          // Check if dealer
-          const { data: dealerContacts } = await db
-            .from("rider_contacts")
-            .select("id, rider_id, name, phone")
-            .eq("contact_type", "dealer");
-
-          const dealer = (dealerContacts ?? []).find(
-            (d: any) => normalizePhone(d.phone) === phone
-          );
-
-          if (dealer) {
-            console.log(`🏬 Dealer: ${dealer.name}`);
-            await processDealerMessage(db,
-              { phone, text: content, name: contactName },
-              { id: dealer.id, rider_id: dealer.rider_id, name: dealer.name }
-            );
-          } else {
-            console.log(`👤 Customer`);
-            await processInboundMessage(db, {
-              phone,
-              text: content,
-              name: contactName,
-            });
+          // Get or create conversation
+          let convId = '';
+          try {
+            const { data } = await db
+              .from('whatsapp_conversations')
+              .select('id')
+              .eq('phone', phone)
+              .single();
+            convId = data?.id || '';
+          } catch {
+            // Not found, create new
+            convId = '';
           }
 
-          console.log("✅ Done");
-        } catch (error) {
-          console.error("❌ Error:", error instanceof Error ? error.message : String(error));
+          if (!convId) {
+            const { data } = await db
+              .from('whatsapp_conversations')
+              .insert({
+                phone,
+                message_count: 0,
+                last_message_at: new Date().toISOString(),
+              })
+              .select('id')
+              .single();
+            convId = data?.id || '';
+          }
+
+          if (!convId) {
+            console.error('Failed to get/create conversation');
+            return;
+          }
+
+          // Save inbound message
+          await db.from('whatsapp_messages').insert({
+            conversation_id: convId,
+            phone,
+            direction: 'inbound',
+            content,
+            message_type: 'text',
+            status: 'received',
+          });
+
+          console.log('✅ Inbound message saved');
+
+          // Send reply via Twilio
+          const reply = `✅ Ricevuto: "${content.substring(0, 30)}"`;
+          console.log(`Sending reply: "${reply}"`);
+
+          try {
+            const twilioResp = await sendTwilioMessage(phone, reply);
+            console.log('✅ Twilio reply sent:', twilioResp.sid);
+
+            // Save outbound message
+            await db.from('whatsapp_messages').insert({
+              conversation_id: convId,
+              phone,
+              direction: 'outbound',
+              content: reply,
+              message_type: 'text',
+              status: 'sent',
+            });
+
+            console.log('✅ Done - message processed successfully');
+          } catch (e) {
+            console.error('❌ Failed to send Twilio reply:', e);
+            // Save as failed
+            await db.from('whatsapp_messages').insert({
+              conversation_id: convId,
+              phone,
+              direction: 'outbound',
+              content: reply,
+              message_type: 'text',
+              status: 'failed',
+            });
+          }
+        } catch (e) {
+          console.error('❌ Processing error:', e);
         }
       })();
 
       return response;
-    } catch (error) {
-      console.error("❌ Parse error:", error);
-      return new Response("OK", { status: 200 });
+    } catch (e) {
+      console.error('❌ Parse error:', e);
+      return new Response('OK', { status: 200 });
     }
   }
 
-  return new Response("Not found", { status: 404 });
+  return new Response('Not found', { status: 404 });
 });
