@@ -27,11 +27,43 @@ serve(async (req: Request) => {
     return new Response("OK", { headers: corsHeaders });
   }
 
-  // POST: Process WhatsApp messages from Meta
+  // POST: Process WhatsApp messages from Twilio or Meta
   if (req.method === "POST") {
     try {
       const body = await req.json();
-      console.log("📨 Webhook received from Meta");
+
+      // Detect webhook source (Twilio or Meta)
+      let phone = "";
+      let content = "";
+      let contactName = "";
+
+      if (body.From) {
+        // Twilio webhook format
+        console.log("📨 Webhook received from Twilio");
+        phone = normalizePhone(body.From.replace("whatsapp:", ""));
+        content = body.Body || "";
+        // Twilio doesn't provide contact name in webhook
+        contactName = "";
+      } else if (body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
+        // Meta webhook format
+        console.log("📨 Webhook received from Meta");
+        const value = body.entry[0].changes[0].value;
+        const message = value.messages[0];
+        const contact = value.contacts?.[0];
+        phone = normalizePhone(message.from);
+
+        if (message.type === "text") {
+          content = message.text.body;
+        } else if (message.type === "audio") {
+          content = `[Audio: ${message.audio.id}]`;
+        } else {
+          content = `[${message.type} message]`;
+        }
+        contactName = contact?.profile?.name || "";
+      } else {
+        console.log("⚠️ No messages in webhook");
+        return new Response("OK", { status: 200 });
+      }
 
       // Return 200 immediately (async processing)
       const response = new Response("OK", { status: 200 });
@@ -39,26 +71,6 @@ serve(async (req: Request) => {
       // Process asynchronously
       (async () => {
         try {
-          // Extract message from Meta webhook
-          if (!body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
-            console.log("⚠️ No messages in webhook");
-            return;
-          }
-
-          const value = body.entry[0].changes[0].value;
-          const message = value.messages[0];
-          const contact = value.contacts?.[0];
-          const phone = normalizePhone(message.from);
-
-          // Get message content
-          let content = "";
-          if (message.type === "text") {
-            content = message.text.body;
-          } else if (message.type === "audio") {
-            content = `[Audio: ${message.audio.id}]`;
-          } else {
-            content = `[${message.type} message]`;
-          }
 
           console.log(`📨 Message from ${phone}: "${content.substring(0, 50)}"`);
 
@@ -79,7 +91,7 @@ serve(async (req: Request) => {
           if (matchedDealer) {
             console.log(`🏬 Dealer message from ${matchedDealer.name}`);
             await processDealerMessage(db,
-              { phone, text: content, name: contact?.profile?.name },
+              { phone, text: content, name: contactName },
               {
                 id: matchedDealer.id,
                 rider_id: matchedDealer.rider_id,
@@ -91,7 +103,7 @@ serve(async (req: Request) => {
             await processInboundMessage(db, {
               phone,
               text: content,
-              name: contact?.profile?.name,
+              name: contactName,
             });
           }
 
