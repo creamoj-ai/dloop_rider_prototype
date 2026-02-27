@@ -8,9 +8,47 @@ import { processDealerMessage } from "./dealer_processor.ts";
 const VERIFY_TOKEN = "dloop_wa_verify_2026";
 
 serve(async (req: Request) => {
-  // GET: Meta webhook verification
+  // GET: Test endpoint or Meta webhook verification
   if (req.method === "GET") {
     const url = new URL(req.url);
+    const testParam = url.searchParams.get("test");
+
+    // Test endpoint: /function/whatsapp-webhook?test=1
+    if (testParam === "1") {
+      console.log("🧪 Running simulate test...");
+      try {
+        const db = getServiceClient();
+        const testMessage = {
+          From: "whatsapp:+393737902538",
+          To: "whatsapp:+14155238886",
+          Body: "Ciao, sto testando il bot Twilio! 🧪",
+        };
+
+        const phone = normalizePhone(testMessage.From.replace("whatsapp:", ""));
+        const content = testMessage.Body;
+
+        await processInboundMessage(db, {
+          phone,
+          text: content,
+          name: "Test User",
+        });
+
+        return new Response(JSON.stringify({ success: true, message: "Test sent!" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Meta webhook verification
     const mode = url.searchParams.get("hub.mode");
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
