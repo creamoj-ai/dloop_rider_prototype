@@ -42,27 +42,46 @@ async function sendTwilioMessage(to: string, text: string) {
 serve(async (req: Request) => {
   if (req.method === 'POST') {
     try {
-      const body = await req.json();
+      const contentType = req.headers.get('content-type') || '';
+      let body: Record<string, unknown> = {};
+
+      // Parse request body - handle both JSON and form-encoded
+      if (contentType.includes('application/json')) {
+        body = await req.json();
+      } else if (contentType.includes('application/x-www-form-urlencoded')) {
+        const formData = await req.formData();
+        for (const [key, value] of formData) {
+          body[key] = value;
+        }
+      } else {
+        try {
+          body = await req.json();
+        } catch {
+          console.log('⚠️ Could not parse request body');
+          return new Response('OK', { status: 200 });
+        }
+      }
+
       console.log('📨 Webhook received');
 
       let phone = '';
       let content = '';
 
-      // Twilio format
+      // Twilio format (form-encoded)
       if (body.From) {
-        phone = body.From.replace('whatsapp:', '');
-        content = body.Body || '';
+        phone = (body.From as string).replace('whatsapp:', '');
+        content = (body.Body as string) || '';
         console.log(`📨 Twilio message from ${phone}`);
       }
-      // Meta format
-      else if (body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
-        const msg = body.entry[0].changes[0].value.messages[0];
-        phone = msg.from;
-        content = msg.text?.body || '';
+      // Meta format (JSON)
+      else if ((body.entry as any)?.[0]?.changes?.[0]?.value?.messages?.[0]) {
+        const msg = (body.entry as any)[0].changes[0].value.messages[0];
+        phone = msg.from as string;
+        content = msg.text?.body as string || '';
         console.log(`📨 Meta message from ${phone}`);
       }
       else {
-        console.log('⚠️ No message');
+        console.log('⚠️ No message found in request');
         return new Response('OK', { status: 200 });
       }
 
