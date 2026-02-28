@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.46.1";
+import { processInboundMessage } from "./processor.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -137,11 +138,16 @@ serve(async (req: Request) => {
 
           console.log('✅ Inbound message saved');
 
-          // Send reply via Twilio
-          const reply = `✅ Ricevuto: "${content.substring(0, 30)}"`;
-          console.log(`Sending reply: "${reply}"`);
-
+          // Process with ChatGPT and get intelligent reply
           try {
+            const { reply } = await processInboundMessage(db, {
+              phone,
+              text: content,
+            });
+
+            console.log(`📤 ChatGPT reply: "${reply.substring(0, 50)}..."`);
+
+            // Send reply via Twilio
             const twilioResp = await sendTwilioMessage(phone, reply);
             console.log('✅ Twilio reply sent:', twilioResp.sid);
 
@@ -157,16 +163,22 @@ serve(async (req: Request) => {
 
             console.log('✅ Done - message processed successfully');
           } catch (e) {
-            console.error('❌ Failed to send Twilio reply:', e);
-            // Save as failed
-            await db.from('whatsapp_messages').insert({
-              conversation_id: convId,
-              phone,
-              direction: 'outbound',
-              content: reply,
-              message_type: 'text',
-              status: 'failed',
-            });
+            console.error('❌ Failed to process message:', e);
+            // Send fallback message on error
+            const fallback = "Mi dispiace, ho avuto un problema. Riprova tra poco!";
+            try {
+              await sendTwilioMessage(phone, fallback);
+              await db.from('whatsapp_messages').insert({
+                conversation_id: convId,
+                phone,
+                direction: 'outbound',
+                content: fallback,
+                message_type: 'text',
+                status: 'failed',
+              });
+            } catch (sendErr) {
+              console.error('❌ Could not send fallback:', sendErr);
+            }
           }
         } catch (e) {
           console.error('❌ Processing error:', e);
