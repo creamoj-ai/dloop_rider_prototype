@@ -2,7 +2,50 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { chatCompletion, transcribeAudio, type ChatMessage } from "../_shared/openai.ts";
 import { customerTools, executeCustomerFunction } from "./customer_functions.ts";
-import { sendWhatsAppMessage, downloadMedia } from "./twilio_api.ts";
+import { sendWhatsAppMessage, downloadMedia, sendTwilioMessage } from "./twilio_api.ts";
+
+// Meta WhatsApp API
+async function sendMetaMessage(phone: string, text: string): Promise<{ success: boolean; messageId?: string }> {
+  const token = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+  const phoneId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+
+  if (!token || !phoneId) {
+    console.error("❌ Meta credentials missing");
+    return { success: false };
+  }
+
+  try {
+    const res = await fetch(
+      `https://graph.instagram.com/v18.0/${phoneId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: phone,
+          type: "text",
+          text: { body: text },
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("❌ Meta error:", err);
+      return { success: false };
+    }
+
+    const data = await res.json();
+    console.log(`✅ Meta sent to ${phone}: ${(data as Record<string, unknown>).messages?.[0]}`);
+    return { success: true, messageId: (data as Record<string, Record<string, unknown>>).messages?.[0]?.id as string };
+  } catch (e) {
+    console.error("❌ Meta exception:", e);
+    return { success: false };
+  }
+}
 
 const MAX_FUNCTION_CALLS = 3;
 const MESSAGE_HISTORY_LIMIT = 10;
@@ -150,8 +193,12 @@ export async function processInboundMessage(
     response.content?.trim() ??
     "Mi dispiace, non sono riuscito a capire. Puoi riprovare?";
 
-  // 8. Send reply via WhatsApp API
-  const sendResult = await sendWhatsAppMessage(phone, reply);
+  // 8. Send reply via WhatsApp API (Meta PRIMARY, Twilio BACKUP)
+  let sendResult = await sendMetaMessage(phone, reply);
+  if (!sendResult.success) {
+    console.log("📤 Meta failed, trying Twilio backup...");
+    sendResult = await sendTwilioMessage(phone, reply);
+  }
 
   // 9. Save outbound message to DB
   await db.from("whatsapp_messages").insert({
@@ -253,7 +300,8 @@ Esempi con emoji:
 3. **Mostra i prodotti** → Usa browse_dealer_menu con il nome del negozio (es. "Toelettatura Pet")
 4. **Cliente sceglie** → Chiedi indirizzo di consegna
 5. **Crea l'ordine** → Usa create_delivery_order con il nome del negozio scelto
-6. **Pagamento** → Offri link Stripe o contanti/POS
+6. **Assegna il rider** → Usa assign_rider con AUTO (migliore disponibile) OPPURE chiedi al cliente se vuole un rider specifico
+7. **Pagamento** → Offri link Stripe o contanti/POS
 
 ## Stile di conversazione DEALER-FOCUSED (CON EMOJI!)
 - ✅ "Ciao! Cerchi prodotti per animali? 🐾 **TOELETTATURA PET** ha tutto quello che serve!"
@@ -262,7 +310,8 @@ Esempi con emoji:
 - ✅ "Se cerchi moda e stile, 👔 **YAMAMAY/CARPISA** ha le ultime collezioni"
 - ✅ Usa SEMPRE l'emoji quando menzioni un dealer
 - ✅ Metti il nome del dealer in **grassetto** (con ** prima e dopo)
-- ❌ NON dire: "Sto usando browse_dealer_menu"
+- ✅ Quando l'ordine è pronto, menziona il rider: "🚗 Marco (4.9/5) sta venendo a casa tua!"
+- ❌ NON dire: "Sto usando browse_dealer_menu" o "Sto assegnando un rider"
 - ❌ NON menzionare funzioni tecniche
 - ❌ NON suggerire negozi sbagliati per la categoria
 
