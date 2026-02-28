@@ -10,36 +10,6 @@ const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')!;
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-async function sendTwilioMessage(to: string, text: string) {
-  const fromNumber = TWILIO_PHONE_NUMBER.replace('+', '');
-  const toNumber = to.replace('+', '');
-
-  const authHeader = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
-  const formData = new URLSearchParams();
-  formData.append('From', `whatsapp:+${fromNumber}`);
-  formData.append('To', `whatsapp:+${toNumber}`);
-  formData.append('Body', text);
-
-  const res = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${authHeader}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData.toString(),
-    }
-  );
-
-  const data = await res.json();
-  if (!res.ok) {
-    console.error('Twilio error:', data);
-    throw new Error(`Twilio error ${res.status}`);
-  }
-  return data;
-}
-
 serve(async (req: Request) => {
   if (req.method === 'POST') {
     try {
@@ -86,100 +56,26 @@ serve(async (req: Request) => {
         return new Response('OK', { status: 200 });
       }
 
-      // Return 200 immediately
+      // Return 200 immediately (webhook pattern)
       const response = new Response('OK', { status: 200 });
 
-      // Process async (non-blocking)
+      // Process async (non-blocking) - let processor.ts handle EVERYTHING
       (async () => {
         try {
-          console.log(`Processing message: "${content.substring(0, 50)}"`);
+          console.log(`📨 Processing message: "${content.substring(0, 50)}"`);
 
-          // Get or create conversation
-          let convId = '';
-          try {
-            const { data } = await db
-              .from('whatsapp_conversations')
-              .select('id')
-              .eq('phone', phone)
-              .single();
-            convId = data?.id || '';
-          } catch {
-            // Not found, create new
-            convId = '';
-          }
-
-          if (!convId) {
-            const { data } = await db
-              .from('whatsapp_conversations')
-              .insert({
-                phone,
-                message_count: 0,
-                last_message_at: new Date().toISOString(),
-              })
-              .select('id')
-              .single();
-            convId = data?.id || '';
-          }
-
-          if (!convId) {
-            console.error('Failed to get/create conversation');
-            return;
-          }
-
-          // Save inbound message
-          await db.from('whatsapp_messages').insert({
-            conversation_id: convId,
+          // processor.ts handles:
+          // - Getting/creating conversation
+          // - Saving inbound message
+          // - ChatGPT processing
+          // - Sending reply via Twilio
+          // - Saving outbound message
+          const { reply } = await processInboundMessage(db, {
             phone,
-            direction: 'inbound',
-            content,
-            message_type: 'text',
-            status: 'received',
+            text: content,
           });
 
-          console.log('✅ Inbound message saved');
-
-          // Process with ChatGPT and get intelligent reply
-          try {
-            const { reply } = await processInboundMessage(db, {
-              phone,
-              text: content,
-            });
-
-            console.log(`📤 ChatGPT reply: "${reply.substring(0, 50)}..."`);
-
-            // Send reply via Twilio
-            const twilioResp = await sendTwilioMessage(phone, reply);
-            console.log('✅ Twilio reply sent:', twilioResp.sid);
-
-            // Save outbound message
-            await db.from('whatsapp_messages').insert({
-              conversation_id: convId,
-              phone,
-              direction: 'outbound',
-              content: reply,
-              message_type: 'text',
-              status: 'sent',
-            });
-
-            console.log('✅ Done - message processed successfully');
-          } catch (e) {
-            console.error('❌ Failed to process message:', e);
-            // Send fallback message on error
-            const fallback = "Mi dispiace, ho avuto un problema. Riprova tra poco!";
-            try {
-              await sendTwilioMessage(phone, fallback);
-              await db.from('whatsapp_messages').insert({
-                conversation_id: convId,
-                phone,
-                direction: 'outbound',
-                content: fallback,
-                message_type: 'text',
-                status: 'failed',
-              });
-            } catch (sendErr) {
-              console.error('❌ Could not send fallback:', sendErr);
-            }
-          }
+          console.log(`✅ Message processed. Reply: "${reply.substring(0, 80)}..."`);
         } catch (e) {
           console.error('❌ Processing error:', e);
         }
