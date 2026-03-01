@@ -2,7 +2,7 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { chatCompletion, transcribeAudio, type ChatMessage } from "../_shared/openai.ts";
 import { customerTools, executeCustomerFunction } from "./customer_functions.ts";
-import { sendWhatsAppMessage, downloadMedia, sendTwilioMessage } from "./twilio_api.ts";
+import { sendWhatsAppMessage, downloadMedia } from "./twilio_api.ts";
 
 // Meta WhatsApp API
 async function sendMetaMessage(phone: string, text: string): Promise<{ success: boolean; messageId?: string }> {
@@ -194,10 +194,11 @@ export async function processInboundMessage(
     "Mi dispiace, non sono riuscito a capire. Puoi riprovare?";
 
   // 8. Send reply via WhatsApp API (Meta PRIMARY, Twilio BACKUP)
-  let sendResult = await sendMetaMessage(phone, reply);
+  const formattedPhone = phone.startsWith("+") ? phone : `+${phone}`;
+  let sendResult = await sendMetaMessage(formattedPhone, reply);
   if (!sendResult.success) {
     console.log("📤 Meta failed, trying Twilio backup...");
-    sendResult = await sendTwilioMessage(phone, reply);
+    sendResult = await sendWhatsAppMessage(formattedPhone, reply);
   }
 
   // 9. Save outbound message to DB
