@@ -212,6 +212,95 @@ export async function processInboundMessage(
   return { reply, conversationId };
 }
 
+// ── Rider Assignment Logic ───────────────────────────────────
+
+async function assignRider(
+  db: SupabaseClient,
+  orderId: string,
+  type: "CLIENT_CHOICE" | "DEALER_MANUAL" | "AUTO",
+  riderId?: string
+): Promise<{ assigned: boolean; riderId?: string; riderName?: string }> {
+  if (type === "CLIENT_CHOICE" && riderId) {
+    // Client selected a specific rider
+    const { data: rider } = await db
+      .from("riders")
+      .select("id, name, status")
+      .eq("id", riderId)
+      .single();
+
+    if (rider && rider.status !== "OFFLINE") {
+      await db
+        .from("orders")
+        .update({
+          assigned_rider_id: riderId,
+          status: "ASSIGNED",
+          assigned_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      console.log(`✅ Rider ${riderId} assigned (client choice)`);
+      return { assigned: true, riderId, riderName: rider.name as string };
+    }
+  }
+
+  if (type === "AUTO") {
+    // Auto-assign best available rider
+    const { data: riders } = await db
+      .from("riders")
+      .select("id, name, rating, current_order_count, status")
+      .eq("status", "ONLINE")
+      .gte("rating", 4.5)
+      .lt("current_order_count", 5)
+      .order("rating", { ascending: false })
+      .limit(1);
+
+    if (riders && riders.length > 0) {
+      const bestRider = riders[0];
+      await db
+        .from("orders")
+        .update({
+          assigned_rider_id: bestRider.id as string,
+          status: "ASSIGNED",
+          assigned_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      await db
+        .from("riders")
+        .update({ current_order_count: (bestRider.current_order_count as number) + 1 })
+        .eq("id", bestRider.id);
+
+      console.log(`✅ Auto-assigned: ${bestRider.name}`);
+      return { assigned: true, riderId: bestRider.id as string, riderName: bestRider.name as string };
+    }
+  }
+
+  if (type === "DEALER_MANUAL" && riderId) {
+    // Dealer manually assigned a rider
+    const { data: rider } = await db
+      .from("riders")
+      .select("id, name, status")
+      .eq("id", riderId)
+      .single();
+
+    if (rider && rider.status !== "OFFLINE") {
+      await db
+        .from("orders")
+        .update({
+          assigned_rider_id: riderId,
+          status: "ASSIGNED",
+          assigned_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      console.log(`✅ Rider ${riderId} assigned (dealer manual)`);
+      return { assigned: true, riderId, riderName: rider.name as string };
+    }
+  }
+
+  return { assigned: false };
+}
+
 // ── Helpers ──────────────────────────────────────────────────────
 
 async function getOrCreateConversation(
@@ -312,14 +401,17 @@ Esempi con emoji:
 - ❌ NON menzionare funzioni tecniche
 - ❌ NON suggerire negozi sbagliati per la categoria
 
-## Flow naturale DEALER-BASED + PWA
+## Flow naturale DEALER-BASED + PWA + RIDER ASSIGNMENT
 1. Cliente dice cosa vuole → Tu identifichi la categoria
 2. Tu suggerisci il negozio specializzato (con entusiasmo!)
 3. **TU MANDI LINK PWA** → "Ordina qui: https://dloop-pwa.vercel.app 🛍️"
 4. Cliente va alla PWA → Vede catalogo + prodotti
 5. Cliente ordina dalla PWA → Checkout form (nome, phone, address)
 6. **Ordine salvato automaticamente** in Supabase
-7. Tu comunichi conferma + tempo stimato (30-45 min) al WhatsApp
+7. **ASSEGNA RIDER** → Usa assign_rider con:
+   - assignment_type: "AUTO" (migliore disponibile) OPPURE
+   - assignment_type: "CLIENT_CHOICE" (se cliente ha scelto)
+8. Tu comunichi conferma + rider assegnato + tempo stimato (30-45 min)
 
 ## Regole importanti
 - SEMPRE suggerire il negozio SPECIALIZZATO per la categoria che il cliente cerca
