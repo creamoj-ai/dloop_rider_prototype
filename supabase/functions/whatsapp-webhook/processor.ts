@@ -212,6 +212,59 @@ export async function processInboundMessage(
   return { reply, conversationId };
 }
 
+// ── Stripe Payment Link Generation ───────────────────────────
+
+async function generatePaymentLink(
+  orderId: string,
+  amount: number,
+  description: string,
+  customerPhone: string,
+  dealerId?: string
+): Promise<{ paymentUrl?: string; error?: string }> {
+  try {
+    const adminKey = Deno.env.get("WOZ_ADMIN_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+    if (!adminKey || !supabaseUrl) {
+      console.error("❌ Missing Stripe config (WOZ_ADMIN_KEY or SUPABASE_URL)");
+      return { error: "Stripe not configured" };
+    }
+
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/stripe-link`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Key": adminKey,
+        },
+        body: JSON.stringify({
+          relay_id: orderId,
+          order_id: orderId,
+          amount,
+          description,
+          customer_phone: customerPhone,
+          platform_fee: Math.max(amount * 0.05, 0.50), // 5% fee or €0.50 minimum
+          dealer_contact_id: dealerId,
+        }),
+      }
+    );
+
+    const data = await response.json() as Record<string, unknown>;
+
+    if (!response.ok) {
+      console.error("❌ Stripe link generation failed:", data);
+      return { error: (data.error as string) ?? "Failed to generate payment link" };
+    }
+
+    console.log(`✅ Payment link generated for order ${orderId}`);
+    return { paymentUrl: data.payment_url as string };
+  } catch (e) {
+    console.error(`❌ Stripe error: ${e}`);
+    return { error: "Stripe service error" };
+  }
+}
+
 // ── FCM Notification for Rider ───────────────────────────────
 
 async function sendRiderNotification(
@@ -439,7 +492,7 @@ Esempi con emoji:
 - ❌ NON menzionare funzioni tecniche
 - ❌ NON suggerire negozi sbagliati per la categoria
 
-## Flow naturale DEALER-BASED + PWA + RIDER ASSIGNMENT + FCM NOTIFICATIONS
+## Flow naturale DEALER-BASED + PWA + RIDER ASSIGNMENT + FCM + STRIPE PAYMENT
 1. Cliente dice cosa vuole → Tu identifichi la categoria
 2. Tu suggerisci il negozio specializzato (con entusiasmo!)
 3. **TU MANDI LINK PWA** → "Ordina qui: https://dloop-pwa.vercel.app 🛍️"
@@ -452,7 +505,8 @@ Esempi con emoji:
 8. **NOTIFICA RIDER** → Sistema inserisce notifica in DB
    - Rider riceve FCM Push: "🆕 Nuovo ordine da [Cliente]"
    - Mostra: Indirizzo, items, importo, ETA
-9. Tu comunichi conferma + rider assegnato + tempo stimato (30-45 min) al cliente
+9. **GENERA LINK STRIPE** → Sistema crea payment link
+10. Tu comunichi al cliente: "💳 Paga qui: [LINK STRIPE] | 🚗 [Rider] arriverà in 30-45 min"
 
 ## Regole importanti
 - SEMPRE suggerire il negozio SPECIALIZZATO per la categoria che il cliente cerca
