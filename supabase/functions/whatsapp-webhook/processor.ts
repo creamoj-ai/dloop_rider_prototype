@@ -212,6 +212,44 @@ export async function processInboundMessage(
   return { reply, conversationId };
 }
 
+// ── FCM Notification for Rider ───────────────────────────────
+
+async function sendRiderNotification(
+  db: SupabaseClient,
+  riderId: string,
+  riderName: string,
+  orderId: string,
+  clientName: string,
+  clientPhone: string,
+  deliveryAddress: string,
+  items: string,
+  totalPrice: number
+): Promise<void> {
+  try {
+    await db.from("notifications").insert({
+      rider_id: riderId,
+      order_id: orderId,
+      notification_type: "NEW_ORDER",
+      title: `🆕 Nuovo ordine da ${clientName}`,
+      body: `Indirizzo: ${deliveryAddress}\nItems: ${items}\nTotale: €${totalPrice.toFixed(2)}`,
+      data: JSON.stringify({
+        order_id: orderId,
+        client_name: clientName,
+        client_phone: clientPhone,
+        delivery_address: deliveryAddress,
+        items,
+        total_price: totalPrice,
+      }),
+      is_read: false,
+      created_at: new Date().toISOString(),
+    });
+
+    console.log(`✅ FCM notification sent to rider ${riderName} (${riderId}) for order ${orderId}`);
+  } catch (e) {
+    console.error(`❌ Failed to send FCM notification: ${e}`);
+  }
+}
+
 // ── Rider Assignment Logic ───────────────────────────────────
 
 async function assignRider(
@@ -401,7 +439,7 @@ Esempi con emoji:
 - ❌ NON menzionare funzioni tecniche
 - ❌ NON suggerire negozi sbagliati per la categoria
 
-## Flow naturale DEALER-BASED + PWA + RIDER ASSIGNMENT
+## Flow naturale DEALER-BASED + PWA + RIDER ASSIGNMENT + FCM NOTIFICATIONS
 1. Cliente dice cosa vuole → Tu identifichi la categoria
 2. Tu suggerisci il negozio specializzato (con entusiasmo!)
 3. **TU MANDI LINK PWA** → "Ordina qui: https://dloop-pwa.vercel.app 🛍️"
@@ -411,7 +449,10 @@ Esempi con emoji:
 7. **ASSEGNA RIDER** → Usa assign_rider con:
    - assignment_type: "AUTO" (migliore disponibile) OPPURE
    - assignment_type: "CLIENT_CHOICE" (se cliente ha scelto)
-8. Tu comunichi conferma + rider assegnato + tempo stimato (30-45 min)
+8. **NOTIFICA RIDER** → Sistema inserisce notifica in DB
+   - Rider riceve FCM Push: "🆕 Nuovo ordine da [Cliente]"
+   - Mostra: Indirizzo, items, importo, ETA
+9. Tu comunichi conferma + rider assegnato + tempo stimato (30-45 min) al cliente
 
 ## Regole importanti
 - SEMPRE suggerire il negozio SPECIALIZZATO per la categoria che il cliente cerca
