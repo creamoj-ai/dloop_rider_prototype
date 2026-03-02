@@ -200,9 +200,9 @@ async function findLatestRelay(
   statuses: string[]
 ): Promise<Record<string, unknown> | null> {
   const { data } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select("id, order_id, status, dealer_message, estimated_amount, created_at")
-    .eq("dealer_contact_id", dealerContactId)
+    .eq("dealer_id", dealerContactId)
     .in("status", statuses)
     .order("created_at", { ascending: false })
     .limit(1);
@@ -239,10 +239,10 @@ async function confirmOrder(
 
   if (relayId) {
     const { data } = await db
-      .from("order_relays")
+      .from("whatsapp_order_relays")
       .select("id, order_id, status, dealer_message, estimated_amount")
       .eq("id", relayId)
-      .eq("dealer_contact_id", dealerContactId)
+      .eq("dealer_id", dealerContactId)
       .single();
     relay = data;
   } else {
@@ -263,7 +263,7 @@ async function confirmOrder(
 
   // Update relay status
   const { error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .update({
       status: "confirmed",
       confirmed_at: new Date().toISOString(),
@@ -283,6 +283,11 @@ async function confirmOrder(
     `Il dealer ha confermato l'ordine. Preparazione in corso.`
   );
 
+  // Proactive notification to customer (fire-and-forget)
+  if (relay.order_id) {
+    triggerCustomerNotify(relay.order_id as string, "order_confirmed");
+  }
+
   return JSON.stringify({
     success: true,
     relay_id: (relay.id as string).slice(0, 8),
@@ -301,10 +306,10 @@ async function declineOrder(
 
   if (relayId) {
     const { data } = await db
-      .from("order_relays")
+      .from("whatsapp_order_relays")
       .select("id, order_id, status")
       .eq("id", relayId)
-      .eq("dealer_contact_id", dealerContactId)
+      .eq("dealer_id", dealerContactId)
       .single();
     relay = data;
   } else {
@@ -326,7 +331,7 @@ async function declineOrder(
   const replyText = reason ? `Rifiutato: ${reason}` : "Rifiutato";
 
   const { error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .update({
       status: "cancelled",
       dealer_reply: replyText,
@@ -362,10 +367,10 @@ async function markOrderReady(
 
   if (relayId) {
     const { data } = await db
-      .from("order_relays")
+      .from("whatsapp_order_relays")
       .select("id, order_id, status")
       .eq("id", relayId)
-      .eq("dealer_contact_id", dealerContactId)
+      .eq("dealer_id", dealerContactId)
       .single();
     relay = data;
   } else {
@@ -388,7 +393,7 @@ async function markOrderReady(
   }
 
   const { error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .update({
       status: "ready",
       ready_at: new Date().toISOString(),
@@ -407,6 +412,11 @@ async function markOrderReady(
     "Il dealer ha preparato l'ordine. Vai a ritirarlo!"
   );
 
+  // Proactive notification to customer (fire-and-forget)
+  if (relay.order_id) {
+    triggerCustomerNotify(relay.order_id as string, "order_ready");
+  }
+
   return JSON.stringify({
     success: true,
     relay_id: (relay.id as string).slice(0, 8),
@@ -419,11 +429,11 @@ async function viewPendingOrders(
   dealerContactId: string
 ): Promise<string> {
   const { data, error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select(
       "id, status, dealer_message, estimated_amount, created_at, orders(customer_name, customer_address)"
     )
-    .eq("dealer_contact_id", dealerContactId)
+    .eq("dealer_id", dealerContactId)
     .in("status", ["pending", "sent", "confirmed", "preparing", "ready"])
     .order("created_at", { ascending: false })
     .limit(10);
@@ -532,9 +542,9 @@ async function getDailySummary(
   const todayISO = today.toISOString();
 
   const { data, error } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select("id, status, estimated_amount, actual_amount, created_at")
-    .eq("dealer_contact_id", dealerContactId)
+    .eq("dealer_id", dealerContactId)
     .gte("created_at", todayISO);
 
   if (error) {
@@ -596,4 +606,22 @@ async function setDealerConversationState(
     success: true,
     new_state: newState,
   });
+}
+
+// ── Proactive Customer Notification (fire-and-forget) ─────────────
+
+function triggerCustomerNotify(orderId: string, event: string): void {
+  const supabaseUrl = Deno.env.get("DB_URL") ?? "";
+  const anonKey = Deno.env.get("DB_ANON_KEY") ?? "";
+  const adminKey = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
+
+  fetch(`${supabaseUrl}/functions/v1/whatsapp-notify`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Key": adminKey,
+      "Authorization": `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ order_id: orderId, event }),
+  }).catch((e) => console.error(`Customer notify [${event}] failed:`, e));
 }

@@ -7,6 +7,7 @@ import '../../../providers/order_relay_provider.dart';
 import '../../../providers/contacts_provider.dart';
 import '../../../theme/tokens.dart';
 import 'dealer_picker_sheet.dart';
+import 'fee_breakdown_sheet.dart';
 import '../../../services/order_relay_service.dart';
 
 /// Compact card showing relay status for an order.
@@ -137,7 +138,14 @@ class RelayStatusCard extends ConsumerWidget {
                 ),
               ],
               const Spacer(),
-              if (relay.isPaid)
+              if (relay.isPaid) ...[
+                _ActionChip(
+                  label: 'Dettagli Fee',
+                  icon: Icons.receipt_long,
+                  color: AppColors.statsGold,
+                  onTap: () => showFeeBreakdownSheet(context, orderId),
+                ),
+                const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -158,6 +166,7 @@ class RelayStatusCard extends ConsumerWidget {
                     ],
                   ),
                 ),
+              ],
               if (relay.estimatedAmount != null && !relay.isPaid)
                 Text(
                   '€${relay.estimatedAmount!.toStringAsFixed(2)}',

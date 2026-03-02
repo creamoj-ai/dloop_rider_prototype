@@ -1,10 +1,14 @@
 // WhatsApp Cloud API client
 // Uses Meta Business API (free tier — Cloud API direct)
 
-const WA_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
-const WA_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const WA_API_VERSION = "v21.0";
-const WA_BASE_URL = `https://graph.facebook.com/${WA_API_VERSION}/${WA_PHONE_NUMBER_ID}`;
+
+function getWaConfig() {
+  const phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
+  const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
+  const baseUrl = `https://graph.facebook.com/${WA_API_VERSION}/${phoneNumberId}`;
+  return { phoneNumberId, accessToken, baseUrl };
+}
 
 interface SendResult {
   success: boolean;
@@ -20,11 +24,12 @@ export async function sendWhatsAppMessage(
   text: string
 ): Promise<SendResult> {
   try {
-    const response = await fetch(`${WA_BASE_URL}/messages`, {
+    const { accessToken, baseUrl } = getWaConfig();
+    const response = await fetch(`${baseUrl}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${WA_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
@@ -37,6 +42,7 @@ export async function sendWhatsAppMessage(
     const data = await response.json();
 
     if (!response.ok) {
+      console.error("WA send failed:", JSON.stringify(data));
       return {
         success: false,
         error: data.error?.message ?? `HTTP ${response.status}`,
@@ -48,6 +54,7 @@ export async function sendWhatsAppMessage(
       messageId: data.messages?.[0]?.id,
     };
   } catch (error) {
+    console.error("WA send exception:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -64,6 +71,7 @@ export async function sendTemplate(
   params: string[] = []
 ): Promise<SendResult> {
   try {
+    const { accessToken, baseUrl } = getWaConfig();
     const components =
       params.length > 0
         ? [
@@ -77,11 +85,11 @@ export async function sendTemplate(
           ]
         : [];
 
-    const response = await fetch(`${WA_BASE_URL}/messages`, {
+    const response = await fetch(`${baseUrl}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${WA_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
@@ -116,16 +124,46 @@ export async function sendTemplate(
   }
 }
 
+// ── Template Names (must be pre-approved on Meta Business) ─────────
+export const WA_TEMPLATES = {
+  NUOVO_ORDINE: "dloop_nuovo_ordine",     // params: [dealer_name, order_details]
+  ORDINE_CONFERMATO: "dloop_ordine_confermato", // params: [order_id, dealer_name]
+  ORDINE_PRONTO: "dloop_ordine_pronto",   // params: [order_id, estimated_time]
+  PAGAMENTO: "dloop_pagamento",           // params: [amount, payment_link]
+  BENVENUTO: "dloop_benvenuto",           // params: [customer_name]
+} as const;
+
+/**
+ * Try sending a template message first. If it fails (template not approved),
+ * fall back to a plain text message. This allows seamless transition when
+ * Meta approves templates without code changes.
+ */
+export async function sendTemplateOrText(
+  to: string,
+  templateName: string,
+  params: string[],
+  fallbackText: string
+): Promise<SendResult> {
+  // Try template first
+  const templateResult = await sendTemplate(to, templateName, params);
+  if (templateResult.success) return templateResult;
+
+  // Template failed (likely not approved yet) — fallback to plain text
+  console.log(`Template ${templateName} failed, falling back to text: ${templateResult.error}`);
+  return await sendWhatsAppMessage(to, fallbackText);
+}
+
 /**
  * Download media from WhatsApp (for voice messages).
  * Returns the raw bytes.
  */
 export async function downloadMedia(mediaId: string): Promise<Uint8Array> {
+  const { accessToken } = getWaConfig();
   // Step 1: Get media URL
   const metaResponse = await fetch(
     `https://graph.facebook.com/${WA_API_VERSION}/${mediaId}`,
     {
-      headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     }
   );
 
@@ -138,7 +176,7 @@ export async function downloadMedia(mediaId: string): Promise<Uint8Array> {
 
   // Step 2: Download the file
   const fileResponse = await fetch(mediaUrl, {
-    headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` },
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
   if (!fileResponse.ok) {

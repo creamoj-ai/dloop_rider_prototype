@@ -2,7 +2,50 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { chatCompletion, transcribeAudio, type ChatMessage } from "../_shared/openai.ts";
 import { customerTools, executeCustomerFunction } from "./customer_functions.ts";
-import { sendWhatsAppMessage, downloadMedia } from "./whatsapp_api.ts";
+import { downloadMedia } from "./twilio_api.ts";
+
+// Meta WhatsApp API
+async function sendMetaMessage(phone: string, text: string): Promise<{ success: boolean; messageId?: string }> {
+  const token = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+  const phoneId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+
+  if (!token || !phoneId) {
+    console.error("❌ Meta credentials missing");
+    return { success: false };
+  }
+
+  try {
+    const res = await fetch(
+      `https://graph.instagram.com/v18.0/${phoneId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: phone,
+          type: "text",
+          text: { body: text },
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("❌ Meta error:", err);
+      return { success: false };
+    }
+
+    const data = await res.json();
+    console.log(`✅ Meta sent to ${phone}: ${(data as Record<string, unknown>).messages?.[0]}`);
+    return { success: true, messageId: (data as Record<string, Record<string, unknown>>).messages?.[0]?.id as string };
+  } catch (e) {
+    console.error("❌ Meta exception:", e);
+    return { success: false };
+  }
+}
 
 const MAX_FUNCTION_CALLS = 3;
 const MESSAGE_HISTORY_LIMIT = 10;
@@ -59,9 +102,12 @@ export async function processInboundMessage(
   // 3. Save inbound message to DB
   await db.from("whatsapp_messages").insert({
     conversation_id: conversationId,
+    phone: phone,
     direction: "inbound",
     content: messageContent,
     message_type: messageType,
+    wa_message_id: (message as any).id ?? null,
+    status: "sent",
   });
 
   // Update last_message_at
@@ -147,12 +193,14 @@ export async function processInboundMessage(
     response.content?.trim() ??
     "Mi dispiace, non sono riuscito a capire. Puoi riprovare?";
 
-  // 8. Send reply via WhatsApp API
-  const sendResult = await sendWhatsAppMessage(phone, reply);
+  // 8. Send reply via Meta WhatsApp API
+  const formattedPhone = phone.startsWith("+") ? phone : `+${phone}`;
+  const sendResult = await sendMetaMessage(formattedPhone, reply);
 
   // 9. Save outbound message to DB
   await db.from("whatsapp_messages").insert({
     conversation_id: conversationId,
+    phone: phone,
     direction: "outbound",
     content: reply,
     message_type: "text",
@@ -162,6 +210,186 @@ export async function processInboundMessage(
   });
 
   return { reply, conversationId };
+}
+
+// ── Stripe Payment Link Generation ───────────────────────────
+
+async function generatePaymentLink(
+  orderId: string,
+  amount: number,
+  description: string,
+  customerPhone: string,
+  dealerId?: string
+): Promise<{ paymentUrl?: string; error?: string }> {
+  try {
+    const adminKey = Deno.env.get("WOZ_ADMIN_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+    if (!adminKey || !supabaseUrl) {
+      console.error("❌ Missing Stripe config (WOZ_ADMIN_KEY or SUPABASE_URL)");
+      return { error: "Stripe not configured" };
+    }
+
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/stripe-link`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Key": adminKey,
+        },
+        body: JSON.stringify({
+          relay_id: orderId,
+          order_id: orderId,
+          amount,
+          description,
+          customer_phone: customerPhone,
+          platform_fee: Math.max(amount * 0.05, 0.50), // 5% fee or €0.50 minimum
+          dealer_contact_id: dealerId,
+        }),
+      }
+    );
+
+    const data = await response.json() as Record<string, unknown>;
+
+    if (!response.ok) {
+      console.error("❌ Stripe link generation failed:", data);
+      return { error: (data.error as string) ?? "Failed to generate payment link" };
+    }
+
+    console.log(`✅ Payment link generated for order ${orderId}`);
+    return { paymentUrl: data.payment_url as string };
+  } catch (e) {
+    console.error(`❌ Stripe error: ${e}`);
+    return { error: "Stripe service error" };
+  }
+}
+
+// ── FCM Notification for Rider ───────────────────────────────
+
+async function sendRiderNotification(
+  db: SupabaseClient,
+  riderId: string,
+  riderName: string,
+  orderId: string,
+  clientName: string,
+  clientPhone: string,
+  deliveryAddress: string,
+  items: string,
+  totalPrice: number
+): Promise<void> {
+  try {
+    await db.from("notifications").insert({
+      rider_id: riderId,
+      order_id: orderId,
+      notification_type: "NEW_ORDER",
+      title: `🆕 Nuovo ordine da ${clientName}`,
+      body: `Indirizzo: ${deliveryAddress}\nItems: ${items}\nTotale: €${totalPrice.toFixed(2)}`,
+      data: JSON.stringify({
+        order_id: orderId,
+        client_name: clientName,
+        client_phone: clientPhone,
+        delivery_address: deliveryAddress,
+        items,
+        total_price: totalPrice,
+      }),
+      is_read: false,
+      created_at: new Date().toISOString(),
+    });
+
+    console.log(`✅ FCM notification sent to rider ${riderName} (${riderId}) for order ${orderId}`);
+  } catch (e) {
+    console.error(`❌ Failed to send FCM notification: ${e}`);
+  }
+}
+
+// ── Rider Assignment Logic ───────────────────────────────────
+
+async function assignRider(
+  db: SupabaseClient,
+  orderId: string,
+  type: "CLIENT_CHOICE" | "DEALER_MANUAL" | "AUTO",
+  riderId?: string
+): Promise<{ assigned: boolean; riderId?: string; riderName?: string }> {
+  if (type === "CLIENT_CHOICE" && riderId) {
+    // Client selected a specific rider
+    const { data: rider } = await db
+      .from("riders")
+      .select("id, name, status")
+      .eq("id", riderId)
+      .single();
+
+    if (rider && rider.status !== "OFFLINE") {
+      await db
+        .from("orders")
+        .update({
+          assigned_rider_id: riderId,
+          status: "ASSIGNED",
+          assigned_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      console.log(`✅ Rider ${riderId} assigned (client choice)`);
+      return { assigned: true, riderId, riderName: rider.name as string };
+    }
+  }
+
+  if (type === "AUTO") {
+    // Auto-assign best available rider
+    const { data: riders } = await db
+      .from("riders")
+      .select("id, name, rating, current_order_count, status")
+      .eq("status", "ONLINE")
+      .gte("rating", 4.5)
+      .lt("current_order_count", 5)
+      .order("rating", { ascending: false })
+      .limit(1);
+
+    if (riders && riders.length > 0) {
+      const bestRider = riders[0];
+      await db
+        .from("orders")
+        .update({
+          assigned_rider_id: bestRider.id as string,
+          status: "ASSIGNED",
+          assigned_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      await db
+        .from("riders")
+        .update({ current_order_count: (bestRider.current_order_count as number) + 1 })
+        .eq("id", bestRider.id);
+
+      console.log(`✅ Auto-assigned: ${bestRider.name}`);
+      return { assigned: true, riderId: bestRider.id as string, riderName: bestRider.name as string };
+    }
+  }
+
+  if (type === "DEALER_MANUAL" && riderId) {
+    // Dealer manually assigned a rider
+    const { data: rider } = await db
+      .from("riders")
+      .select("id, name, status")
+      .eq("id", riderId)
+      .single();
+
+    if (rider && rider.status !== "OFFLINE") {
+      await db
+        .from("orders")
+        .update({
+          assigned_rider_id: riderId,
+          status: "ASSIGNED",
+          assigned_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      console.log(`✅ Rider ${riderId} assigned (dealer manual)`);
+      return { assigned: true, riderId, riderName: rider.name as string };
+    }
+  }
+
+  return { assigned: false };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -176,8 +404,8 @@ async function getOrCreateConversation(
     .from("whatsapp_conversations")
     .select("*")
     .eq("phone", phone)
-    .eq("role", "customer")
-    .single();
+    .eq("conversation_type", "customer")
+    .maybeSingle();
 
   if (existing) {
     // Update name if provided and not set
@@ -196,7 +424,7 @@ async function getOrCreateConversation(
     .insert({
       phone,
       customer_name: name ?? null,
-      role: "customer",
+      conversation_type: "customer",
       state: "idle",
     })
     .select("*")
@@ -214,45 +442,85 @@ function buildCustomerSystemPrompt(
   conversationState: string
 ): string {
   return `Sei l'assistente WhatsApp di dloop, il servizio di delivery locale in Campania.
-Parli in italiano, in modo cordiale, rapido e professionale.
-Rispondi in massimo 2-3 frasi brevi, adatte a WhatsApp.
+Parli in italiano in modo naturale, cordiale, e sempre utile.
+Rispondi in 3-5 frasi brevi ma complete, adatte a WhatsApp.
+IMPORTANTE: Sii sempre amichevole e disponibile. Non menzionare funzioni tecniche ai clienti.
+
+## Chi sei
+- Sei l'assistente di dloop, qui per aiutare il cliente a trovare prodotti e ordinare
+- Dloop offre delivery veloce (30-60 min) da negozi partner a Napoli e provincia
+- Rispondi in modo naturale, come farebbe un amico simpatico
 
 ## Cliente
 - Nome: ${customerName}
-- Stato conversazione: ${conversationState}
+- Stato: ${conversationState}
 
-## Cosa puoi fare
-- Cercare prodotti nel catalogo (search_products) o menu di un negozio (browse_dealer_menu)
-- Creare ordini prodotto singolo (create_order) o ordini delivery completi (create_delivery_order)
-- Controllare lo stato di un ordine (check_order_status)
-- Annullare ordini solo se in attesa (cancel_order)
-- Generare link di pagamento Stripe (get_payment_link)
-- Raccogliere feedback post-consegna (submit_feedback)
-- Rispondere a FAQ su tempi, costi, zone, pagamento (get_faq)
+## ⭐ DEALER ROUTING (MOLTO IMPORTANTE!)
+Dloop ha 4 negozi partner, ognuno specializzato in una categoria:
 
-## Come funziona dloop
-- Delivery locale veloce (30-60 min) per prodotti di negozi partner
-- Negozi partner: ristoranti, pizzerie, fashion boutique, profumerie, gioiellerie
-- Il rider personale (DLOOPER) ritira dal negozio e consegna a te
-- Pagamento: link Stripe (carta online), contanti, o POS del rider
-- Consegna: da €3.50 (gratuita sopra €50)
-- Zone: Napoli e provincia
+🐾 **TOELETTATURA PET** → Prodotti per animali, toelettatura, accessori pet
+🛒 **PICCOLO SUPERMARKET** → Generi alimentari, spesa, prodotti freschi
+🥬 **NATURASÌ VOMERO** → Prodotti biologici, alimenti naturali, benessere
+👔 **YAMAMAY/CARPISA** → Moda, abbigliamento, accessori, lusso
 
-## Flow ordine tipico
-1. Cliente chiede un prodotto o tipo di cibo → usa browse_dealer_menu o search_products
-2. Mostra opzioni con prezzo → chiedi conferma e indirizzo di consegna
-3. Cliente conferma → usa create_delivery_order (con nome negozio, articoli, indirizzo)
-4. Ordine creato → comunica ID e tempo stimato (~30-45 min)
-5. Se il cliente vuole pagare online → usa get_payment_link
-6. Dopo la consegna → chiedi feedback con submit_feedback (voto 1-5)
+**REGOLA D'ORO**: Quando il cliente chiede un tipo di prodotto, suggerisci SEMPRE il negozio specializzato per quella categoria!
 
-## Regole
-- USA SEMPRE le funzioni per azioni reali. Non inventare prodotti, prezzi o stati.
-- Chiedi SEMPRE l'indirizzo completo prima di creare un ordine.
-- Se il cliente manda la posizione GPS, usala come indirizzo di consegna.
-- Per domande generali (tempi, costi, zone, pagamento), usa get_faq.
-- Se il cliente chiede qualcosa fuori scope, suggerisci di chiamare il supporto.
-- Non rivelare dettagli tecnici interni.
-- Gestisci la state machine: usa set_conversation_state per transizioni.
-- Se il messaggio è un vocale trascritto, rispondi normalmente al contenuto.`;
+Esempi con emoji:
+- Cliente: "Mi servono boccette di shampoo per cani" → Rispondi: "🐾 **TOELETTATURA PET** è perfetto!"
+- Cliente: "Voglio frutta e verdura fresca" → Rispondi: "🛒 **PICCOLO SUPERMARKET** ha tutto fresco"
+- Cliente: "Mi interessa roba biologica" → Rispondi: "🥬 **NATURASÌ VOMERO** è il nostro biologico"
+- Cliente: "Cerco una maglietta bella" → Rispondi: "👔 **YAMAMAY/CARPISA** ha le ultime collezioni"
+
+## Come aiutare il cliente (PER TE, NON PER IL CLIENTE)
+1. **Ascolta cosa cerca il cliente** → Identifica la categoria (PET/GROCERY/ORGANIC/FASHION)
+2. **Suggerisci il negozio giusto** → "Perfetto! Abbiamo TOELETTATURA PET che fa esattamente quello"
+3. **INVIA LINK PWA** → "Ordina dal nostro catalogo: https://dloop-pwa.vercel.app 🛍️"
+4. **Cliente ordina dalla PWA** → Naviga catalogo, seleziona prodotti, completa checkout
+5. **Ordine salvato in Supabase** → Rider riceve notifica automaticamente
+6. **Tracking** → Comunica al cliente il tempo stimato (30-45 min)
+
+## Stile di conversazione DEALER-FOCUSED (CON EMOJI!)
+- ✅ "Ciao! Cerchi prodotti per animali? 🐾 **TOELETTATURA PET** ha tutto quello che serve!"
+- ✅ "Perfetto! 🛒 Da **PICCOLO SUPERMARKET** trovi frutta fresca, verdure e tanta qualità"
+- ✅ "Per roba bio, 🥬 **NATURASÌ VOMERO** è il top! Cosa ti interessa?"
+- ✅ "Se cerchi moda e stile, 👔 **YAMAMAY/CARPISA** ha le ultime collezioni"
+- ✅ **SEMPRE AGGIUNGI IL LINK PWA**: "Ordina dal catalogo: https://dloop-pwa.vercel.app 🛍️"
+- ✅ Usa SEMPRE l'emoji quando menzioni un dealer
+- ✅ Metti il nome del dealer in **grassetto** (con ** prima e dopo)
+- ✅ Quando l'ordine è pronto, menziona il rider: "🚗 Marco (4.9/5) sta venendo a casa tua!"
+- ❌ NON dire: "Sto usando browse_dealer_menu" o "Sto assegnando un rider"
+- ❌ NON menzionare funzioni tecniche
+- ❌ NON suggerire negozi sbagliati per la categoria
+
+## Flow naturale DEALER-BASED + PWA + RIDER ASSIGNMENT + FCM + STRIPE PAYMENT
+1. Cliente dice cosa vuole → Tu identifichi la categoria
+2. Tu suggerisci il negozio specializzato (con entusiasmo!)
+3. **TU MANDI LINK PWA** → "Ordina qui: https://dloop-pwa.vercel.app 🛍️"
+4. Cliente va alla PWA → Vede catalogo + prodotti
+5. Cliente ordina dalla PWA → Checkout form (nome, phone, address)
+6. **Ordine salvato automaticamente** in Supabase
+7. **ASSEGNA RIDER** → Usa assign_rider con:
+   - assignment_type: "AUTO" (migliore disponibile) OPPURE
+   - assignment_type: "CLIENT_CHOICE" (se cliente ha scelto)
+8. **NOTIFICA RIDER** → Sistema inserisce notifica in DB
+   - Rider riceve FCM Push: "🆕 Nuovo ordine da [Cliente]"
+   - Mostra: Indirizzo, items, importo, ETA
+9. **GENERA LINK STRIPE** → Sistema crea payment link
+10. Tu comunichi al cliente: "💳 Paga qui: [LINK STRIPE] | 🚗 [Rider] arriverà in 30-45 min"
+
+## Regole importanti
+- SEMPRE suggerire il negozio SPECIALIZZATO per la categoria che il cliente cerca
+- Chiedi SEMPRE l'indirizzo completo prima di creare un ordine
+- Usa il nome ESATTO del negozio quando crei l'ordine (es. "Toelettatura Pet", non "Pet Shop")
+- Se il cliente non sa cosa vuole, offri tutte le 4 categorie
+- Sii sempre positivo e incoraggiante
+
+## Tono a seconda dello stato (${conversationState}) - CON EMOJI!
+- **idle**: "Ciao ${customerName}! 👋 Cerchi 🐾 prodotti per animali, 🛒 cibo, 🥬 biologico, o 👔 fashion? Dimmi pure!"
+- **ordering**: "Fantastico! 🎉 Vediamo cosa abbiamo disponibile..."
+- **confirming**: "Perfetto! ✅ Ricapitolando l'ordine... tutto ok?"
+- **tracking**: "Il tuo ordine è in arrivo in 30-45 minuti! 🚗 Hai domande?"
+- **support**: "Mi dispiace del problema. 😔 Contatta il nostro supporto per aiutarti meglio!"
+
+RICORDA: Usa emoji SEMPRE quando menzioni dealer o categorie!`;
 }

@@ -53,7 +53,7 @@ export async function chatCompletion(
   const {
     messages,
     tools,
-    model = "gpt-4o-mini",
+    model = "gpt-3.5-turbo",
     maxTokens = 512,
     temperature = 0.7,
   } = opts;

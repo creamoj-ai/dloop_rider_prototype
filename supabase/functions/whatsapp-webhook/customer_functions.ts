@@ -228,6 +228,33 @@ export const customerTools: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "assign_rider",
+      description:
+        "Assegna un rider a un ordine. Può essere AUTO (migliore disponibile) o CLIENT_CHOICE (scelto dal cliente).",
+      parameters: {
+        type: "object",
+        properties: {
+          order_id: {
+            type: "string",
+            description: "ID dell'ordine a cui assegnare il rider",
+          },
+          assignment_type: {
+            type: "string",
+            enum: ["AUTO", "CLIENT_CHOICE"],
+            description: "Tipo di assegnazione (AUTO = migliore disponibile, CLIENT_CHOICE = scelto dal cliente)",
+          },
+          rider_name: {
+            type: "string",
+            description: "Nome del rider (obbligatorio se assignment_type è CLIENT_CHOICE)",
+          },
+        },
+        required: ["order_id", "assignment_type"],
+      },
+    },
+  },
 ];
 
 // ── Function Executors ────────────────────────────────────────────
@@ -263,46 +290,80 @@ export async function executeCustomerFunction(
         phone,
         args.order_id as string | undefined
       );
-    case "cancel_order":
-      return await cancelOrder(db, phone, args.order_id as string);
+    case "cancel_order": {
+      const cancelResult = await cancelOrder(db, phone, args.order_id as string);
+      // Auto-transition back to idle after cancellation
+      const cancelParsed = JSON.parse(cancelResult);
+      if (cancelParsed.success) {
+        await db.from("whatsapp_conversations")
+          .update({ state: "idle" })
+          .eq("id", conversationId);
+      }
+      return cancelResult;
+    }
     case "set_conversation_state":
       return await setConversationState(
         db,
         conversationId,
         args.new_state as string
       );
-    case "browse_dealer_menu":
-      return await browseDealerMenu(
+    case "browse_dealer_menu": {
+      const menuResult = await browseDealerMenu(
         db,
         args.dealer_name as string | undefined,
         args.product_type as string | undefined
       );
+      // Auto-transition to ordering when browsing menus
+      await db.from("whatsapp_conversations")
+        .update({ state: "ordering" })
+        .eq("id", conversationId);
+      return menuResult;
+    }
     case "create_delivery_order": {
       const { data: conv2 } = await db
         .from("whatsapp_conversations")
         .select("customer_name")
         .eq("id", conversationId)
         .single();
-      return await createDeliveryOrder(db, phone, conversationId, {
+      const orderResult = await createDeliveryOrder(db, phone, conversationId, {
         items: args.items as string,
         deliveryAddress: args.delivery_address as string,
         dealerName: args.dealer_name as string | undefined,
         customerNotes: args.customer_notes as string | undefined,
         customerName: (conv2?.customer_name as string) ?? "Cliente WhatsApp",
       });
+      // Auto-transition to tracking state on success
+      const parsed = JSON.parse(orderResult);
+      if (parsed.success) {
+        await db.from("whatsapp_conversations")
+          .update({ state: "tracking" })
+          .eq("id", conversationId);
+      }
+      return orderResult;
     }
     case "get_payment_link":
       return await getPaymentLink(db, args.order_id as string);
-    case "submit_feedback":
-      return await submitFeedback(
+    case "submit_feedback": {
+      const feedbackResult = await submitFeedback(
         db,
         phone,
         args.order_id as string,
         args.rating as number,
         args.comment as string | undefined
       );
+      // Auto-transition back to idle after feedback
+      const fbParsed = JSON.parse(feedbackResult);
+      if (fbParsed.success) {
+        await db.from("whatsapp_conversations")
+          .update({ state: "idle" })
+          .eq("id", conversationId);
+      }
+      return feedbackResult;
+    }
     case "get_faq":
-      return getFaq(args.topic as string);
+      return await getFaq(db, args.topic as string);
+    case "assign_rider":
+      return await assignRider(db, args.order_id as string, args.assignment_type as string, args.rider_name as string | undefined);
     default:
       return JSON.stringify({ error: `Funzione sconosciuta: ${name}` });
   }
@@ -531,17 +592,39 @@ async function browseDealerMenu(
 ): Promise<string> {
   // If dealer name provided, find the dealer and their products
   if (dealerName) {
-    const pattern = `%${dealerName.trim()}%`;
-    const { data: dealers } = await db
-      .from("rider_contacts")
-      .select("id, rider_id, name, phone")
-      .eq("contact_type", "dealer")
-      .ilike("name", pattern)
-      .limit(3);
+    const normalized = dealerName.trim();
+    // Multi-pattern fuzzy search: split into words for broader matching
+    const words = normalized.split(/\s+/).filter((w) => w.length > 2);
+    const patterns = [
+      `%${normalized}%`,
+      ...words.map((w) => `%${w}%`),
+    ];
+    // Search with OR across all patterns
+    let dealers: Record<string, unknown>[] | null = null;
+    for (const pattern of patterns) {
+      const { data } = await db
+        .from("rider_contacts")
+        .select("id, rider_id, name, phone, is_available")
+        .eq("contact_type", "dealer")
+        .ilike("name", pattern)
+        .limit(5);
+      if (data && data.length > 0) {
+        dealers = data;
+        break;
+      }
+    }
 
     if (!dealers || dealers.length === 0) {
+      // List available dealers as suggestion
+      const { data: allDealers } = await db
+        .from("rider_contacts")
+        .select("name")
+        .eq("contact_type", "dealer")
+        .eq("status", "active")
+        .limit(10);
+      const names = (allDealers ?? []).map((d: Record<string, unknown>) => d.name).join(", ");
       return JSON.stringify({
-        message: `Nessun negozio trovato per "${dealerName}". Prova un nome diverso.`,
+        message: `Nessun negozio trovato per "${dealerName}".${names ? ` Negozi disponibili: ${names}` : " Prova un nome diverso."}`,
       });
     }
 
@@ -557,6 +640,7 @@ async function browseDealerMenu(
 
       results.push({
         dealer_name: dealer.name,
+        is_available: dealer.is_available !== false,
         products: (products ?? []).map((p: Record<string, unknown>) => ({
           id: p.id,
           name: p.name,
@@ -658,6 +742,16 @@ async function createDeliveryOrder(
     });
   }
 
+  // Get rider's pricing or use defaults
+  const { data: pricing } = await db
+    .from("rider_pricing")
+    .select("base_fee, per_km_fee")
+    .eq("rider_id", dealerContact.rider_id as string)
+    .single();
+
+  const baseEarning = (pricing?.base_fee as number) ?? 3.5;
+  const minGuarantee = Math.max(baseEarning, 3.0);
+
   // Create order in the main orders table
   const { data: order, error: orderErr } = await db
     .from("orders")
@@ -671,16 +765,16 @@ async function createDeliveryOrder(
       wa_conversation_id: conversationId,
       status: "pending",
       source: "whatsapp",
-      base_earning: 3.5,
+      base_earning: baseEarning,
       bonus_earning: 0,
       tip_amount: 0,
       rush_multiplier: 1.0,
       hold_cost: 0,
       hold_minutes: 0,
-      min_guarantee: 3.0,
-      total_earning: 3.5,
+      min_guarantee: minGuarantee,
+      total_earning: baseEarning,
       distance_km: 0,
-      dealer_contact_id: dealerContact.id,
+      dealer_id: dealerContact.rider_id,
     })
     .select("id")
     .single();
@@ -692,18 +786,67 @@ async function createDeliveryOrder(
   }
 
   // Auto-create order relay
-  const { error: relayErr } = await db.from("order_relays").insert({
+  const { error: relayErr } = await db.from("whatsapp_order_relays").insert({
+    conversation_id: conversationId,
     order_id: order.id,
-    rider_id: dealerContact.rider_id,
-    dealer_contact_id: dealerContact.id,
-    relay_channel: "whatsapp",
+    dealer_id: dealerContact.rider_id,
+    customer_phone: phone,
+    customer_name: opts.customerName,
     status: "pending",
-    dealer_message: opts.items,
-    estimated_amount: 0,
+    products: opts.items,
+    total_price: 0,
+    notes: opts.customerNotes,
   });
 
   if (relayErr) {
     console.error("Failed to create relay:", relayErr);
+  }
+
+  // Get relay ID for stripe-link
+  const { data: relayData } = await db
+    .from("whatsapp_order_relays")
+    .select("id")
+    .eq("order_id", order.id)
+    .limit(1)
+    .single();
+
+  const supabaseUrl = Deno.env.get("DB_URL") ?? "";
+  const anonKey = Deno.env.get("DB_ANON_KEY") ?? "";
+  const adminKey = Deno.env.get("WOZ_ADMIN_KEY") ?? "";
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Admin-Key": adminKey,
+    "Authorization": `Bearer ${anonKey}`,
+  };
+
+  // Auto-dispatch: fire-and-forget
+  try {
+    fetch(`${supabaseUrl}/functions/v1/dispatch-order`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ order_id: order.id }),
+    }).catch((e) => console.error("Auto-dispatch failed:", e));
+  } catch (e) {
+    console.error("Auto-dispatch error:", e);
+  }
+
+  // Auto-generate Stripe payment link: fire-and-forget
+  if (relayData?.id) {
+    try {
+      fetch(`${supabaseUrl}/functions/v1/stripe-link`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          relay_id: relayData.id,
+          amount: baseEarning,
+          description: opts.items,
+          customer_phone: phone,
+          order_id: order.id,
+        }),
+      }).catch((e) => console.error("Auto-stripe-link failed:", e));
+    } catch (e) {
+      console.error("Auto-stripe-link error:", e);
+    }
   }
 
   return JSON.stringify({
@@ -713,7 +856,8 @@ async function createDeliveryOrder(
     items: opts.items,
     delivery_address: opts.deliveryAddress,
     estimated_time: "30-45 min",
-    message: `Ordine inviato a ${dealerContact.name}! ID: ${(order.id as string).slice(0, 8)}. Il rider ti aggiornerà sullo stato. Tempo stimato: 30-45 min.`,
+    payment_link: "In arrivo via WhatsApp",
+    message: `Ordine inviato a ${dealerContact.name}! ID: ${(order.id as string).slice(0, 8)}. Riceverai il link di pagamento a breve. Tempo stimato: 30-45 min.`,
   });
 }
 
@@ -723,7 +867,7 @@ async function getPaymentLink(
 ): Promise<string> {
   // Check if this order has a relay with a Stripe link
   const { data: relay } = await db
-    .from("order_relays")
+    .from("whatsapp_order_relays")
     .select("id, stripe_payment_link, payment_status, estimated_amount, actual_amount")
     .eq("order_id", orderId)
     .limit(1)
@@ -822,7 +966,165 @@ async function submitFeedback(
   });
 }
 
-function getFaq(topic: string): string {
+async function assignRider(
+  db: SupabaseClient,
+  orderId: string,
+  assignmentType: string,
+  riderName?: string
+): Promise<string> {
+  // Get order details
+  const { data: order, error: orderErr } = await db
+    .from("orders")
+    .select("id, status, rider_id")
+    .eq("id", orderId)
+    .single();
+
+  if (orderErr || !order) {
+    return JSON.stringify({ error: "Ordine non trovato." });
+  }
+
+  if (assignmentType === "AUTO") {
+    // Auto-assign best available rider
+    const { data: riders, error: ridersErr } = await db
+      .from("riders")
+      .select("id, name, rating, current_order_count, status")
+      .eq("status", "ONLINE")
+      .gte("rating", 4.5)
+      .lt("current_order_count", 5)
+      .order("rating", { ascending: false })
+      .order("current_order_count", { ascending: true })
+      .limit(1);
+
+    if (ridersErr || !riders || riders.length === 0) {
+      return JSON.stringify({
+        error: "Nessun rider disponibile al momento. Riprova tra poco.",
+      });
+    }
+
+    const bestRider = riders[0];
+    const { error: updateErr } = await db
+      .from("orders")
+      .update({
+        assigned_rider_id: bestRider.id,
+        status: "ASSIGNED",
+        assigned_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (updateErr) {
+      return JSON.stringify({
+        error: `Errore nell'assegnazione: ${updateErr.message}`,
+      });
+    }
+
+    // Increment rider's order count
+    await db
+      .from("riders")
+      .update({
+        current_order_count: (bestRider.current_order_count as number) + 1,
+      })
+      .eq("id", bestRider.id);
+
+    return JSON.stringify({
+      success: true,
+      assigned_rider: bestRider.name,
+      rating: bestRider.rating,
+      message: `🚗 Assegnato a ${bestRider.name} (${bestRider.rating}/5). Arrivo stimato: 30-45 min.`,
+    });
+  } else if (assignmentType === "CLIENT_CHOICE" && riderName) {
+    // Client selected a specific rider
+    const { data: rider, error: riderErr } = await db
+      .from("riders")
+      .select("id, name, status, rating")
+      .ilike("name", `%${riderName}%`)
+      .limit(1)
+      .single();
+
+    if (riderErr || !rider) {
+      return JSON.stringify({
+        error: `Rider "${riderName}" non trovato o non disponibile.`,
+      });
+    }
+
+    if ((rider.status as string) === "OFFLINE") {
+      return JSON.stringify({
+        error: `${rider.name} è offline. Scegli un altro rider o usa AUTO.`,
+      });
+    }
+
+    const { error: updateErr } = await db
+      .from("orders")
+      .update({
+        assigned_rider_id: rider.id,
+        status: "ASSIGNED",
+        assigned_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (updateErr) {
+      return JSON.stringify({
+        error: `Errore nell'assegnazione: ${updateErr.message}`,
+      });
+    }
+
+    // Increment rider's order count
+    const { data: riderData } = await db
+      .from("riders")
+      .select("current_order_count")
+      .eq("id", rider.id)
+      .single();
+
+    await db
+      .from("riders")
+      .update({
+        current_order_count: ((riderData?.current_order_count as number) ?? 0) + 1,
+      })
+      .eq("id", rider.id);
+
+    return JSON.stringify({
+      success: true,
+      assigned_rider: rider.name,
+      rating: rider.rating,
+      message: `🚗 Perfetto! ${rider.name} sta venendo. Arrivo stimato: 30-45 min. Grazie per aver scelto dloop!`,
+    });
+  }
+
+  return JSON.stringify({
+    error: "Tipo di assegnazione non valido. Usa AUTO o CLIENT_CHOICE.",
+  });
+}
+
+async function getFaq(db: SupabaseClient, topic: string): Promise<string> {
+  const key = topic.toLowerCase().trim();
+
+  // Try DB first (faq_entries table)
+  const { data: faqRows } = await db
+    .from("faq_entries")
+    .select("topic, answer")
+    .eq("is_active", true);
+
+  if (faqRows && faqRows.length > 0) {
+    // Exact match
+    const exact = faqRows.find(
+      (r: Record<string, unknown>) => (r.topic as string).toLowerCase() === key
+    );
+    if (exact) return JSON.stringify({ answer: exact.answer });
+
+    // Fuzzy match
+    for (const row of faqRows) {
+      const faqKey = (row.topic as string).toLowerCase();
+      if (key.includes(faqKey) || faqKey.includes(key)) {
+        return JSON.stringify({ answer: row.answer });
+      }
+    }
+
+    const topics = faqRows.map((r: Record<string, unknown>) => r.topic).join(", ");
+    return JSON.stringify({
+      answer: `Non ho una risposta specifica. Posso aiutarti con: ${topics}.`,
+    });
+  }
+
+  // Fallback: hardcoded FAQ (used if faq_entries table doesn't exist or is empty)
   const faqs: Record<string, string> = {
     tempi:
       "La consegna richiede di solito 30-60 minuti, a seconda della distanza e del tempo di preparazione del negozio.",
@@ -842,20 +1144,12 @@ function getFaq(topic: string): string {
       "Puoi annullare un ordine solo se è ancora in stato 'in attesa'. Una volta confermato dal negozio, non è più annullabile.",
   };
 
-  const key = topic.toLowerCase().trim();
-
-  // Try exact match
-  if (faqs[key]) {
-    return JSON.stringify({ answer: faqs[key] });
-  }
-
-  // Fuzzy match
+  if (faqs[key]) return JSON.stringify({ answer: faqs[key] });
   for (const [faqKey, answer] of Object.entries(faqs)) {
     if (key.includes(faqKey) || faqKey.includes(key)) {
       return JSON.stringify({ answer });
     }
   }
-
   return JSON.stringify({
     answer:
       "Non ho una risposta specifica per questa domanda. Posso aiutarti con: tempi, costi, zone, pagamento, come funziona, supporto, orari, annullamento.",

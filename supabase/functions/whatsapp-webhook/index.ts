@@ -1,201 +1,94 @@
-// Edge Function: whatsapp-webhook — WhatsApp Cloud API webhook handler
-// Routes messages to customer or dealer pipeline based on phone lookup.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getServiceClient, corsHeaders } from "../_shared/supabase.ts";
-import { normalizePhone } from "../_shared/phone_utils.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.46.1";
 import { processInboundMessage } from "./processor.ts";
-import { processDealerMessage } from "./dealer_processor.ts";
 
-const VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN") ?? "dloop_wa_verify_2026";
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
 serve(async (req: Request) => {
-  // ── GET: Webhook Verification (Meta challenge) ──────────────
-  if (req.method === "GET") {
+  // ✅ GET request (Meta webhook verification)
+  if (req.method === 'GET') {
     const url = new URL(req.url);
-    const mode = url.searchParams.get("hub.mode");
-    const token = url.searchParams.get("hub.verify_token");
-    const challenge = url.searchParams.get("hub.challenge");
+    const hubChallenge = url.searchParams.get('hub.challenge');
+    const hubVerifyToken = url.searchParams.get('hub.verify_token');
 
-    if (mode === "subscribe" && token === VERIFY_TOKEN) {
-      console.log("Webhook verified successfully");
-      return new Response(challenge, { status: 200 });
+    // Meta webhook verification
+    if (hubChallenge && hubVerifyToken === 'dloop_wa_verify_2026') {
+      return new Response(hubChallenge, { status: 200 });
     }
 
-    return new Response("Forbidden", { status: 403 });
+    return new Response('WhatsApp webhook is running (Meta API Only)', { status: 200 });
   }
 
-  // ── OPTIONS: CORS ───────────────────────────────────────────
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  // ── POST: Incoming webhook events ───────────────────────────
-  if (req.method === "POST") {
+  // ✅ POST request (incoming messages from Meta WhatsApp)
+  if (req.method === 'POST') {
     try {
-      const body = await req.json();
-      const db = getServiceClient();
+      const contentType = req.headers.get('content-type') || '';
+      let body: Record<string, unknown> = {};
 
-      // Process each entry in the webhook payload
-      const entries = body.entry ?? [];
-      for (const entry of entries) {
-        const changes = entry.changes ?? [];
-        for (const change of changes) {
-          if (change.field !== "messages") continue;
+      console.log('📨 Webhook received (Meta format)');
 
-          const value = change.value;
-          const messages = value?.messages ?? [];
-          const contacts = value?.contacts ?? [];
-          const statuses = value?.statuses ?? [];
-
-          // Handle status updates (delivered, read)
-          for (const status of statuses) {
-            await handleStatusUpdate(db, status);
-          }
-
-          // Handle incoming messages
-          for (let i = 0; i < messages.length; i++) {
-            const msg = messages[i];
-            const contact = contacts[i] ?? contacts[0];
-
-            await handleIncomingMessage(db, msg, contact);
-          }
-        }
+      // ── PARSE JSON BODY (Meta WhatsApp API) ──
+      try {
+        body = await req.json();
+      } catch (e) {
+        console.log('⚠️ Could not parse JSON:', e);
+        return new Response('OK', { status: 200 });
       }
 
-      // Always return 200 to Meta (they retry on non-200)
-      return new Response(JSON.stringify({ status: "ok" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    } catch (error) {
-      console.error("Webhook processing error:", error);
-      // Still return 200 to prevent Meta retries
-      return new Response(JSON.stringify({ status: "error_logged" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // ── EXTRACT META MESSAGE ──
+      const msg = (body as any).entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+      if (!msg) {
+        console.log('⏭️ No message in webhook payload');
+        return new Response('OK', { status: 200 });
+      }
+
+      const phone = msg.from as string;
+      const content = msg.text?.body as string || '';
+      const profileName = (body as any).entry[0].changes[0].value.contacts?.[0]?.profile?.name;
+
+      // ✅ FILTER: Ignore empty messages
+      if (!content || content.trim().length === 0) {
+        console.log('⏭️ Skipping empty message');
+        return new Response('OK', { status: 200 });
+      }
+
+      console.log(`📨 Meta WhatsApp - From: ${phone}`);
+      console.log(`📝 Content: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
+
+      // ✅ Return 200 immediately (webhook pattern - non-blocking)
+      const response = new Response('OK', { status: 200 });
+
+      // ✅ Process message asynchronously (non-blocking)
+      (async () => {
+        try {
+          console.log(`🤖 Starting ChatGPT processing for ${phone}...`);
+
+          const { reply } = await processInboundMessage(db, {
+            phone,
+            text: content,
+            name: profileName,
+          });
+
+          console.log(`✅ Reply sent to ${phone}: "${reply.substring(0, 80)}${reply.length > 80 ? '...' : ''}"`);
+        } catch (e) {
+          console.error('❌ Processing error:', e);
+          console.error('Stack:', e instanceof Error ? e.stack : 'No stack trace');
+        }
+      })();
+
+      return response;
+    } catch (e) {
+      console.error('❌ Webhook error:', e);
+      console.error('Stack:', e instanceof Error ? e.stack : 'No stack trace');
+
+      // ✅ Always return 200 to prevent webhook retries
+      return new Response('OK', { status: 200 });
     }
   }
 
-  return new Response("Method not allowed", { status: 405 });
+  // ✅ Method not allowed
+  return new Response('Method not allowed', { status: 405 });
 });
-
-// ── Handlers ────────────────────────────────────────────────────
-
-async function handleIncomingMessage(
-  db: ReturnType<typeof getServiceClient>,
-  msg: Record<string, unknown>,
-  contact: Record<string, unknown>
-): Promise<void> {
-  const phone = msg.from as string;
-  const name =
-    (contact?.profile as Record<string, unknown>)?.name as string | undefined;
-  const msgType = msg.type as string;
-
-  // Build InboundMessage based on type
-  const inbound: Record<string, unknown> = { phone, name };
-
-  switch (msgType) {
-    case "text":
-      inbound.text = (msg.text as Record<string, unknown>)?.body as string;
-      break;
-    case "audio":
-      inbound.audioMediaId = (msg.audio as Record<string, unknown>)
-        ?.id as string;
-      break;
-    case "image":
-      inbound.imageMediaId = (msg.image as Record<string, unknown>)
-        ?.id as string;
-      inbound.imageCaption = (msg.image as Record<string, unknown>)
-        ?.caption as string;
-      break;
-    case "location":
-      inbound.latitude = (msg.location as Record<string, unknown>)
-        ?.latitude as number;
-      inbound.longitude = (msg.location as Record<string, unknown>)
-        ?.longitude as number;
-      break;
-    default:
-      // Unsupported message type — treat as text
-      inbound.text = `[${msgType} non supportato]`;
-      break;
-  }
-
-  try {
-    // Route: check if sender is a dealer by matching phone in rider_contacts
-    const normalized = normalizePhone(phone);
-    const { data: dealerContacts } = await db
-      .from("rider_contacts")
-      .select("id, rider_id, name, phone")
-      .eq("contact_type", "dealer");
-
-    const matchedDealer = (dealerContacts ?? []).find(
-      (d: Record<string, unknown>) =>
-        normalizePhone(d.phone as string) === normalized
-    );
-
-    if (matchedDealer) {
-      // DEALER pipeline
-      console.log(`Routing to DEALER pipeline: ${matchedDealer.name}`);
-      await processDealerMessage(db, inbound as {
-        phone: string;
-        text?: string;
-        name?: string;
-        audioMediaId?: string;
-        imageMediaId?: string;
-        imageCaption?: string;
-        latitude?: number;
-        longitude?: number;
-      }, {
-        id: matchedDealer.id as string,
-        rider_id: matchedDealer.rider_id as string,
-        name: matchedDealer.name as string,
-      });
-    } else {
-      // CUSTOMER pipeline (existing)
-      console.log(`Routing to CUSTOMER pipeline: ${phone}`);
-      await processInboundMessage(db, inbound as {
-        phone: string;
-        text?: string;
-        name?: string;
-        audioMediaId?: string;
-        imageMediaId?: string;
-        imageCaption?: string;
-        latitude?: number;
-        longitude?: number;
-      });
-    }
-  } catch (error) {
-    console.error(`Failed to process message from ${phone}:`, error);
-  }
-}
-
-async function handleStatusUpdate(
-  db: ReturnType<typeof getServiceClient>,
-  status: Record<string, unknown>
-): Promise<void> {
-  const waMessageId = status.id as string;
-  const newStatus = status.status as string;
-
-  if (!waMessageId || !newStatus) return;
-
-  // Map Meta status to our status
-  const statusMap: Record<string, string> = {
-    sent: "sent",
-    delivered: "delivered",
-    read: "read",
-    failed: "failed",
-  };
-
-  const mappedStatus = statusMap[newStatus];
-  if (!mappedStatus) return;
-
-  try {
-    await db
-      .from("whatsapp_messages")
-      .update({ status: mappedStatus })
-      .eq("wa_message_id", waMessageId);
-  } catch (error) {
-    console.error(`Failed to update status for ${waMessageId}:`, error);
-  }
-}

@@ -1,9 +1,15 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:email_validator/email_validator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../theme/tokens.dart';
+
+// TODO: Replace with real Iubenda policy IDs after setup
+const _kPrivacyPolicyUrl = 'https://www.iubenda.com/privacy-policy/POLICY_ID';
+const _kTermsUrl = 'https://www.iubenda.com/terms-and-conditions/POLICY_ID';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -398,13 +404,25 @@ class _SignupPageState extends State<SignupPage> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Terms text
-                      Text(
-                        'Registrandoti, accetti i nostri Termini di Servizio e la Privacy Policy',
+                      // Terms text with clickable links
+                      RichText(
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: Colors.grey[600],
+                        text: TextSpan(
+                          style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[600]),
+                          children: [
+                            const TextSpan(text: 'Registrandoti, accetti i nostri '),
+                            TextSpan(
+                              text: 'Termini di Servizio',
+                              style: const TextStyle(decoration: TextDecoration.underline, color: Colors.blueAccent),
+                              recognizer: TapGestureRecognizer()..onTap = () => _openLegalUrl(_kTermsUrl),
+                            ),
+                            const TextSpan(text: ' e la '),
+                            TextSpan(
+                              text: 'Privacy Policy',
+                              style: const TextStyle(decoration: TextDecoration.underline, color: Colors.blueAccent),
+                              recognizer: TapGestureRecognizer()..onTap = () => _openLegalUrl(_kPrivacyPolicyUrl),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -443,6 +461,13 @@ class _SignupPageState extends State<SignupPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _openLegalUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _buildTextField({

@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../theme/tokens.dart';
 import '../../services/biometric_service.dart';
 import '../../services/preferences_service.dart';
 import '../../services/push_notification_service.dart';
+
+// TODO: Replace with real Iubenda policy IDs after setup
+const _kPrivacyPolicyUrl = 'https://www.iubenda.com/privacy-policy/POLICY_ID';
+const _kTermsUrl = 'https://www.iubenda.com/terms-and-conditions/POLICY_ID';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -142,10 +147,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Info section
                 _sectionHeader('Informazioni'),
                 _actionTile(cs, Icons.description_outlined, 'Termini di servizio', () {
-                  _showInfoSheet(context, 'Termini di Servizio', 'I termini di servizio completi saranno disponibili a breve.');
+                  _openLegalUrl(_kTermsUrl);
                 }),
                 _actionTile(cs, Icons.privacy_tip_outlined, 'Privacy Policy', () {
-                  _showInfoSheet(context, 'Privacy Policy', 'La privacy policy completa sarà disponibile a breve.');
+                  _openLegalUrl(_kPrivacyPolicyUrl);
                 }),
                 _actionTile(cs, Icons.info_outline, 'Info app', () {
                   _showAppInfo(context);
@@ -427,6 +432,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Navigator.pop(context);
       },
     );
+  }
+
+  Future<void> _openLegalUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   void _showInfoSheet(BuildContext context, String title, String body) {

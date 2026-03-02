@@ -27,13 +27,18 @@ void main() {
       expect(find.text('REGISTRATI'), findsOneWidget);
     });
 
-    testWidgets('renders terms and conditions', (tester) async {
+    testWidgets('renders terms and privacy links', (tester) async {
       await tester.pumpWidget(testScreen(const SignupPage()));
 
+      // RichText with TextSpan children
       expect(
-        find.text(
-          'Registrandoti, accetti i nostri Termini di Servizio e la Privacy Policy',
-        ),
+        find.byWidgetPredicate((w) =>
+            w is RichText && w.text.toPlainText().contains('Termini di Servizio')),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate((w) =>
+            w is RichText && w.text.toPlainText().contains('Privacy Policy')),
         findsOneWidget,
       );
     });

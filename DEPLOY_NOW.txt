@@ -1,0 +1,43 @@
+═══════════════════════════════════════════════════════════════
+  🚀 DEPLOY WHATSAPP WEBHOOK - QUICK START
+═══════════════════════════════════════════════════════════════
+
+✅ BUGS FIXED (3 critical issues):
+  1. Undefined parameters crashing createDeliveryOrder
+  2. Wrong environment variable names (SUPABASE_URL vs DB_URL)
+  3. Poor error logging masking real errors
+
+─────────────────────────────────────────────────────────────
+
+📋 DEPLOYMENT COMMAND (copy-paste):
+
+cd /c/Users/itjob/dloop_rider_prototype && npx supabase functions deploy whatsapp-webhook --project-ref aqpwfurradxbnqvycvkm --no-verify-jwt
+
+─────────────────────────────────────────────────────────────
+
+🔐 IF LOGIN REQUIRED:
+
+1. Generate token: https://app.supabase.com/account/tokens
+2. Set token: export SUPABASE_ACCESS_TOKEN='sbp_...'
+3. Run deployment command above
+
+─────────────────────────────────────────────────────────────
+
+🧪 AFTER DEPLOYMENT:
+
+Test by sending WhatsApp message to: +39 328 1854639
+Message: "Ciao, vorrei ordinare una pizza"
+
+Expected: Bot replies with dealer menu or product search
+
+─────────────────────────────────────────────────────────────
+
+📊 CHECK LOGS:
+https://supabase.com/dashboard/project/aqpwfurradxbnqvycvkm/functions/whatsapp-webhook/logs
+
+─────────────────────────────────────────────────────────────
+
+📄 DETAILED REPORT:
+See WEBHOOK_BUG_FIX_REPORT.md for full analysis
+
+═══════════════════════════════════════════════════════════════
