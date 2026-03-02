@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:793691819503:android:c96b89e9b727a2ed87ba1a",
         "android_client_info": {
-          "package_name": "com.dloop.rider.prototype"
+          "package_name": "it.dloop.rider"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "793691819503-jq40h6f0ge5uojc5cvpncoqumihstfru.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.dloop.rider.prototype",
+            "package_name": "it.dloop.rider",
             "certificate_hash": "5a37a66000fc965dbdbe305aa9d698c63a0a2881"
           }
         },
