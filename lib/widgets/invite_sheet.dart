@@ -453,7 +453,7 @@ Usa il mio codice: $referralCode
 
 Riceverai €10 di bonus dopo le prime 5 consegne.
 
-Scarica l'app: https://dloop.app/download
+Scarica l'app: https://wwa.dloop.it
 ''';
 
     Share.share(message, subject: 'Unisciti a dloop!');
