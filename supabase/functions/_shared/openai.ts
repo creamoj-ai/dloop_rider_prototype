@@ -50,10 +50,14 @@ interface ChatCompletionResponse {
 export async function chatCompletion(
   opts: ChatCompletionOptions
 ): Promise<ChatCompletionResponse> {
+  if (!OPENAI_API_KEY) {
+    throw new Error("❌ OPENAI_API_KEY not configured. Set it in Supabase secrets.");
+  }
+
   const {
     messages,
     tools,
-    model = "gpt-3.5-turbo",
+    model = "gpt-4-turbo", // Updated: Better function calling support
     maxTokens = 512,
     temperature = 0.7,
   } = opts;
