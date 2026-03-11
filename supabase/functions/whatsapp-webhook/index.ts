@@ -1,11 +1,32 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.46.1";
-import { processInboundMessage } from "./processor.ts";
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+console.log('🚀 [INIT] Webhook function starting - MINIMAL TEST');
 
-const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+let db: any;
+
+try {
+  console.log('📦 [INIT] Importing dependencies...');
+  const { createClient } = await import("npm:@supabase/supabase-js@2.46.1");
+  const { processInboundMessage } = await import("./processor.ts");
+
+  console.log('✅ [INIT] Imports successful');
+
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+  const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  console.log(`🔐 [INIT] SUPABASE_URL: ${SUPABASE_URL ? 'SET' : 'MISSING'}`);
+  console.log(`🔐 [INIT] SERVICE_KEY: ${SERVICE_KEY ? 'SET (' + SERVICE_KEY.length + ' chars)' : 'MISSING'}`);
+
+  if (!SUPABASE_URL || !SERVICE_KEY) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  }
+
+  console.log('✅ [INIT] Environment variables OK');
+  db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+  console.log('✅ [INIT] Supabase client created successfully');
+} catch (initError) {
+  console.error('❌ [INIT] Initialization failed:', initError);
+}
 
 serve(async (req: Request) => {
   // ✅ GET request (Meta webhook verification)
@@ -66,6 +87,12 @@ serve(async (req: Request) => {
         try {
           console.log(`🤖 Starting ChatGPT processing for ${phone}...`);
 
+          if (!db) {
+            console.error('❌ Database not initialized - cannot process message');
+            return;
+          }
+
+          const { processInboundMessage } = await import("./processor.ts");
           const { reply } = await processInboundMessage(db, {
             phone,
             text: content,
