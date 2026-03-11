@@ -9,6 +9,11 @@ async function sendMetaMessage(phone: string, text: string): Promise<{ success: 
   const token = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
   const phoneId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
 
+  // Debug logging
+  console.log(`🔐 [DEBUG] Token length: ${token?.length || 0}`);
+  console.log(`🔐 [DEBUG] Token preview: ${token ? token.substring(0, 20) + "..." + token.substring(token.length - 10) : "MISSING"}`);
+  console.log(`🔐 [DEBUG] Phone ID: ${phoneId || "MISSING"}`);
+
   if (!token || !phoneId) {
     console.error("❌ Meta credentials missing");
     return { success: false };
