@@ -2,7 +2,7 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { chatCompletion, transcribeAudio, type ChatMessage } from "../_shared/openai.ts";
 import { customerTools, executeCustomerFunction } from "./customer_functions.ts";
-import { sendWhatsAppMessage, downloadMedia } from "./whatsapp_api.ts";
+import { sendWhatsAppMessage, downloadMedia } from "./twilio_api.ts";
 
 const MAX_FUNCTION_CALLS = 3;
 const MESSAGE_HISTORY_LIMIT = 10;
