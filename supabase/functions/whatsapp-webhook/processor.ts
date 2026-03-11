@@ -152,16 +152,16 @@ export async function processInboundMessage(
     response.content?.trim() ??
     "Mi dispiace, non sono riuscito a capire. Puoi riprovare?";
 
-  // 8. Send reply via Meta API (primary) or Twilio (fallback)
+  // 8. Send reply via Twilio (primary - 62% cheaper) or Meta (fallback)
   const formattedPhone = phone.startsWith("+") ? phone : `+${phone}`;
 
-  // Try Meta API first
-  let sendResult = await sendMetaMessage(formattedPhone, reply);
+  // Try Twilio first (cheaper)
+  let sendResult = await sendTwilioMessage(formattedPhone, reply);
 
-  // Fallback to Twilio if Meta fails
+  // Fallback to Meta if Twilio fails
   if (!sendResult.success) {
-    console.log(`⚠️ Meta failed, trying Twilio fallback...`);
-    sendResult = await sendTwilioMessage(formattedPhone, reply);
+    console.log(`⚠️ Twilio failed, trying Meta fallback...`);
+    sendResult = await sendMetaMessage(formattedPhone, reply);
   }
 
   // 9. Save outbound message to DB
