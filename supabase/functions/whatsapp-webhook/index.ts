@@ -119,21 +119,46 @@ serve(async (req: Request) => {
       // ✅ Process message asynchronously (non-blocking)
       (async () => {
         try {
-          console.log(`🤖 Starting ChatGPT processing for ${phone}...`);
+          console.log(`🤖 Starting message processing for ${phone}...`);
 
           if (!db) {
             console.error('❌ Database not initialized - cannot process message');
             return;
           }
 
-          const { processInboundMessage } = await import("./processor.ts");
-          const { reply } = await processInboundMessage(db, {
-            phone,
-            text: content,
-            name: profileName,
-          });
+          // Try full ChatGPT pipeline first
+          try {
+            const { processInboundMessage } = await import("./processor.ts");
+            const { reply } = await processInboundMessage(db, {
+              phone,
+              text: content,
+              name: profileName,
+            });
+            console.log(`✅ Reply sent to ${phone}: "${reply.substring(0, 80)}${reply.length > 80 ? '...' : ''}"`);
+          } catch (chatGPTError) {
+            // Fallback: Save message and send simple response
+            console.warn('⚠️ ChatGPT failed, using fallback response:', chatGPTError);
 
-          console.log(`✅ Reply sent to ${phone}: "${reply.substring(0, 80)}${reply.length > 80 ? '...' : ''}"`);
+            const fallbackReply = `📝 Ho ricevuto: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}" \n\nTi risponderemo a breve! 😊`;
+
+            await db.from("whatsapp_messages").insert({
+              phone,
+              direction: "inbound",
+              content,
+              message_type: "text",
+              status: "received",
+            }).catch(() => null);
+
+            // Try to send fallback (non-blocking)
+            try {
+              const { sendWhatsAppMessage } = await import("./twilio_api.ts");
+              const phoneFormatted = phone.startsWith("+") ? phone : `+${phone}`;
+              await sendWhatsAppMessage(phoneFormatted, fallbackReply);
+              console.log(`✅ Fallback reply sent to ${phone}`);
+            } catch (sendError) {
+              console.warn('⚠️ Fallback send also failed:', sendError);
+            }
+          }
         } catch (e) {
           console.error('❌ Processing error:', e);
           console.error('Stack:', e instanceof Error ? e.stack : 'No stack trace');
