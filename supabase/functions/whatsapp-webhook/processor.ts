@@ -2,7 +2,9 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { chatCompletion, transcribeAudio, type ChatMessage } from "../_shared/openai.ts";
 import { customerTools, executeCustomerFunction } from "./customer_functions.ts";
-import { sendWhatsAppMessage, downloadMedia } from "./twilio_api.ts";
+// Import both APIs - Meta primary, Twilio fallback
+import { sendWhatsAppMessage as sendMetaMessage, downloadMedia } from "./whatsapp_api.ts";
+import { sendWhatsAppMessage as sendTwilioMessage } from "./twilio_api.ts";
 
 const MAX_FUNCTION_CALLS = 3;
 const MESSAGE_HISTORY_LIMIT = 10;
@@ -150,9 +152,17 @@ export async function processInboundMessage(
     response.content?.trim() ??
     "Mi dispiace, non sono riuscito a capire. Puoi riprovare?";
 
-  // 8. Send reply via Twilio WhatsApp API
+  // 8. Send reply via Meta API (primary) or Twilio (fallback)
   const formattedPhone = phone.startsWith("+") ? phone : `+${phone}`;
-  const sendResult = await sendWhatsAppMessage(formattedPhone, reply);
+
+  // Try Meta API first
+  let sendResult = await sendMetaMessage(formattedPhone, reply);
+
+  // Fallback to Twilio if Meta fails
+  if (!sendResult.success) {
+    console.log(`⚠️ Meta failed, trying Twilio fallback...`);
+    sendResult = await sendTwilioMessage(formattedPhone, reply);
+  }
 
   // 9. Save outbound message to DB
   await db.from("whatsapp_messages").insert({
