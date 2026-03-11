@@ -2,50 +2,7 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { chatCompletion, transcribeAudio, type ChatMessage } from "../_shared/openai.ts";
 import { customerTools, executeCustomerFunction } from "./customer_functions.ts";
-import { downloadMedia } from "./twilio_api.ts";
-
-// Meta WhatsApp API
-async function sendMetaMessage(phone: string, text: string): Promise<{ success: boolean; messageId?: string }> {
-  const token = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
-  const phoneId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
-
-  if (!token || !phoneId) {
-    console.error("❌ Meta credentials missing");
-    return { success: false };
-  }
-
-  try {
-    const res = await fetch(
-      `https://graph.instagram.com/v18.0/${phoneId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: phone,
-          type: "text",
-          text: { body: text },
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("❌ Meta error:", err);
-      return { success: false };
-    }
-
-    const data = await res.json();
-    console.log(`✅ Meta sent to ${phone}: ${(data as Record<string, unknown>).messages?.[0]}`);
-    return { success: true, messageId: (data as Record<string, Record<string, unknown>>).messages?.[0]?.id as string };
-  } catch (e) {
-    console.error("❌ Meta exception:", e);
-    return { success: false };
-  }
-}
+import { downloadMedia, sendWhatsAppMessage } from "./twilio_api.ts";
 
 const MAX_FUNCTION_CALLS = 3;
 const MESSAGE_HISTORY_LIMIT = 10;
@@ -193,9 +150,9 @@ export async function processInboundMessage(
     response.content?.trim() ??
     "Mi dispiace, non sono riuscito a capire. Puoi riprovare?";
 
-  // 8. Send reply via Meta WhatsApp API
+  // 8. Send reply via Twilio WhatsApp API
   const formattedPhone = phone.startsWith("+") ? phone : `+${phone}`;
-  const sendResult = await sendMetaMessage(formattedPhone, reply);
+  const sendResult = await sendWhatsAppMessage(formattedPhone, reply);
 
   // 9. Save outbound message to DB
   await db.from("whatsapp_messages").insert({

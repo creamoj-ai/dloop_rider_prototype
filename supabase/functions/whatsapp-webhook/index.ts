@@ -22,41 +22,75 @@ serve(async (req: Request) => {
     return new Response('WhatsApp webhook is running (Meta API Only)', { status: 200 });
   }
 
-  // ✅ POST request (incoming messages from Meta WhatsApp)
+  // ✅ POST request (incoming messages from Twilio or Meta WhatsApp)
   if (req.method === 'POST') {
     try {
       const contentType = req.headers.get('content-type') || '';
       let body: Record<string, unknown> = {};
+      let phone = '';
+      let content = '';
+      let profileName = '';
 
-      console.log('📨 Webhook received (Meta format)');
+      console.log('📨 Webhook received');
 
-      // ── PARSE JSON BODY (Meta WhatsApp API) ──
-      try {
-        body = await req.json();
-      } catch (e) {
-        console.log('⚠️ Could not parse JSON:', e);
-        return new Response('OK', { status: 200 });
+      // ── DETECT MESSAGE SOURCE (Twilio vs Meta) ──
+      if (contentType.includes('application/x-www-form-urlencoded')) {
+        // ── TWILIO FORMAT (form-encoded) ──
+        console.log('📨 Twilio WhatsApp format detected');
+        const text = await req.text();
+        const params = new URLSearchParams(text);
+
+        // Twilio sends: From=whatsapp:+39328..., Body=message
+        const from = params.get('From') || '';
+        content = params.get('Body') || '';
+
+        // Extract phone from "whatsapp:+39328..."
+        phone = from.replace('whatsapp:', '').trim();
+
+        // ✅ FILTER: Ignore status callbacks and empty messages
+        const messageStatus = params.get('MessageStatus');
+        if (messageStatus && messageStatus !== 'received') {
+          console.log(`⏭️ Ignoring status callback: ${messageStatus}`);
+          return new Response('OK', { status: 200 });
+        }
+
+        if (!content || content.trim().length === 0) {
+          console.log('⏭️ Skipping empty message');
+          return new Response('OK', { status: 200 });
+        }
+
+        console.log(`📨 Twilio WhatsApp - From: ${phone}`);
+        console.log(`📝 Content: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
+      } else {
+        // ── META FORMAT (JSON) ──
+        console.log('📨 Meta WhatsApp format detected');
+        try {
+          body = await req.json();
+        } catch (e) {
+          console.log('⚠️ Could not parse JSON:', e);
+          return new Response('OK', { status: 200 });
+        }
+
+        // ── EXTRACT META MESSAGE ──
+        const msg = (body as any).entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+        if (!msg) {
+          console.log('⏭️ No message in webhook payload');
+          return new Response('OK', { status: 200 });
+        }
+
+        phone = msg.from as string;
+        content = msg.text?.body as string || '';
+        profileName = (body as any).entry[0].changes[0].value.contacts?.[0]?.profile?.name;
+
+        // ✅ FILTER: Ignore empty messages
+        if (!content || content.trim().length === 0) {
+          console.log('⏭️ Skipping empty message');
+          return new Response('OK', { status: 200 });
+        }
+
+        console.log(`📨 Meta WhatsApp - From: ${phone}`);
+        console.log(`📝 Content: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
       }
-
-      // ── EXTRACT META MESSAGE ──
-      const msg = (body as any).entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-      if (!msg) {
-        console.log('⏭️ No message in webhook payload');
-        return new Response('OK', { status: 200 });
-      }
-
-      const phone = msg.from as string;
-      const content = msg.text?.body as string || '';
-      const profileName = (body as any).entry[0].changes[0].value.contacts?.[0]?.profile?.name;
-
-      // ✅ FILTER: Ignore empty messages
-      if (!content || content.trim().length === 0) {
-        console.log('⏭️ Skipping empty message');
-        return new Response('OK', { status: 200 });
-      }
-
-      console.log(`📨 Meta WhatsApp - From: ${phone}`);
-      console.log(`📝 Content: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
 
       // ✅ Return 200 immediately (webhook pattern - non-blocking)
       const response = new Response('OK', { status: 200 });
