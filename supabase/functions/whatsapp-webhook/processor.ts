@@ -21,7 +21,7 @@ async function sendMetaMessage(phone: string, text: string): Promise<{ success: 
 
   try {
     const res = await fetch(
-      `https://graph.instagram.com/v18.0/${phoneId}/messages`,
+      `https://graph.facebook.com/v18.0/${phoneId}/messages`,
       {
         method: "POST",
         headers: {
