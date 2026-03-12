@@ -228,6 +228,33 @@ export const customerTools: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "assign_rider",
+      description:
+        "Assegna un rider a un ordine. Può essere AUTO (migliore disponibile) o CLIENT_CHOICE (scelto dal cliente).",
+      parameters: {
+        type: "object",
+        properties: {
+          order_id: {
+            type: "string",
+            description: "ID dell'ordine a cui assegnare il rider",
+          },
+          assignment_type: {
+            type: "string",
+            enum: ["AUTO", "CLIENT_CHOICE"],
+            description: "Tipo di assegnazione (AUTO = migliore disponibile, CLIENT_CHOICE = scelto dal cliente)",
+          },
+          rider_name: {
+            type: "string",
+            description: "Nome del rider (obbligatorio se assignment_type è CLIENT_CHOICE)",
+          },
+        },
+        required: ["order_id", "assignment_type"],
+      },
+    },
+  },
 ];
 
 // ── Function Executors ────────────────────────────────────────────
@@ -335,6 +362,8 @@ export async function executeCustomerFunction(
     }
     case "get_faq":
       return await getFaq(db, args.topic as string);
+    case "assign_rider":
+      return await assignRider(db, args.order_id as string, args.assignment_type as string, args.rider_name as string | undefined);
     default:
       return JSON.stringify({ error: `Funzione sconosciuta: ${name}` });
   }
@@ -934,6 +963,134 @@ async function submitFeedback(
   return JSON.stringify({
     success: true,
     message: `Grazie per il feedback! ${stars}${comment ? ` — "${comment}"` : ""}`,
+  });
+}
+
+async function assignRider(
+  db: SupabaseClient,
+  orderId: string,
+  assignmentType: string,
+  riderName?: string
+): Promise<string> {
+  // Get order details
+  const { data: order, error: orderErr } = await db
+    .from("orders")
+    .select("id, status, rider_id")
+    .eq("id", orderId)
+    .single();
+
+  if (orderErr || !order) {
+    return JSON.stringify({ error: "Ordine non trovato." });
+  }
+
+  if (assignmentType === "AUTO") {
+    // Auto-assign best available rider
+    const { data: riders, error: ridersErr } = await db
+      .from("riders")
+      .select("id, name, rating, current_order_count, status")
+      .eq("status", "ONLINE")
+      .gte("rating", 4.5)
+      .lt("current_order_count", 5)
+      .order("rating", { ascending: false })
+      .order("current_order_count", { ascending: true })
+      .limit(1);
+
+    if (ridersErr || !riders || riders.length === 0) {
+      return JSON.stringify({
+        error: "Nessun rider disponibile al momento. Riprova tra poco.",
+      });
+    }
+
+    const bestRider = riders[0];
+    const { error: updateErr } = await db
+      .from("orders")
+      .update({
+        assigned_rider_id: bestRider.id,
+        status: "ASSIGNED",
+        assigned_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (updateErr) {
+      return JSON.stringify({
+        error: `Errore nell'assegnazione: ${updateErr.message}`,
+      });
+    }
+
+    // Increment rider's order count
+    await db
+      .from("riders")
+      .update({
+        current_order_count: (bestRider.current_order_count as number) + 1,
+      })
+      .eq("id", bestRider.id);
+
+    return JSON.stringify({
+      success: true,
+      assigned_rider: bestRider.name,
+      rating: bestRider.rating,
+      message: `🚗 Assegnato a ${bestRider.name} (${bestRider.rating}/5). Arrivo stimato: 30-45 min.`,
+    });
+  } else if (assignmentType === "CLIENT_CHOICE" && riderName) {
+    // Client selected a specific rider
+    const { data: rider, error: riderErr } = await db
+      .from("riders")
+      .select("id, name, status, rating")
+      .ilike("name", `%${riderName}%`)
+      .limit(1)
+      .single();
+
+    if (riderErr || !rider) {
+      return JSON.stringify({
+        error: `Rider "${riderName}" non trovato o non disponibile.`,
+      });
+    }
+
+    if ((rider.status as string) === "OFFLINE") {
+      return JSON.stringify({
+        error: `${rider.name} è offline. Scegli un altro rider o usa AUTO.`,
+      });
+    }
+
+    const { error: updateErr } = await db
+      .from("orders")
+      .update({
+        assigned_rider_id: rider.id,
+        status: "ASSIGNED",
+        assigned_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (updateErr) {
+      return JSON.stringify({
+        error: `Errore nell'assegnazione: ${updateErr.message}`,
+      });
+    }
+
+    // Increment rider's order count
+    const { data: riderData } = await db
+      .from("riders")
+      .select("current_order_count")
+      .eq("id", rider.id)
+      .single();
+
+    await db
+      .from("riders")
+      .update({
+        current_order_count: ((riderData?.current_order_count as number) ?? 0) + 1,
+      })
+      .eq("id", rider.id);
+
+    return JSON.stringify({
+      success: true,
+      assigned_rider: rider.name,
+      rating: rider.rating,
+      message: `🚗 Perfetto! ${rider.name} sta venendo. Arrivo stimato: 30-45 min. Grazie per aver scelto dloop!`,
+    });
+  }
+
+  return JSON.stringify({
+    error: "Tipo di assegnazione non valido. Usa AUTO o CLIENT_CHOICE.",
   });
 }
 
