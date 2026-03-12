@@ -156,12 +156,18 @@ export async function processInboundMessage(
   const formattedPhone = phone.startsWith("+") ? phone : `+${phone}`;
 
   // Try Twilio first (numero è collegato a Twilio)
+  console.log(`📤 Sending via Twilio to ${formattedPhone}...`);
   let sendResult = await sendTwilioMessage(formattedPhone, reply);
+  console.log(`📤 Twilio result: success=${sendResult.success}, error=${sendResult.error ?? "none"}, messageId=${sendResult.messageId ?? "none"}`);
 
   // Fallback to Meta if Twilio fails
   if (!sendResult.success) {
-    console.log(`⚠️ Twilio failed, trying Meta fallback...`);
+    console.log(`⚠️ Twilio failed: ${sendResult.error}, trying Meta fallback...`);
+    console.log(`📤 Sending via Meta to ${formattedPhone}...`);
     sendResult = await sendMetaMessage(formattedPhone, reply);
+    console.log(`📤 Meta result: success=${sendResult.success}, error=${sendResult.error ?? "none"}, messageId=${sendResult.messageId ?? "none"}`);
+  } else {
+    console.log(`✅ Twilio delivered successfully! MessageID: ${sendResult.messageId}`);
   }
 
   // 9. Save outbound message to DB
