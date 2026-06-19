@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DLOOP Admin - Assegna Ordini</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabaseClient/supabaseClient-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@db/db-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -214,7 +214,7 @@
         // ============================================================================
         // CONFIG
         // ============================================================================
-        const SUPABASE_URL = 'https://aqpwfurradxbnqvycvkm.supabaseClient.co';
+        const SUPABASE_URL = 'https://aqpwfurradxbnqvycvkm.db.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxcHdmdXJyYWR4Ym5xdnljdmttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTk3NzAsImV4cCI6MjA4NTY5NTc3MH0.Ekhco06o8_88e8tQJHm4EjEa0HOQv8Z-gAHa1busvog';
         const ADMIN_SECRET = 'password_sicura_123';
         const ASSIGN_RIDER_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/assign-rider`;
@@ -222,8 +222,8 @@
         // ============================================================================
         // SUPABASE CLIENT
         // ============================================================================
-        const { createClient } = window.supabaseClient;
-        const supabaseClientClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const { createClient } = window.supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let orders = [];
         let riders = [];
@@ -232,7 +232,7 @@
         // FETCH PENDING ORDERS
         // ============================================================================
         async function fetchOrders() {
-            const { data, error } = await supabaseClient
+            const { data, error } = await db
                 .from('orders')
                 .select('*')
                 .eq('status', 'pending')
@@ -253,7 +253,7 @@
         // ============================================================================
         async function fetchRiders() {
             // Fetch riders from auth.users (o da una tabella riders se esiste)
-            const { data, error } = await supabaseClient
+            const { data, error } = await db
                 .from('fcm_tokens')
                 .select('rider_id')
                 .eq('is_active', true);
@@ -395,7 +395,7 @@
         // REALTIME SUBSCRIPTION (new orders arrive)
         // ============================================================================
         function setupRealtime() {
-            supabaseClient
+            db
                 .channel('orders-changes')
                 .on('postgres_changes', {
                     event: 'INSERT',
