@@ -271,9 +271,9 @@ serve(async (req) => {
       .from("orders")
       .update({
         assigned_rider_id: rider_id,
-        rider_id: rider_id,  // Compatibility con app che usa rider_id
+        rider_id: rider_id,
         status: "assigned",
-        updated_at: new Date().toISOString(),
+        assigned_at: new Date().toISOString(),
       })
       .eq("id", order_id);
 
