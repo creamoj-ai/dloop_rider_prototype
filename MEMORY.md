@@ -71,8 +71,14 @@ sql/
 
 ## 🎯 Current Task List
 
+### ✅ COMPLETATO - Migrazione FCM v1 API
+- ✅ **assign-rider function migrata** - Da Legacy API a FCM v1 con Firebase Admin SDK
+- ✅ **OAuth2 JWT signing implementato** - RS256 con Web Crypto API
+- ✅ **FIREBASE_SERVICE_ACCOUNT secret configurato** - Service Account JSON deployato
+- ✅ **Function deployata** - Live su Supabase project aqpwfurradxbnqvycvkm
+
 ### 🚀 MVP Yamamay - Prossimi Step
-1. **Configurare Secrets Supabase** - ADMIN_SECRET, YAMAMAY_WEBHOOK_SECRET, FCM_SERVER_KEY
+1. **Configurare Secrets Rimanenti** - ADMIN_SECRET, YAMAMAY_WEBHOOK_SECRET
 2. **Setup Admin Panel** - Modificare index.html con SUPABASE_URL/ANON_KEY, deploy su Netlify
 3. **Test Webhook E2E** - Simulare ordine Yamamay, assegnare rider, verificare FCM push
 4. **Integrazione Yamamay Reale** - Ottenere credenziali webhook da loro e-commerce
