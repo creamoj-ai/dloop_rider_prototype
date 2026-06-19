@@ -40,28 +40,48 @@ class User {
   });
 
   // Da JSON (Supabase → Flutter)
+  // Supporta sia tabella 'riders' che vecchia 'users'
   factory User.fromJson(Map<String, dynamic> json) {
+    // Parse name: riders ha 'name' (full), users aveva 'first_name'/'last_name'
+    String? firstName = json['first_name'] as String?;
+    String? lastName = json['last_name'] as String?;
+    if (firstName == null && json['name'] != null) {
+      final fullName = json['name'] as String;
+      final parts = fullName.split(' ');
+      firstName = parts.isNotEmpty ? parts[0] : null;
+      lastName = parts.length > 1 ? parts.sublist(1).join(' ') : null;
+    }
+
     return User(
       id: json['id'] as String,
-      email: json['email'] as String,
-      firstName: json['first_name'] as String?,
-      lastName: json['last_name'] as String?,
+      email: (json['email'] as String?) ?? '',
+      firstName: firstName,
+      lastName: lastName,
       phone: json['phone'] as String?,
       avatarUrl: json['avatar_url'] as String?,
-      isOnline: json['is_online'] as bool? ?? false,
-      isActive: json['is_active'] as bool? ?? true,
+      // riders: status='online'/'offline', users: is_online bool
+      isOnline: json['is_online'] as bool? ?? (json['status'] == 'online'),
+      isActive: json['is_active'] as bool? ?? json['active'] as bool? ?? true,
       currentLat: json['current_lat'] != null ? (json['current_lat'] as num).toDouble() : null,
       currentLng: json['current_lng'] != null ? (json['current_lng'] as num).toDouble() : null,
       lastLocationUpdate: json['last_location_update'] != null
           ? DateTime.parse(json['last_location_update'] as String)
           : null,
-      totalEarnings: (json['total_earnings'] as num?)?.toDouble() ?? 0.0,
-      rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
-      totalOrders: json['total_orders'] as int? ?? 0,
+      // riders: earnings_week, users: total_earnings
+      totalEarnings: (json['total_earnings'] as num?)?.toDouble()
+          ?? (json['earnings_week'] as num?)?.toDouble() ?? 0.0,
+      // riders: reputation_score (0-100), users: rating (1-5)
+      rating: (json['rating'] as num?)?.toDouble()
+          ?? ((json['reputation_score'] as num?)?.toDouble() ?? 50.0) / 10.0,
+      // riders: total_deliveries, users: total_orders
+      totalOrders: json['total_orders'] as int?
+          ?? json['total_deliveries'] as int? ?? 0,
       referralCode: json['referral_code'] as String?,
       referredBy: json['referred_by'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : DateTime.parse(json['created_at'] as String),
     );
   }
 

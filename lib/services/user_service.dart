@@ -16,7 +16,7 @@ class UserService {
     try {
       return await retry(() async {
         final response = await _supabase
-            .from('users')
+            .from('riders')
             .select()
             .eq('id', userId)
             .single();
@@ -37,7 +37,7 @@ class UserService {
   Future<User?> getUserById(String userId) async {
     try {
       final response = await _supabase
-          .from('users')
+          .from('riders')
           .select()
           .eq('id', userId)
           .single();
@@ -70,7 +70,7 @@ class UserService {
         if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
 
         final response = await _supabase
-            .from('users')
+            .from('riders')
             .update(updates)
             .eq('id', userId)
             .select()
@@ -95,8 +95,8 @@ class UserService {
       if (userId == null) return false;
 
       await _supabase
-          .from('users')
-          .update({'is_online': isOnline})
+          .from('riders')
+          .update({'status': isOnline ? 'online' : 'offline'})
           .eq('id', userId);
 
       return true;
@@ -115,7 +115,7 @@ class UserService {
       if (userId == null) return false;
 
       await _supabase
-          .from('users')
+          .from('riders')
           .update({
             'current_lat': lat,
             'current_lng': lng,
@@ -153,7 +153,7 @@ class UserService {
         if (user == null) return false;
 
         await _supabase
-            .from('users')
+            .from('riders')
             .update({
               'total_orders': user.totalOrders + 1,
               'total_earnings': user.totalEarnings + earnings,
@@ -174,7 +174,7 @@ class UserService {
   Future<User?> getUserByReferralCode(String code) async {
     try {
       final response = await _supabase
-          .from('users')
+          .from('riders')
           .select()
           .eq('referral_code', code)
           .single();
@@ -194,7 +194,7 @@ class UserService {
     if (userId == null) return Stream.value(null);
 
     return _supabase
-        .from('users')
+        .from('riders')
         .stream(primaryKey: ['id'])
         .eq('id', userId)
         .map((data) {
@@ -212,10 +212,10 @@ class UserService {
       if (userId == null) return false;
 
       await _supabase
-          .from('users')
+          .from('riders')
           .update({
-            'is_active': false,
-            'is_online': false,
+            'active': false,
+            'status': 'offline',
           })
           .eq('id', userId);
 
