@@ -252,24 +252,22 @@
         // FETCH AVAILABLE RIDERS
         // ============================================================================
         async function fetchRiders() {
-            // Fetch riders from auth.users (o da una tabella riders se esiste)
+            // Fetch riders from riders table
             const { data, error } = await db
-                .from('fcm_tokens')
-                .select('rider_id')
-                .eq('is_active', true);
+                .from('riders')
+                .select('id, name, phone, status')
+                .eq('active', true)
+                .order('name', { ascending: true });
 
             if (error) {
                 console.error('Error fetching riders:', error);
                 return;
             }
 
-            // Extract unique rider IDs
-            const riderIds = [...new Set(data.map(t => t.rider_id))];
-
-            // For MVP: use rider IDs directly (oppure fetch names da altra tabella)
-            riders = riderIds.map(id => ({
-                id: id,
-                name: `Rider ${id.slice(0, 8)}` // MVP: mostra solo parte UUID
+            // Map riders with name and status
+            riders = (data || []).map(rider => ({
+                id: rider.id,
+                name: `${rider.name}${rider.status === 'online' ? ' 🟢' : ' ⚫'}` // Mostra status
             }));
         }
 

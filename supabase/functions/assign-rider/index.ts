@@ -253,19 +253,16 @@ serve(async (req) => {
       );
     }
 
-    // 4. Fetch rider FCM token
-    const { data: fcmData, error: fcmError } = await supabase
-      .from("fcm_tokens")
-      .select("token")
-      .eq("rider_id", rider_id)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(1)
+    // 4. Fetch rider FCM token from riders table
+    const { data: riderData, error: riderError } = await supabase
+      .from("riders")
+      .select("fcm_token, name")
+      .eq("id", rider_id)
       .single();
 
-    const fcmToken = fcmData?.token;
+    const fcmToken = riderData?.fcm_token;
 
-    if (fcmError || !fcmToken) {
+    if (riderError || !fcmToken) {
       console.warn(`⚠️ No FCM token found for rider ${rider_id}. Order assigned but no push sent.`);
     }
 
