@@ -143,19 +143,28 @@ serve(async (req) => {
       );
     }
 
-    // 5. Estrai coordinate dealer (POINT format: "POINT(lng lat)")
-    // Supabase PostGIS restituisce geometry come stringa WKT
-    const dealerLocationMatch = dealer.location.match(/POINT\(([0-9.-]+) ([0-9.-]+)\)/);
-    if (!dealerLocationMatch) {
+    // 5. Estrai coordinate dealer
+    // Supabase restituisce POINT come "(lng,lat)" o "POINT(lng lat)"
+    let dealerLng: number;
+    let dealerLat: number;
+
+    const locationStr = String(dealer.location);
+    const wktMatch = locationStr.match(/POINT\(([0-9.-]+)\s+([0-9.-]+)\)/);
+    const tupleMatch = locationStr.match(/\(([0-9.-]+),([0-9.-]+)\)/);
+
+    if (wktMatch) {
+      dealerLng = parseFloat(wktMatch[1]);
+      dealerLat = parseFloat(wktMatch[2]);
+    } else if (tupleMatch) {
+      dealerLng = parseFloat(tupleMatch[1]);
+      dealerLat = parseFloat(tupleMatch[2]);
+    } else {
       console.error("❌ Invalid dealer location format:", dealer.location);
       return new Response(
         JSON.stringify({ error: "Invalid dealer location" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const dealerLng = parseFloat(dealerLocationMatch[1]);
-    const dealerLat = parseFloat(dealerLocationMatch[2]);
 
     // 6. Geocode customer address
     const customerCoords = geocodeAddress(customer_address);

@@ -1,5 +1,5 @@
 # DLOOP Rider Prototype - Memory Aggiornato
-**Last Updated:** 2026-06-19 | **Branch:** feat/dloop-2.0-insurance-platform | **Commit:** f837725
+**Last Updated:** 2026-06-19 13:17 | **Branch:** feat/dloop-2.0-insurance-platform | **Commit:** a0beb1f
 
 ## 📋 Project Status
 
@@ -77,12 +77,12 @@ sql/
 - ✅ **FIREBASE_SERVICE_ACCOUNT secret configurato** - Service Account JSON deployato
 - ✅ **Function deployata** - Live su Supabase project aqpwfurradxbnqvycvkm
 
-### 🚀 MVP Yamamay - Prossimi Step
-1. **Configurare Secrets Rimanenti** - ADMIN_SECRET, YAMAMAY_WEBHOOK_SECRET
-2. **Setup Admin Panel** - Modificare index.html con SUPABASE_URL/ANON_KEY, deploy su Netlify
-3. **Test Webhook E2E** - Simulare ordine Yamamay, assegnare rider, verificare FCM push
-4. **Integrazione Yamamay Reale** - Ottenere credenziali webhook da loro e-commerce
-5. **Email Notifications (Opzionale)** - Configurare Resend se merchant lo richiedono post-pilota
+### 🚀 MVP Yamamay - Fix Admin Panel COMPLETATO
+1. ✅ **Admin Panel URL fixato** - Corretto typo `.db.co` → `.supabase.co` (commit a0beb1f)
+2. ⏳ **Configurare Secrets Supabase** - ADMIN_SECRET, YAMAMAY_WEBHOOK_SECRET, FIREBASE_SERVICE_ACCOUNT
+3. ⏳ **Redeploy Admin Panel** - Netlify auto-deploy da GitHub push
+4. ⏳ **Test Webhook E2E** - Usare script test-admin-panel.sh
+5. 📋 **Integrazione Yamamay Reale** - Ottenere credenziali webhook da loro e-commerce
 
 ### Skippato per MVP (TODO Fase 2)
 - ❌ **Email automatiche** - Resend non configurato (notifiche manuali per ora)
@@ -174,5 +174,9 @@ FCM_SERVER_KEY=firebase_server_key  # Push notifications rider app
 - **Gate validazione:** 15+ ordini/giorno × 4 settimane
 
 ---
-**Last Work Session:** Claude Sonnet 4.5 (Giugno 19, 2026)
-**Continuation Note:** MVP Yamamay completato. 3 Cloud Functions deployate. Admin Panel pronto. Email skippata (WoZ manuale). Prossimo: configurare secrets + test E2E webhook.
+**Last Work Session:** Claude Sonnet 4.5 (Giugno 19, 2026 13:17 UTC)
+**Continuation Note:**
+- ✅ Fixato bug critico Admin Panel (URL Supabase typo)
+- ✅ Commit a0beb1f pushato su GitHub
+- 📋 Creati file helper: QUICK_FIX_CHECKLIST.md + test-admin-panel.sh
+- ⏳ Prossimo: configurare secrets Supabase + test E2E con script
