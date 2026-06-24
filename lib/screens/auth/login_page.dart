@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,14 +90,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
 
     try {
+      if (kIsWeb) {
+        // Flutter Web: use Supabase OAuth redirect flow
+        await Supabase.instance.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: Uri.base.origin,
+        );
+        // Browser will redirect — no further code runs here
+        return;
+      }
+
+      // Mobile: use native Google Sign-In
       await _initGoogleSignIn();
 
       final googleUser = await GoogleSignIn.instance.authenticate();
-
-      // Safe null checks
-      if (googleUser.authentication == null) {
-        throw Exception('Autenticazione Google fallita');
-      }
 
       final idToken = googleUser.authentication?.idToken;
       if (idToken == null) {
