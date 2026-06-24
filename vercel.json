@@ -3,9 +3,6 @@
   "outputDirectory": "build/web",
   "framework": null,
   "installCommand": "if [ ! -d \"$HOME/flutter\" ]; then git clone https://github.com/flutter/flutter.git -b stable $HOME/flutter; fi && export PATH=\"$PATH:$HOME/flutter/bin\" && flutter doctor && flutter pub get",
-  "env": {
-    "PATH": "/usr/bin:/bin:/usr/local/bin:$HOME/flutter/bin"
-  },
   "github": {
     "silent": true
   }
