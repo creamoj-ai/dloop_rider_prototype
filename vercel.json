@@ -1,5 +1,5 @@
 {
-  "buildCommand": "apt-get update && apt-get install -y chromium-browser && flutter build web --release --web-renderer canvaskit",
+  "buildCommand": "flutter build web --release --web-renderer html",
   "outputDirectory": "build/web",
   "framework": null,
   "installCommand": "if [ ! -d \"$HOME/flutter\" ]; then git clone https://github.com/flutter/flutter.git -b stable $HOME/flutter; fi && export PATH=\"$PATH:$HOME/flutter/bin\" && flutter doctor && flutter pub get",
