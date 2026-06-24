@@ -610,9 +610,9 @@ class _NetworkSheetState extends State<_NetworkSheet> {
             ],
           ),
           const SizedBox(height: 12),
-          _howStep('1', '\u20AC10 bonus per ogni rider attivato'),
-          _howStep('2', '6% sui guadagni (primi 3 mesi)'),
-          _howStep('3', '3% sui guadagni (dal 4\u00B0 mese)'),
+          _howStep('1', '\u20AC10 bonus per ogni rider referral'),
+          _howStep('2', '\u20AC50 bonus per ogni dealer segnalato'),
+          _howStep('3', 'Bonus dopo 10 ordini completati dal dealer'),
         ],
       ),
     );

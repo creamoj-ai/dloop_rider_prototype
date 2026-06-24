@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/tokens.dart';
@@ -184,7 +185,7 @@ class InviteSheet extends ConsumerWidget {
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      Navigator.pushNamed(context, '/money/network');
+                      context.go('/money/network');
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.earningsGreen,
