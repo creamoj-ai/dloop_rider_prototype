@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../theme/tokens.dart';
 import '../../../providers/rider_stats_provider.dart';
 import '../../../providers/earnings_provider.dart';
@@ -168,9 +169,16 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
               Navigator.pop(context);
               context.push('/today/ai-chat');
             }),
-            _botItem(Icons.shopping_bag, 'WhatsApp Market Bot', 'Gestisci ordini del tuo marketplace', AppColors.earningsGreen, cs, context),
-            _botItem(Icons.support_agent, 'Supporto Rider', 'Parla con il supporto dloop', AppColors.routeBlue, cs, context, notificationCount: ref.read(unreadNotificationsCountProvider)),
-            _botItem(Icons.group, 'Community Riders', 'Chat gruppo riders della tua zona', AppColors.bonusPurple, cs, context),
+            _botItem(Icons.shopping_bag, 'WhatsApp Market Bot', 'Gestisci ordini del tuo marketplace', AppColors.earningsGreen, cs, context, comingSoon: true, onTapOverride: () {
+              Navigator.pop(context);
+              _showComingSoonDialog(context, 'WhatsApp Market Bot');
+            }),
+            _botItem(Icons.support_agent, 'Supporto Rider', 'Apri ticket di supporto', AppColors.routeBlue, cs, context, notificationCount: ref.read(unreadNotificationsCountProvider), onTapOverride: () {
+              Navigator.pop(context);
+              _openSupportTicketForm(context);
+            }),
+            // Community Riders - Hidden until 10+ active riders
+            // _botItem(Icons.group, 'Community Riders', 'Chat gruppo riders della tua zona', AppColors.bonusPurple, cs, context),
             const SizedBox(height: 8),
           ],
         ),
@@ -178,7 +186,7 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
     );
   }
 
-  Widget _botItem(IconData icon, String title, String subtitle, Color color, ColorScheme cs, BuildContext context, {int notificationCount = 0, VoidCallback? onRead, VoidCallback? onTapOverride}) {
+  Widget _botItem(IconData icon, String title, String subtitle, Color color, ColorScheme cs, BuildContext context, {int notificationCount = 0, bool comingSoon = false, VoidCallback? onRead, VoidCallback? onTapOverride}) {
     return InkWell(
       onTap: onTapOverride ?? () {
         Navigator.pop(context);
@@ -210,7 +218,19 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Row(
+                  children: [
+                    Expanded(child: Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    if (comingSoon) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: AppColors.turboOrange.withOpacity(0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.turboOrange.withOpacity(0.3))),
+                        child: Text('Presto', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.turboOrange)),
+                      ),
+                    ],
+                  ],
+                ),
                 Text(subtitle, style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
               ]),
             ),
@@ -328,6 +348,200 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
         const SizedBox(width: 12),
         Expanded(child: Text(text, style: GoogleFonts.inter(fontSize: 14, color: cs.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis)),
       ]),
+    );
+  }
+
+  void _showComingSoonDialog(BuildContext context, String featureName) {
+    final cs = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: Icon(Icons.rocket_launch, color: AppColors.turboOrange, size: 48),
+        title: Text('In arrivo presto!', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
+        content: Text('$featureName sarà disponibile nelle prossime settimane. Resta aggiornato!', style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.routeBlue)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openSupportTicketForm(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => const _SupportTicketForm(),
+    );
+  }
+}
+
+/// Support Ticket Form Widget
+class _SupportTicketForm extends StatefulWidget {
+  const _SupportTicketForm();
+
+  @override
+  State<_SupportTicketForm> createState() => _SupportTicketFormState();
+}
+
+class _SupportTicketFormState extends State<_SupportTicketForm> {
+  final _descriptionController = TextEditingController();
+  String? _selectedCategory;
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitTicket() async {
+    if (_selectedCategory == null || _descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Compila tutti i campi', style: GoogleFonts.inter()),
+          backgroundColor: AppColors.urgentRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final supabase = Supabase.instance.client;
+      final riderId = supabase.auth.currentUser?.id;
+
+      if (riderId == null) throw Exception('User not authenticated');
+
+      // Map UI category to DB enum
+      final categoryMap = {
+        'Problema Tecnico': 'technical',
+        'Pagamento': 'payment',
+        'Ordine': 'order',
+        'Altro': 'other',
+      };
+
+      await supabase.from('support_tickets').insert({
+        'rider_id': riderId,
+        'category': categoryMap[_selectedCategory],
+        'subject': _selectedCategory,
+        'description': _descriptionController.text.trim(),
+        'priority': 'medium',
+        'status': 'open',
+      });
+
+      if (!mounted) return;
+
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ Ticket inviato! Riceverai risposta entro 24h', style: GoogleFonts.inter(fontSize: 14)),
+          backgroundColor: AppColors.earningsGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Errore: ${e.toString()}', style: GoogleFonts.inter()),
+          backgroundColor: AppColors.urgentRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 24,
+        right: 24,
+        top: 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.support_agent, color: AppColors.routeBlue, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                'Apri Ticket di Supporto',
+                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text('Categoria', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: cs.surfaceContainerHighest,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            value: _selectedCategory,
+            items: ['Problema Tecnico', 'Pagamento', 'Ordine', 'Altro']
+                .map((cat) => DropdownMenuItem(value: cat, child: Text(cat, style: GoogleFonts.inter(fontSize: 14))))
+                .toList(),
+            onChanged: (val) => setState(() => _selectedCategory = val),
+            hint: Text('Seleziona categoria', style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
+          ),
+          const SizedBox(height: 16),
+          Text('Descrizione', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _descriptionController,
+            maxLines: 4,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: cs.surfaceContainerHighest,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              hintText: 'Descrivi il problema in dettaglio...',
+              hintStyle: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant),
+              contentPadding: const EdgeInsets.all(16),
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _submitTicket,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.routeBlue,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : Text('Invia Ticket', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 }
