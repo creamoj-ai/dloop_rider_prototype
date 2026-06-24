@@ -22,7 +22,6 @@ class NetworkScreenV2 extends ConsumerWidget {
     final totalBonus = ref.watch(merchantReferralBonusProvider);
 
     return Scaffold(
-      backgroundColor: DloopTokens.bgBase,
       appBar: AppBar(
         title: const Text('Network'),
         backgroundColor: Colors.transparent,
@@ -59,7 +58,7 @@ class NetworkScreenV2 extends ConsumerWidget {
         onPressed: () => _showAddReferralSheet(context),
         icon: const Icon(Icons.person_add),
         label: const Text('Segnala Dealer'),
-        backgroundColor: DloopTokens.primary,
+        backgroundColor: AppColors.turboOrange,
       ),
     );
   }
@@ -163,14 +162,14 @@ class NetworkScreenV2 extends ConsumerWidget {
                   child: _buildKPIItem(
                     label: 'Attivi',
                     value: active.toString(),
-                    color: DloopTokens.turboOrange,
+                    color: AppColors.turboOrange,
                   ),
                 ),
                 Expanded(
                   child: _buildKPIItem(
                     label: 'Completati',
                     value: completed.toString(),
-                    color: DloopTokens.earningsGreen,
+                    color: AppColors.earningsGreen,
                   ),
                 ),
               ],
@@ -188,7 +187,7 @@ class NetworkScreenV2 extends ConsumerWidget {
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: DloopTokens.earningsGreen,
+                    color: AppColors.earningsGreen,
                   ),
                 ),
               ],
@@ -299,7 +298,7 @@ class NetworkScreenV2 extends ConsumerWidget {
                       value: referral.progressPercent / 100,
                       backgroundColor: Colors.grey.shade200,
                       valueColor: const AlwaysStoppedAnimation(
-                        DloopTokens.turboOrange,
+                        AppColors.turboOrange,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -326,7 +325,7 @@ class NetworkScreenV2 extends ConsumerWidget {
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: referral.isCompleted
-                          ? DloopTokens.earningsGreen
+                          ? AppColors.earningsGreen
                           : Colors.grey,
                     ),
                   ),
@@ -376,11 +375,11 @@ class NetworkScreenV2 extends ConsumerWidget {
         label = 'In attesa';
         break;
       case MerchantReferralStatus.active:
-        color = DloopTokens.turboOrange;
+        color = AppColors.turboOrange;
         label = 'Attivo';
         break;
       case MerchantReferralStatus.completed:
-        color = DloopTokens.earningsGreen;
+        color = AppColors.earningsGreen;
         label = 'Completato';
         break;
       case MerchantReferralStatus.expired:
@@ -566,7 +565,7 @@ class _AddMerchantReferralSheetState extends State<AddMerchantReferralSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Dealer segnalato con successo!'),
-            backgroundColor: DloopTokens.earningsGreen,
+            backgroundColor: AppColors.earningsGreen,
           ),
         );
       } else if (mounted) {
@@ -661,12 +660,12 @@ class _AddMerchantReferralSheetState extends State<AddMerchantReferralSheet> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: DloopTokens.earningsGreen.withValues(alpha:0.1),
+                color: AppColors.earningsGreen.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline, color: DloopTokens.earningsGreen),
+                  Icon(Icons.info_outline, color: AppColors.earningsGreen),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -683,7 +682,7 @@ class _AddMerchantReferralSheetState extends State<AddMerchantReferralSheet> {
             ElevatedButton(
               onPressed: _isLoading ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: DloopTokens.primary,
+                backgroundColor: AppColors.turboOrange,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isLoading
