@@ -141,7 +141,7 @@ class InviteSheet extends ConsumerWidget {
                 _buildStep(cs, '1', 'Condividi il tuo codice', Icons.share),
                 _buildStep(cs, '2', 'Il tuo amico si registra', Icons.person_add),
                 _buildStep(cs, '3', 'Completa 5 consegne', Icons.delivery_dining),
-                _buildStep(cs, '4', 'Ricevete €10 entrambi', Icons.euro, isLast: true),
+                _buildStep(cs, '4', '€10 per te quando completa 5 consegne', Icons.euro, isLast: true),
                 const SizedBox(height: 32),
 
                 // CTA Condividi
@@ -171,6 +171,41 @@ class InviteSheet extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         const Icon(Icons.share, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // CTA Segnala Dealer
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, '/money/network');
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.earningsGreen,
+                      side: const BorderSide(color: AppColors.earningsGreen, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.store, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'SEGNALA DEALER (€50 BONUS)',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                       ],
                     ),
                   ),
