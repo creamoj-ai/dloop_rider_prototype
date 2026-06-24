@@ -5,9 +5,10 @@ class RiderContact {
   final String contactType; // 'dealer' | 'client'
   final String status; // 'active' | 'potential' | 'vip'
   final String? phone;
+  final String? email;
   final int totalOrders;
-  final double monthlyEarnings;
   final DateTime createdAt;
+  final String? referralId; // FK to merchant_referrals
 
   const RiderContact({
     required this.id,
@@ -16,9 +17,10 @@ class RiderContact {
     required this.contactType,
     this.status = 'active',
     this.phone,
+    this.email,
     this.totalOrders = 0,
-    this.monthlyEarnings = 0,
     required this.createdAt,
+    this.referralId,
   });
 
   bool get isDealer => contactType == 'dealer';
@@ -34,11 +36,11 @@ class RiderContact {
         contactType: json['contact_type'] as String? ?? 'client',
         status: json['status'] as String? ?? 'active',
         phone: json['phone'] as String?,
+        email: json['email'] as String?,
         totalOrders: int.tryParse(json['total_orders']?.toString() ?? '0') ?? 0,
-        monthlyEarnings:
-            double.tryParse(json['monthly_earnings']?.toString() ?? '0') ?? 0,
         createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
             DateTime.now(),
+        referralId: json['referral_id'] as String?,
       );
 
   Map<String, dynamic> toInsertJson(String riderId) => {
@@ -47,7 +49,7 @@ class RiderContact {
         'contact_type': contactType,
         'status': status,
         'phone': phone,
+        'email': email,
         'total_orders': totalOrders,
-        'monthly_earnings': monthlyEarnings,
       };
 }
