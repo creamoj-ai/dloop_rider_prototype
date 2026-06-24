@@ -13,6 +13,7 @@ import { buildSystemPrompt } from "./prompts.ts";
 
 const MAX_FUNCTION_CALLS = 3;
 const HISTORY_LIMIT = 20;
+const MODEL = "claude-haiku-4-5"; // Claude Haiku 4.5 (migrated from gpt-3.5-turbo)
 
 serve(async (req: Request) => {
   // Handle CORS preflight
@@ -82,10 +83,11 @@ serve(async (req: Request) => {
       ...history,
     ];
 
-    // 7. Call OpenAI with function calling loop (max 3 iterations)
+    // 7. Call AI with function calling loop (max 3 iterations)
     let response = await chatCompletion({
       messages,
       tools: chatBotTools,
+      model: MODEL,
     });
 
     let iterations = 0;
@@ -119,10 +121,11 @@ serve(async (req: Request) => {
         });
       }
 
-      // Call OpenAI again with function results
+      // Call AI again with function results
       response = await chatCompletion({
         messages,
         tools: chatBotTools,
+        model: MODEL,
       });
 
       iterations++;
@@ -138,7 +141,7 @@ serve(async (req: Request) => {
       role: "assistant",
       content: assistantContent,
       tokens_used: response.usage.total_tokens,
-      model: "gpt-3.5-turbo",
+      model: MODEL,
     });
 
     // 9. Return response

@@ -62,31 +62,9 @@ export const chatBotTools: ToolDefinition[] = [
             type: "number",
             description: "Distanza della consegna in chilometri",
           },
-          is_luxury: {
-            type: "boolean",
-            description: "Se è una consegna luxury (bonus +30%)",
-          },
         },
         required: ["distance_km"],
       },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_luxury_delivery_info",
-      description:
-        "Informazioni sulle procedure di consegna luxury (Yamamay, Jolie, gioielli)",
-      parameters: { type: "object", properties: {}, required: [] },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_caution_deposit_info",
-      description:
-        "Informazioni sulla cauzione €250 e le differenze tra piano Free e Pro",
-      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
@@ -142,13 +120,8 @@ export async function executeFunction(
       return await calculateDeliveryFee(
         db,
         riderId,
-        args.distance_km as number,
-        (args.is_luxury as boolean) ?? false
+        args.distance_km as number
       );
-    case "get_luxury_delivery_info":
-      return getLuxuryDeliveryInfo();
-    case "get_caution_deposit_info":
-      return getCautionDepositInfo();
     case "get_market_products":
       return await getMarketProducts(db, args.category as string | undefined);
     case "get_referral_system_info":
@@ -305,8 +278,7 @@ async function getPricingInfo(
 async function calculateDeliveryFee(
   db: SupabaseClient,
   riderId: string,
-  distanceKm: number,
-  isLuxury: boolean
+  distanceKm: number
 ): Promise<string> {
   // Get rider's pricing or use defaults
   const { data } = await db
@@ -318,117 +290,14 @@ async function calculateDeliveryFee(
   const baseFee = (data?.base_fee as number) ?? 3.5;
   const perKm = (data?.per_km_fee as number) ?? 0.8;
 
-  let fee = baseFee + perKm * distanceKm;
-  const luxuryBonus = isLuxury ? fee * 0.3 : 0;
-  fee += luxuryBonus;
+  const fee = baseFee + perKm * distanceKm;
 
   return JSON.stringify({
     distance_km: distanceKm,
     base_fee: `€${baseFee.toFixed(2)}`,
     distance_fee: `€${(perKm * distanceKm).toFixed(2)}`,
-    luxury_bonus: isLuxury ? `€${luxuryBonus.toFixed(2)} (+30%)` : "N/A",
     estimated_total: `€${fee.toFixed(2)}`,
     note: "Stima basata sulle tue tariffe attuali. Il compenso finale può variare.",
-  });
-}
-
-function getLuxuryDeliveryInfo(): string {
-  return JSON.stringify({
-    luxury_delivery: {
-      overview:
-        "dloop offre consegne speciali per brand di lusso e moda con bonus +30% sulla tariffa base.",
-      requisiti: {
-        rating_minimo: "4.5/5",
-        completamento_training: true,
-      },
-      brands: [
-        {
-          name: "Yamamay / Cimmino Group",
-          category: "Intimo e abbigliamento",
-          procedure: [
-            "Consegna in busta elegante brandizzata",
-            "Mai piegare o schiacciare i capi",
-            "Conferma visiva al ritiro (foto packaging)",
-            "Tempo max consegna: 45 min zona urbana",
-          ],
-        },
-        {
-          name: "Jolie profumerie (Afragola)",
-          category: "Profumi e cosmetici",
-          procedure: [
-            "Trasporto SEMPRE in posizione verticale",
-            "Evitare sbalzi termici (no sole diretto, no bagagliaio caldo)",
-            "Packaging originale deve restare intatto",
-            "Consegna delicata: appoggare, non lanciare",
-          ],
-        },
-        {
-          name: "Gioielli e accessori",
-          category: "Gioielleria",
-          procedure: [
-            "Custodia rigida obbligatoria",
-            "Foto al ritiro e alla consegna",
-            "Firma del destinatario obbligatoria",
-            "Contatto telefonico 5 min prima della consegna",
-          ],
-        },
-      ],
-    },
-  });
-}
-
-function getCautionDepositInfo(): string {
-  return JSON.stringify({
-    piani_confronto: {
-      piano_free: {
-        costo_mensile: "€0",
-        cauzione: "€250 obbligatoria",
-        descrizione_cauzione:
-          "Deposito cauzionale come garanzia per merci di valore trasportate (specialmente luxury)",
-        rimborso:
-          "Rimborsabile alla cessazione del rapporto, meno eventuali danni a merci",
-        assicurazione: "Nessuna",
-        partner_benefits: "Non inclusi",
-      },
-      piano_pro: {
-        costo_mensile: "€29",
-        cauzione: "€0 — ESENZIONE COMPLETA",
-        assicurazione: {
-          provider: "Qover",
-          descrizione:
-            "Stesso partner assicurativo di Deliveroo, Glovo e Wolt",
-          coperture: [
-            "Infortuni durante l'attività di consegna",
-            "Responsabilità civile verso terzi",
-            "Copertura in caso di malattia",
-          ],
-        },
-        vantaggi_inclusi: [
-          "Assicurazione Qover completa",
-          "Esenzione cauzione €250",
-          "Partner Benefits (Fiscozen P.IVA, Finom conto business, ho.Mobile dati, SumUp POS)",
-          "Zone prioritarie",
-          "Badge PRO visibile ai dealer",
-          "Supporto prioritario via chat",
-        ],
-      },
-      nuovo_modello_guadagni: {
-        descrizione:
-          "Con il modello SaaS di dloop, NON ci sono commissioni sui tuoi guadagni",
-        come_funziona: [
-          "Tu imposti le tariffe con i tuoi dealer (es. €5/consegna)",
-          "Guadagni il 100% di quanto pattuito",
-          "dloop guadagna solo dall'abbonamento del dealer (€19-€49/mese)",
-          "Bonus extra: €10 per ogni rider che inviti, €50 per ogni dealer che segnali",
-        ],
-        confronto_vecchio_modello: {
-          prima: "Commissioni 6% primi 3 mesi, poi 3% dal 4° mese",
-          ora: "0% commissioni — guadagni tutto tu",
-        },
-      },
-      consiglio:
-        "Il piano PRO costa €29/mese ma ti risparmia €250 di cauzione subito + hai assicurazione completa Qover. Con il nuovo modello senza commissioni, guadagni di più e lavori protetto.",
-    },
   });
 }
 
