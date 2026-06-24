@@ -11,7 +11,7 @@ import '../screens/today/delivery_navigation_screen.dart';
 import '../screens/earn/earn_demo_screen.dart';
 import '../screens/money/money_screen.dart';
 import '../screens/money/sub/transactions_screen.dart';
-import '../screens/money/sub/network_screen.dart';
+import '../screens/money/sub/network_screen_v2.dart';
 import '../screens/money/sub/analytics_screen.dart';
 import '../screens/market/market_tab_screen.dart';
 import '../screens/money/sub/market_screen.dart';
@@ -82,7 +82,7 @@ final appRouter = GoRouter(
           pageBuilder: (context, state) => const NoTransitionPage(child: MoneyScreen()),
           routes: [
             GoRoute(path: 'transactions', builder: (context, state) => const TransactionsScreen()),
-            GoRoute(path: 'network', builder: (context, state) => const NetworkScreen()),
+            GoRoute(path: 'network', builder: (context, state) => const NetworkScreenV2()),
             GoRoute(path: 'analytics', builder: (context, state) => const AnalyticsScreen()),
           ],
         ),
