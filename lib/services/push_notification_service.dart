@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../navigation/app_router.dart';
@@ -190,13 +191,22 @@ class PushNotificationService {
     if (riderId == null) return;
 
     try {
-      final fcmToken = token ?? await _messaging.getToken();
+      // Su web, getToken() richiede vapidKey per Web Push Protocol
+      // TODO: Generare VAPID key pair in Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
+      final fcmToken = token ??
+          await _messaging.getToken(
+            vapidKey: kIsWeb
+                ? 'SOSTITUIRE_CON_VAPID_KEY_DA_FIREBASE_CONSOLE'
+                : null,
+          );
       if (fcmToken == null) return;
 
       await _client.from('fcm_tokens').upsert({
         'rider_id': riderId,
         'token': fcmToken,
-        'device_info': Platform.isAndroid ? 'android' : 'ios',
+        'device_info': kIsWeb
+            ? 'web'
+            : (Platform.isAndroid ? 'android' : 'ios'),
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'rider_id,token');
 

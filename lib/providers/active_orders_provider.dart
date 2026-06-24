@@ -233,6 +233,7 @@ class ActiveOrdersState {
 /// Notifier per gestire ordini attivi — wired to Supabase real-time
 class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
   StreamSubscription<List<Order>>? _ordersSub;
+  bool _isAccepting = false; // Debounce flag per prevenire doppio tap
 
   ActiveOrdersNotifier() : super(const ActiveOrdersState()) {
     _subscribeToOrders();
@@ -298,14 +299,31 @@ class ActiveOrdersNotifier extends StateNotifier<ActiveOrdersState> {
   }
 
   /// Accetta un ordine disponibile
-  void acceptOrder(ActiveOrder order) {
-    state = state.copyWith(
-      orders: [...state.orders, order.copyWith(phase: OrderPhase.toPickup)],
-      availableOrders: state.availableOrders.where((o) => o.id != order.id).toList(),
-    );
-    // Persist to Supabase (skip demo orders)
-    if (!order.isDemo) {
-      OrdersService.updateOrderStatus(order.id, OrderStatus.accepted);
+  Future<void> acceptOrder(ActiveOrder order) async {
+    // Debounce: previeni doppio tap
+    if (_isAccepting) return;
+    _isAccepting = true;
+
+    try {
+      // Update ottimistico: aggiungi ordine allo stato locale
+      state = state.copyWith(
+        orders: [...state.orders, order.copyWith(phase: OrderPhase.toPickup)],
+        availableOrders: state.availableOrders.where((o) => o.id != order.id).toList(),
+      );
+
+      // Persist to Supabase (skip demo orders)
+      if (!order.isDemo) {
+        await OrdersService.updateOrderStatus(order.id, OrderStatus.accepted);
+      }
+    } catch (e) {
+      // Rollback ottimistico: rimuovi ordine se accept fallisce
+      state = state.copyWith(
+        orders: state.orders.where((o) => o.id != order.id).toList(),
+        availableOrders: [...state.availableOrders, order],
+      );
+      rethrow; // Propaga errore per mostrare snackbar in UI
+    } finally {
+      _isAccepting = false;
     }
   }
 

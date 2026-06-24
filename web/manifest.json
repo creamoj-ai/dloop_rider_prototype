@@ -1,13 +1,14 @@
 {
-    "name": "dloop_rider_prototype",
-    "short_name": "dloop_rider_prototype",
+    "name": "Dloop Rider",
+    "short_name": "Dloop",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "App per rider Dloop - Gestisci le tue consegne e i tuoi guadagni",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
+    "categories": ["business", "productivity"],
     "icons": [
         {
             "src": "icons/Icon-192.png",
