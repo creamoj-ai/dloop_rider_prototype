@@ -108,6 +108,15 @@ export const chatBotTools: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_referral_system_info",
+      description:
+        "Informazioni complete sul sistema referral: come invitare rider (€10) e segnalare dealer (€50)",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
 ];
 
 // ── Function Executors ────────────────────────────────────────────
@@ -142,6 +151,8 @@ export async function executeFunction(
       return getCautionDepositInfo();
     case "get_market_products":
       return await getMarketProducts(db, args.category as string | undefined);
+    case "get_referral_system_info":
+      return getReferralSystemInfo();
     default:
       return JSON.stringify({ error: `Funzione sconosciuta: ${name}` });
   }
@@ -368,37 +379,55 @@ function getLuxuryDeliveryInfo(): string {
 
 function getCautionDepositInfo(): string {
   return JSON.stringify({
-    caution_deposit: {
+    piani_confronto: {
       piano_free: {
-        cauzione: "€250",
-        descrizione:
-          "Deposito cauzionale obbligatorio per rider senza piano PRO",
+        costo_mensile: "€0",
+        cauzione: "€250 obbligatoria",
+        descrizione_cauzione:
+          "Deposito cauzionale come garanzia per merci di valore trasportate (specialmente luxury)",
         rimborso:
           "Rimborsabile alla cessazione del rapporto, meno eventuali danni a merci",
-        motivo:
-          "Garanzia per merci di valore trasportate (specialmente luxury)",
+        assicurazione: "Nessuna",
+        partner_benefits: "Non inclusi",
       },
       piano_pro: {
-        costo: "€29/mese",
-        cauzione: "€0 — NESSUNA cauzione richiesta",
+        costo_mensile: "€29",
+        cauzione: "€0 — ESENZIONE COMPLETA",
         assicurazione: {
-          tipo: "Assicurazione Qover",
-          copertura_infortuni: "Infortuni durante l'attività di consegna",
-          copertura_rc: "Responsabilità civile verso terzi",
-          copertura_malattia: "Copertura in caso di malattia",
-          partner: "Qover (usato anche da Deliveroo, Glovo, Wolt)",
+          provider: "Qover",
+          descrizione:
+            "Stesso partner assicurativo di Deliveroo, Glovo e Wolt",
+          coperture: [
+            "Infortuni durante l'attività di consegna",
+            "Responsabilità civile verso terzi",
+            "Copertura in caso di malattia",
+          ],
         },
-        vantaggi_extra: [
-          "Assicurazione Qover inclusa",
-          "Esenzione deposito cauzionale €250",
-          "Accesso a Partner Benefits",
+        vantaggi_inclusi: [
+          "Assicurazione Qover completa",
+          "Esenzione cauzione €250",
+          "Partner Benefits (Fiscozen P.IVA, Finom conto business, ho.Mobile dati, SumUp POS)",
           "Zone prioritarie",
           "Badge PRO visibile ai dealer",
-          "Supporto prioritario",
+          "Supporto prioritario via chat",
         ],
       },
+      nuovo_modello_guadagni: {
+        descrizione:
+          "Con il modello SaaS di dloop, NON ci sono commissioni sui tuoi guadagni",
+        come_funziona: [
+          "Tu imposti le tariffe con i tuoi dealer (es. €5/consegna)",
+          "Guadagni il 100% di quanto pattuito",
+          "dloop guadagna solo dall'abbonamento del dealer (€19-€49/mese)",
+          "Bonus extra: €10 per ogni rider che inviti, €50 per ogni dealer che segnali",
+        ],
+        confronto_vecchio_modello: {
+          prima: "Commissioni 6% primi 3 mesi, poi 3% dal 4° mese",
+          ora: "0% commissioni — guadagni tutto tu",
+        },
+      },
       consiglio:
-        "Il piano PRO a €29/mese include l'assicurazione Qover e ti esonera dal deposito di €250. Si ripaga da solo con i vantaggi e la tranquillità.",
+        "Il piano PRO costa €29/mese ma ti risparmia €250 di cauzione subito + hai assicurazione completa Qover. Con il nuovo modello senza commissioni, guadagni di più e lavori protetto.",
     },
   });
 }
@@ -436,5 +465,46 @@ async function getMarketProducts(
       available: (p.stock as number) > 0,
       description: p.description,
     })),
+  });
+}
+
+function getReferralSystemInfo(): string {
+  return JSON.stringify({
+    sistema_referral: {
+      rider_referral: {
+        bonus: "€10",
+        come_funziona: [
+          "Vai su 'Invita e guadagna' nella schermata Money",
+          "Condividi il tuo codice referral (es. DLOOP1234)",
+          "Il nuovo rider si registra usando il tuo codice",
+          "Quando completa 5 consegne, ricevi €10 bonus",
+        ],
+        condizioni: "Il bonus viene accreditato automaticamente dopo la 5a consegna completata dal rider invitato",
+      },
+      dealer_referral: {
+        bonus: "€50",
+        come_funziona: [
+          "Segnala un dealer/ristorante/negozio dalla sezione 'Segnala Dealer'",
+          "Inserisci nome, telefono/email del dealer",
+          "dloop contatta il dealer e lo onboarda sulla piattaforma",
+          "Quando il dealer completa 10 ordini tramite dloop, ricevi €50 bonus",
+        ],
+        condizioni: "Bonus pagato dopo 10 ordini completati dal dealer segnalato (tracciamento automatico)",
+        nota: "I dealer pagano un abbonamento mensile a dloop (€19-€49), NON ti tolgono commissioni",
+      },
+      nuovo_modello: {
+        zero_commissioni: "dloop NON prende commissioni sui tuoi guadagni",
+        come_guadagni: [
+          "Tu imposti le tariffe con i tuoi dealer (es. €5/consegna)",
+          "Guadagni il 100% di quanto pattuito",
+          "dloop guadagna solo dall'abbonamento del dealer",
+        ],
+        vantaggi: [
+          "Più dealer segnali = più rete = più ordini per te",
+          "Bonus €50 per ogni dealer attivato",
+          "Nessuna perdita percentuale sui guadagni",
+        ],
+      },
+    },
   });
 }
