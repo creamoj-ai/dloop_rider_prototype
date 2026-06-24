@@ -287,7 +287,6 @@ INSERT INTO public.merchant_referrals (
   dealer_contact_id,
   dealer_name,
   dealer_phone,
-  dealer_email,
   status,
   current_order_count,
   bonus_amount_cents,
@@ -300,7 +299,6 @@ SELECT
   rc.id,
   rc.name,
   rc.phone,
-  rc.email,
   CASE
     -- Se dealer ha completato >= 10 ordini, referral completed
     WHEN rc.total_orders >= 10 THEN 'completed'
