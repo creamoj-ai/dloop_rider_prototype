@@ -84,8 +84,8 @@ class _QuickActionsGridState extends ConsumerState<QuickActionsGrid> {
                 child: _ActionTile(
                   icon: Icons.people,
                   label: 'Network',
-                  subtitle: '$activeReferrals attivi',
-                  subtitleExtra: '+\u20AC${networkMonthlyEarnings.toStringAsFixed(0)}/mese',
+                  subtitle: '$activeReferrals referral',
+                  subtitleExtra: '+\u20AC${networkMonthlyEarnings.toStringAsFixed(0)} bonus',
                   color: AppColors.routeBlue,
                   onTap: () => _showNetworkSheet(context, networkMonthlyEarnings, activeReferrals),
                 ),
@@ -505,7 +505,7 @@ class _NetworkSheetState extends State<_NetworkSheet> {
                   children: [
                     Text('Il tuo network', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface)),
                     const SizedBox(height: 4),
-                    Text('Guadagni passivi dai tuoi invitati', style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
+                    Text('Bonus referral dai dealer segnalati', style: GoogleFonts.inter(fontSize: 14, color: cs.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -532,7 +532,7 @@ class _NetworkSheetState extends State<_NetworkSheet> {
                   style: GoogleFonts.inter(fontSize: 32, fontWeight: FontWeight.w700, color: AppColors.earningsGreen),
                 ),
                 const SizedBox(height: 4),
-                Text('Guadagni passivi questo mese', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
+                Text('Bonus referral guadagnati', style: GoogleFonts.inter(fontSize: 13, color: cs.onSurfaceVariant)),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,

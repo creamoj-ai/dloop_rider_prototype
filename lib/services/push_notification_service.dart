@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -7,6 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../navigation/app_router.dart';
 import '../utils/logger.dart';
+import '../utils/platform_info.dart';
 
 /// Top-level handler for background FCM messages
 @pragma('vm:entry-point')
@@ -204,9 +204,7 @@ class PushNotificationService {
       await _client.from('fcm_tokens').upsert({
         'rider_id': riderId,
         'token': fcmToken,
-        'device_info': kIsWeb
-            ? 'web'
-            : (Platform.isAndroid ? 'android' : 'ios'),
+        'device_info': getPlatformName(),
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'rider_id,token');
 

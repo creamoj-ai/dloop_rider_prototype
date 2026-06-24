@@ -37,11 +37,8 @@ final clientsCountProvider = Provider<int>((ref) {
       0;
 });
 
-/// Total monthly earnings from dealer contacts
+/// Total referral bonus earned (from merchant_referrals system)
+/// DEPRECATED: Use merchantReferralBonusProvider from merchant_referrals_provider.dart instead.
 final contactsMonthlyEarningsProvider = Provider<double>((ref) {
-  return ref.watch(dealersProvider).whenOrNull(
-            data: (dealers) =>
-                dealers.fold<double>(0.0, (sum, d) => sum + d.monthlyEarnings),
-          ) ??
-      0;
+  return 0.0;
 });

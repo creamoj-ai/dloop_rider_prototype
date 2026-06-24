@@ -396,7 +396,7 @@ class NetworkScreenV2 extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha:0.2),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -661,7 +661,7 @@ class _AddMerchantReferralSheetState extends State<AddMerchantReferralSheet> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: DloopTokens.earningsGreen.withOpacity(0.1),
+                color: DloopTokens.earningsGreen.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(

@@ -212,15 +212,15 @@ BEGIN
         INSERT INTO public.transactions (
           rider_id,
           type,
-          amount_cents,
+          amount,
           status,
           description,
           processed_at
         )
         VALUES (
           _referral.referrer_rider_id,
-          'merchant_referral_bonus',
-          _referral.bonus_amount_cents,
+          'bonus',
+          _referral.bonus_amount_cents / 100.0,
           'completed',
           'Bonus referral merchant: ' || _referral.dealer_name,
           now()
@@ -322,7 +322,10 @@ SELECT
   END
 FROM public.rider_contacts rc
 WHERE rc.contact_type = 'dealer'
-ON CONFLICT DO NOTHING;
+  AND NOT EXISTS (
+    SELECT 1 FROM public.merchant_referrals mr
+    WHERE mr.dealer_contact_id = rc.id
+  );
 
 -- Log migration result
 DO $$
@@ -356,29 +359,39 @@ CREATE INDEX IF NOT EXISTS idx_rider_contacts_referral
   ON public.rider_contacts (referral_id)
   WHERE referral_id IS NOT NULL;
 
--- Depreca monthly_earnings (NON eliminare subito per backward compat)
-ALTER TABLE public.rider_contacts
-  ADD COLUMN IF NOT EXISTS monthly_earnings_deprecated BOOLEAN DEFAULT false;
-
-UPDATE public.rider_contacts
-SET monthly_earnings_deprecated = true
-WHERE monthly_earnings IS NOT NULL;
-
-COMMENT ON COLUMN public.rider_contacts.monthly_earnings IS
-  'DEPRECATED: Use merchant_referrals.bonus_amount_cents instead';
+-- Depreca monthly_earnings se esiste (NON eliminare subito per backward compat)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'rider_contacts' AND column_name = 'monthly_earnings'
+  ) THEN
+    ALTER TABLE public.rider_contacts
+      ADD COLUMN IF NOT EXISTS monthly_earnings_deprecated BOOLEAN DEFAULT false;
+    UPDATE public.rider_contacts
+    SET monthly_earnings_deprecated = true
+    WHERE monthly_earnings IS NOT NULL;
+    EXECUTE 'COMMENT ON COLUMN public.rider_contacts.monthly_earnings IS ''DEPRECATED: Use merchant_referrals.bonus_amount_cents instead''';
+  END IF;
+END $$;
 
 -- ============================================================
 -- STEP 11: DEPRECATE dealer_subscriptions
 -- ============================================================
 
--- Flag deprecato (NON eliminare table per backward compat backend)
-ALTER TABLE public.dealer_subscriptions
-  ADD COLUMN IF NOT EXISTS deprecated BOOLEAN DEFAULT true;
-
-UPDATE public.dealer_subscriptions SET deprecated = true;
-
-COMMENT ON TABLE public.dealer_subscriptions IS
-  'DEPRECATED: Replaced by merchant_referrals system. Keep for backend compatibility.';
+-- Flag deprecato se la tabella esiste (NON eliminare per backward compat backend)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'dealer_subscriptions'
+  ) THEN
+    ALTER TABLE public.dealer_subscriptions
+      ADD COLUMN IF NOT EXISTS deprecated BOOLEAN DEFAULT true;
+    UPDATE public.dealer_subscriptions SET deprecated = true;
+    EXECUTE 'COMMENT ON TABLE public.dealer_subscriptions IS ''DEPRECATED: Replaced by merchant_referrals system. Keep for backend compatibility.''';
+  END IF;
+END $$;
 
 -- ============================================================
 -- STEP 12: HELPER VIEWS
@@ -409,9 +422,15 @@ GRANT SELECT ON public.active_merchant_referrals TO authenticated;
 -- MIGRATION COMPLETE
 -- ============================================================
 
-RAISE NOTICE '✅ Merchant referrals system migration complete!';
-RAISE NOTICE '   - Created merchant_referrals table';
-RAISE NOTICE '   - Migrated % dealer contacts', (SELECT COUNT(*) FROM merchant_referrals);
-RAISE NOTICE '   - Set up triggers for auto-activation and completion';
-RAISE NOTICE '   - Deprecated dealer_subscriptions (kept for backend compat)';
-RAISE NOTICE '   - Next: Update Flutter app to use new merchant_referrals API';
+DO $$
+DECLARE
+  _count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO _count FROM public.merchant_referrals;
+  RAISE NOTICE '✅ Merchant referrals system migration complete!';
+  RAISE NOTICE '   - Created merchant_referrals table';
+  RAISE NOTICE '   - Migrated % dealer contacts', _count;
+  RAISE NOTICE '   - Set up triggers for auto-activation and completion';
+  RAISE NOTICE '   - Deprecated dealer_subscriptions (kept for backend compat)';
+  RAISE NOTICE '   - Next: Update Flutter app to use new merchant_referrals API';
+END $$;

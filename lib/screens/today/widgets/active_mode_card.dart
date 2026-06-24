@@ -207,9 +207,17 @@ class ActiveModeCard extends ConsumerWidget {
               Expanded(
                 flex: 2,
                 child: ElevatedButton(
-                  onPressed: () {
-                    ref.read(activeOrdersProvider.notifier).acceptOrder(order);
-                    context.push('/today/delivery', extra: order.id);
+                  onPressed: () async {
+                    try {
+                      await ref.read(activeOrdersProvider.notifier).acceptOrder(order);
+                      if (context.mounted) context.push('/today/delivery', extra: order.id);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Errore accettazione ordine'), backgroundColor: Colors.red),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.earningsGreen,
@@ -429,9 +437,17 @@ class ActiveModeCard extends ConsumerWidget {
               SizedBox(
                 height: 32,
                 child: ElevatedButton(
-                  onPressed: () {
-                    ref.read(activeOrdersProvider.notifier).acceptOrder(order);
-                    context.push('/today/delivery', extra: order.id);
+                  onPressed: () async {
+                    try {
+                      await ref.read(activeOrdersProvider.notifier).acceptOrder(order);
+                      if (context.mounted) context.push('/today/delivery', extra: order.id);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Errore accettazione ordine'), backgroundColor: Colors.red),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.earningsGreen,

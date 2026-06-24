@@ -1,5 +1,10 @@
 // Firebase Cloud Messaging Service Worker
 // Gestisce notifiche push in background per Dloop Rider PWA
+//
+// TODO: Replace appId below with real value from Firebase Console:
+//   Firebase Console > Project Settings > Your Apps > Web app > App ID
+//   The appId should look like: 1:793691819503:web:a1b2c3d4e5f6g7h8
+// TODO: Generate VAPID key in Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
 
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');

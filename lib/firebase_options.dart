@@ -57,6 +57,8 @@ class DefaultFirebaseOptions {
     storageBucket: 'loop-rider-prototype.firebasestorage.app',
   );
 
+  // TODO: Replace appId with real value from Firebase Console > Project Settings > Your Apps > Web
+  // Run: flutterfire configure --platforms=web to regenerate
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyDSp5lXMuyE9zfeNEEyCumQEvA77UFFVGA',
     appId: '1:793691819503:web:dloop-web-config',

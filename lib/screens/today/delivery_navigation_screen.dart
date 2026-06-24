@@ -644,16 +644,26 @@ class _DeliveryNavigationScreenState extends ConsumerState<DeliveryNavigationScr
             width: double.infinity,
             height: 40,
             child: ElevatedButton.icon(
-              onPressed: () {
-                ref.read(activeOrdersProvider.notifier).acceptOrder(order);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${order.dealerName} aggiunto!'),
-                    backgroundColor: AppColors.earningsGreen,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+              onPressed: () async {
+                try {
+                  await ref.read(activeOrdersProvider.notifier).acceptOrder(order);
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${order.dealerName} aggiunto!'),
+                        backgroundColor: AppColors.earningsGreen,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Errore accettazione ordine'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
               },
               icon: const Icon(Icons.add, size: 18),
               label: Text(

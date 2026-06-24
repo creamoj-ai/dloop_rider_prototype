@@ -11,9 +11,10 @@ void main() {
         'contact_type': 'dealer',
         'status': 'active',
         'phone': '+39 081 5539204',
+        'email': 'info@damichele.it',
         'total_orders': 45,
-        'monthly_earnings': 350.50,
         'created_at': '2026-01-15T10:00:00Z',
+        'referral_id': 'ref-001',
       };
 
       final contact = RiderContact.fromJson(json);
@@ -24,8 +25,9 @@ void main() {
       expect(contact.contactType, 'dealer');
       expect(contact.status, 'active');
       expect(contact.phone, '+39 081 5539204');
+      expect(contact.email, 'info@damichele.it');
       expect(contact.totalOrders, 45);
-      expect(contact.monthlyEarnings, 350.50);
+      expect(contact.referralId, 'ref-001');
       expect(contact.createdAt.year, 2026);
     });
 
@@ -38,12 +40,13 @@ void main() {
         'status': 'vip',
         'phone': null,
         'total_orders': 10,
-        'monthly_earnings': 0,
         'created_at': '2026-02-01T10:00:00Z',
       };
 
       final contact = RiderContact.fromJson(json);
       expect(contact.phone, isNull);
+      expect(contact.email, isNull);
+      expect(contact.referralId, isNull);
     });
 
     test('with missing/null fields uses defaults', () {
@@ -60,8 +63,9 @@ void main() {
       expect(contact.contactType, 'client');
       expect(contact.status, 'active');
       expect(contact.phone, isNull);
+      expect(contact.email, isNull);
       expect(contact.totalOrders, 0);
-      expect(contact.monthlyEarnings, 0.0);
+      expect(contact.referralId, isNull);
     });
 
     test('with numeric fields as strings', () {
@@ -72,13 +76,11 @@ void main() {
         'contact_type': 'dealer',
         'status': 'active',
         'total_orders': '25',
-        'monthly_earnings': '175.50',
         'created_at': '2026-02-10T12:00:00Z',
       };
 
       final contact = RiderContact.fromJson(json);
       expect(contact.totalOrders, 25);
-      expect(contact.monthlyEarnings, 175.50);
     });
   });
 
@@ -164,8 +166,8 @@ void main() {
         contactType: 'dealer',
         status: 'potential',
         phone: '+39 333 0000000',
+        email: 'test@dealer.it',
         totalOrders: 0,
-        monthlyEarnings: 0,
         createdAt: DateTime(2026, 2, 10),
       );
 
@@ -176,6 +178,7 @@ void main() {
       expect(json['contact_type'], 'dealer');
       expect(json['status'], 'potential');
       expect(json['phone'], '+39 333 0000000');
+      expect(json['email'], 'test@dealer.it');
       expect(json.containsKey('id'), false);
       expect(json.containsKey('created_at'), false);
     });
