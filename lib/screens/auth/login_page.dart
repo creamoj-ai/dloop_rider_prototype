@@ -93,7 +93,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       final googleUser = await GoogleSignIn.instance.authenticate();
 
-      final idToken = googleUser.authentication.idToken;
+      // Safe null checks
+      if (googleUser.authentication == null) {
+        throw Exception('Autenticazione Google fallita');
+      }
+
+      final idToken = googleUser.authentication?.idToken;
       if (idToken == null) {
         throw Exception('Impossibile ottenere il token Google');
       }
