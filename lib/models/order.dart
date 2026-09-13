@@ -44,6 +44,7 @@ class Order {
   final String? dealerPlatformId;
   final String? dispatchStatus;
   final int dispatchAttempts;
+  final String? deliverySlot;
 
   // Rate per km default (usato quando non c'è RiderPricing)
   static const double defaultRatePerKm = 1.50;
@@ -75,6 +76,7 @@ class Order {
     this.dealerPlatformId,
     this.dispatchStatus,
     this.dispatchAttempts = 0,
+    this.deliverySlot,
   });
 
   /// Calcola guadagno totale (con minimo garantito)
@@ -177,6 +179,7 @@ class Order {
       dealerPlatformId: dealerPlatformId,
       dispatchStatus: dispatchStatus,
       dispatchAttempts: dispatchAttempts,
+      deliverySlot: deliverySlot,
     );
   }
 
@@ -207,6 +210,7 @@ class Order {
       priorityExpiresAt: priorityExpiresAt,
       dealerContactId: dealerContactId,
       dealerPlatformId: dealerPlatformId,
+      deliverySlot: deliverySlot,
     );
   }
 
@@ -237,6 +241,7 @@ class Order {
       priorityExpiresAt: priorityExpiresAt,
       dealerContactId: dealerContactId,
       dealerPlatformId: dealerPlatformId,
+      deliverySlot: deliverySlot,
     );
   }
 
@@ -274,6 +279,7 @@ class Order {
       'dealer_platform_id': dealerPlatformId,
       'dispatch_status': dispatchStatus,
       'dispatch_attempts': dispatchAttempts,
+      'delivery_slot': deliverySlot,
     };
   }
 
@@ -337,6 +343,7 @@ class Order {
       dealerPlatformId: json['dealer_platform_id']?.toString(),
       dispatchStatus: json['dispatch_status'] as String?,
       dispatchAttempts: _int(json['dispatch_attempts']),
+      deliverySlot: json['delivery_slot'] as String?,
     );
   }
 
